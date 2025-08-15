@@ -22,11 +22,9 @@ ${description}
 flat minimalist style - watercolor print aesthetic
 muted colors, no strokes/gradients, just polygons
 top-down view like Pokemon/stardew valley
-should tile seamlessly when repeated
-IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
-Fill the entire 1024x1024 canvas edge to edge with the pattern.
-
-grass tile (flat) - satisfying - watercolor - no building
+Fill the entire 1024x1024 canvas edge to edge
+satisfying
+no building
 `;
     } else {
       imagePrompt = `flat minimalist 2d architectural game map element - watercolor print style

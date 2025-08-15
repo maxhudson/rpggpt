@@ -76,7 +76,7 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
 
     if (existingMaterialEntry) {
       // If erasing or drawing on top of existing material, remove it
-      if (isErasing || selectedMaterialId) {
+      if (isErasing || selectedMaterialId !== existingMaterialEntry[1].objectTypeId) {
         const [existingUuid] = existingMaterialEntry;
         const updatedMapObjects = { ...currentMapObjects };
         delete updatedMapObjects[existingUuid];
@@ -118,7 +118,13 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     const isRightClick = e.evt.button === 2;
     if (!selectedMaterialId && !isRightClick) return;
 
+    // Prevent context menu on right click
+    if (isRightClick) {
+      e.evt.preventDefault();
+    }
+
     setIsDrawing(true);
+    setIsRightClickDrawing(isRightClick);
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
@@ -134,9 +140,7 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
 
   const handleStageMouseMove = (e) => {
     if (!isDrawing || !drawingMode) return;
-
-    const isRightClick = e.evt.button === 2;
-    if (!selectedMaterialId && !isRightClick) return;
+    if (!selectedMaterialId && !isRightClickDrawing) return;
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
@@ -147,21 +151,27 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     const worldX = pointerPosition.x - screenCenterX + playerPosition.x;
     const worldY = pointerPosition.y - screenCenterY + playerPosition.y + (GRID_SIZE / 2);
 
-    addOrRemoveMaterialAtPosition(worldX, worldY, isRightClick);
+    addOrRemoveMaterialAtPosition(worldX, worldY, isRightClickDrawing);
   };
 
   const handleStageMouseUp = () => {
     setIsDrawing(false);
+    setIsRightClickDrawing(false);
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: 'hsl(73, 20%, 78%)' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#fff' }}>
       <Stage
         width={stageSize.width}
         height={stageSize.height}
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onContextMenu={(e) => {
+          if (drawingMode) {
+            e.evt.preventDefault();
+          }
+        }}
       >
         <Layer>
           {/* Render map objects - materials first, then objects */}

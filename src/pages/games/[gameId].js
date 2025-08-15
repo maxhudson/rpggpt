@@ -77,20 +77,18 @@ export default function GamePage({session}) {
     }
   }, [gameId]);
 
-  console.log('game', game);
-
   var updateGame = async (updatedGame, {updateSupabase = true, updateState = true} = {}) => {
+    if (updateState) {
+      setGame(updatedGame);
+      stateRef.current.game = updatedGame;
+    }
+
     if (updateSupabase) {
       const { data, error } = await supabase
         .from('games')
         .update(updatedGame)
         .eq('id', gameId)
         .eq('user_id', session.user.id);
-    }
-
-    if (updateState) {
-      setGame(updatedGame);
-      stateRef.current.game = updatedGame;
     }
   }
 
