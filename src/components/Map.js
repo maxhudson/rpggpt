@@ -1,15 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 const Stage = dynamic(() => import('react-konva').then(mod => ({ default: mod.Stage })), { ssr: false });
 const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Layer })), { ssr: false });
+const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
 
 import MapObject from './MapObject';
+import Player from './Player';
 
 export default function Map({ game, objectTypes, isEditing, updateGame, debouncedUpdateGame, drawingMode, selectedMaterialId, stateRef }) {
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [isRightClickDrawing, setIsRightClickDrawing] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
+  const keysPressed = useRef({});
 
   useEffect(() => {
     const updateSize = () => {
@@ -29,7 +35,47 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  const { playerPosition = { x: 0, y: 0 }, mapObjects = {} } = game.data;
+  useEffect(() => {
+    const moveSpeed = 1;
+
+    const handleKeyDown = (e) => {
+      keysPressed.current[e.key.toLowerCase()] = true;
+    };
+
+    const handleKeyUp = (e) => {
+      keysPressed.current[e.key.toLowerCase()] = false;
+    };
+
+    const updatePlayerPosition = () => {
+      let deltaX = 0;
+      let deltaY = 0;
+
+      if (keysPressed.current['w']) deltaY -= moveSpeed;
+      if (keysPressed.current['s']) deltaY += moveSpeed;
+      if (keysPressed.current['a']) deltaX -= moveSpeed;
+      if (keysPressed.current['d']) deltaX += moveSpeed;
+
+      if (deltaX !== 0 || deltaY !== 0) {
+        setPlayerPosition(prev => ({
+          x: prev.x + deltaX,
+          y: prev.y + deltaY
+        }));
+      }
+    };
+
+    const intervalId = setInterval(updatePlayerPosition, 16); // ~60fps
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const { mapObjects = {} } = game.data;
 
   const handleUpdatePosition = async (uuid, newPosition) => {
     if (!updateGame) return;
@@ -159,14 +205,49 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     setIsRightClickDrawing(false);
   };
 
+  const handleWheel = (e) => {
+    e.evt.preventDefault();
+
+    const stage = e.target.getStage();
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    // Determine zoom direction and amount
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const zoomFactor = 1.1;
+    let newScale = direction > 0 ? oldScale * zoomFactor : oldScale / zoomFactor;
+
+    // Clamp zoom between 0.5x and 2x
+    newScale = Math.max(0.5, Math.min(2, newScale));
+
+    setZoom(newScale);
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+
+    setOffset(newPos);
+  };
+
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#fff' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#cdceac' }}>
       <Stage
         width={stageSize.width}
         height={stageSize.height}
+        scaleX={zoom}
+        scaleY={zoom}
+        x={offset.x}
+        y={offset.y}
         onMouseDown={handleStageMouseDown}
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onWheel={handleWheel}
         onContextMenu={(e) => {
           if (drawingMode) {
             e.evt.preventDefault();
@@ -174,6 +255,17 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
         }}
       >
         <Layer>
+          {/* Render Player Shadow - below all other elements */}
+          <Ellipse
+            x={stageSize.width / 2}
+            y={stageSize.height / 2 + 1}
+            radiusX={6}
+            radiusY={3}
+            fill="rgba(0, 0, 0, 0.3)"
+            opacity={0.6}
+            listening={false}
+          />
+
           {/* Render map objects - materials first, then objects */}
           {Object.entries(mapObjects)
             .sort(([, mapObjectA], [, mapObjectB]) => {
@@ -192,7 +284,7 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
               const objectType = objectTypes[mapObject.objectTypeId];
               if (!objectType) return null;
 
-              return (
+              return objectType.type === 'material' ? null : (
                 <MapObject
                   key={uuid}
                   uuid={uuid}
@@ -205,6 +297,14 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
                 />
               );
             })}
+
+          {/* Render Player */}
+          <Player
+            centerX={stageSize.width / 2}
+            centerY={stageSize.height / 2}
+            playerPosition={playerPosition}
+            fill="#ff0000"
+          />
         </Layer>
       </Stage>
     </div>
