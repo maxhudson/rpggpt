@@ -5,11 +5,13 @@ import useImage from 'use-image';
 const Image = dynamic(() => import('react-konva').then(mod => ({ default: mod.Image })), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
 const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Group })), { ssr: false });
+const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
 
 export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, isEditing, onUpdatePosition }) {
-  const [image] = useImage(objectType.imageData);
+  const [image] = useImage(objectType?.imageData);
   const [isSelected, setIsSelected] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const groupRef = useRef();
   const transformerRef = useRef();
 
@@ -40,7 +42,51 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     }
   }, [isSelected]);
 
-  if (!objectType || !mapObject) return null;
+  if (!mapObject) return null;
+
+  // Handle missing objectType - render as black rectangle
+  if (!objectType) {
+    const screenCenterX = stageSize.width / 2;
+    const screenCenterY = stageSize.height / 2;
+    const relativeX = mapObject.x - playerPosition.x;
+    const relativeY = mapObject.y - playerPosition.y;
+    const screenX = screenCenterX + relativeX;
+    const screenY = screenCenterY + relativeY;
+
+    return (
+      <Group
+        x={screenX}
+        y={screenY}
+        draggable={isEditing}
+        onDragEnd={(e) => {
+          if (!isEditing || !onUpdatePosition) return;
+          const node = e.target;
+          const newX = snapToGrid(node.x() - screenCenterX + playerPosition.x);
+          const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
+          onUpdatePosition(uuid, { x: newX, y: newY });
+        }}
+        dragBoundFunc={(pos) => {
+          if (!isEditing) return pos;
+          const worldX = pos.x - screenCenterX + playerPosition.x;
+          const worldY = pos.y - screenCenterY + playerPosition.y;
+          const snappedWorldX = snapToGrid(worldX);
+          const snappedWorldY = snapToGrid(worldY);
+          return {
+            x: screenCenterX + (snappedWorldX - playerPosition.x),
+            y: screenCenterY + (snappedWorldY - playerPosition.y)
+          };
+        }}
+      >
+        <Rect
+          x={-10}
+          y={-10}
+          width={20}
+          height={20}
+          fill="black"
+        />
+      </Group>
+    );
+  }
 
   const {
     originalWidth,
@@ -71,7 +117,13 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
   const shadowWidth = displayWidth * shadowRadius * 2;
   const shadowHeight = shadowWidth * 0.5; // Make shadow elliptical
 
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+  };
+
   const handleDragEnd = (e) => {
+    setIsDragging(false);
+
     if (!isEditing || !onUpdatePosition) return;
 
     const node = e.target;
@@ -98,6 +150,7 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
         x={screenX}
         y={screenY}
         draggable={isEditing}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleClick}
         onTap={handleClick}
@@ -126,7 +179,7 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
             y={displayHeight * 0.4} // Position shadow below object
             radiusX={shadowWidth / 2}
             radiusY={shadowHeight / 2}
-            fill="rgba(0, 0, 0, 0.3)"
+            fill={isSelected || isDragging ? "rgba(0, 0, 0, 0.6)" : "rgba(0, 0, 0, 0.1)"}
             opacity={0.6}
           />
         )}

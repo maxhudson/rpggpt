@@ -8,10 +8,8 @@ const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.
 import MapObject from './MapObject';
 import Player from './Player';
 
-export default function Map({ game, objectTypes, isEditing, updateGame, debouncedUpdateGame, drawingMode, selectedMaterialId, stateRef }) {
+export default function Map({ game, objectTypes, isEditing, updateGame, stateRef }) {
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [isRightClickDrawing, setIsRightClickDrawing] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
@@ -35,6 +33,72 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  // Check for collisions with objects - allows walking away from inside boundary
+  const checkCollision = (newX, newY, currentPlayerPos) => {
+    const currentState = stateRef.current;
+    if (!currentState?.game?.data?.mapObjects || !currentState?.objectTypes) {
+      console.log('No collision data available');
+      return false;
+    }
+
+    const playerRadius = 10; // Player collision radius
+    const currentMapObjects = Object.values(currentState.game.data.mapObjects);
+    const currentObjectTypes = currentState.objectTypes;
+
+    console.log('Checking collision:', {
+      newX, newY,
+      currentPlayerPos,
+      mapObjectsCount: currentMapObjects.length,
+      objectTypesCount: Object.keys(currentObjectTypes).length
+    });
+
+    const hasCollision = currentMapObjects.some(obj => {
+      const objType = currentObjectTypes[obj.objectTypeId];
+      if (!objType || objType.type === 'material') return false; // No collision with materials
+
+      const collisionRadius = objType.collisionRadius || 0.25;
+      const objDisplayWidth = objType.type === 'material' ? 20 : (objType.originalWidth || 100) * (objType.scale || 1);
+      const boundaryDistance = playerRadius + (objDisplayWidth * collisionRadius);
+
+      const currentDistance = Math.sqrt(
+        Math.pow(obj.x - currentPlayerPos.x, 2) +
+        Math.pow(obj.y - currentPlayerPos.y, 2)
+      );
+
+      const newDistance = Math.sqrt(
+        Math.pow(obj.x - newX, 2) +
+        Math.pow(obj.y - newY, 2)
+      );
+
+      console.log('Object collision check:', {
+        objId: obj.objectTypeId,
+        objPos: { x: obj.x, y: obj.y },
+        objType: objType.title,
+        collisionRadius,
+        objDisplayWidth,
+        boundaryDistance,
+        currentDistance,
+        newDistance,
+        wouldCollide: newDistance < boundaryDistance
+      });
+
+      // If currently inside boundary, allow movement that increases distance (walking away)
+      if (currentDistance < boundaryDistance) {
+        const blocked = newDistance < currentDistance;
+        console.log('Inside boundary - blocked:', blocked);
+        return blocked; // Block only if getting closer
+      }
+
+      // If currently outside boundary, prevent entering
+      const blocked = newDistance < boundaryDistance;
+      console.log('Outside boundary - blocked:', blocked);
+      return blocked;
+    });
+
+    console.log('Final collision result:', hasCollision);
+    return hasCollision;
+  };
+
   useEffect(() => {
     const moveSpeed = 1;
 
@@ -56,10 +120,26 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
       if (keysPressed.current['d']) deltaX += moveSpeed;
 
       if (deltaX !== 0 || deltaY !== 0) {
-        setPlayerPosition(prev => ({
-          x: prev.x + deltaX,
-          y: prev.y + deltaY
-        }));
+        setPlayerPosition(prev => {
+          const newX = prev.x + deltaX;
+          const newY = prev.y + deltaY;
+
+          // Check collision for each axis separately to allow sliding along walls
+          let finalX = prev.x;
+          let finalY = prev.y;
+
+          // Check X movement
+          if (deltaX !== 0 && !checkCollision(newX, prev.y, prev)) {
+            finalX = newX;
+          }
+
+          // Check Y movement
+          if (deltaY !== 0 && !checkCollision(finalX, newY, prev)) {
+            finalY = newY;
+          }
+
+          return { x: finalX, y: finalY };
+        });
       }
     };
 
@@ -101,109 +181,6 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
   };
 
-  const addOrRemoveMaterialAtPosition = (worldX, worldY, isErasing = false) => {
-    if (!drawingMode || (!selectedMaterialId && !isErasing) || !debouncedUpdateGame) return;
-
-    const snappedX = snapToGrid(worldX);
-    const snappedY = snapToGrid(worldY);
-
-    // Use stateRef to get current data to avoid race conditions
-    const currentGame = stateRef.current.game;
-    const currentObjectTypes = stateRef.current.objectTypes;
-    const currentMapObjects = currentGame.data.mapObjects || {};
-
-    // Find existing material at this position
-    const existingMaterialEntry = Object.entries(currentMapObjects).find(([uuid, obj]) => {
-      const objType = currentObjectTypes[obj.objectTypeId];
-      return objType && objType.type === 'material' &&
-             snapToGrid(obj.x) === snappedX &&
-             snapToGrid(obj.y) === snappedY;
-    });
-
-    if (existingMaterialEntry) {
-      // If erasing or drawing on top of existing material, remove it
-      if (isErasing || selectedMaterialId !== existingMaterialEntry[1].objectTypeId) {
-        const [existingUuid] = existingMaterialEntry;
-        const updatedMapObjects = { ...currentMapObjects };
-        delete updatedMapObjects[existingUuid];
-
-        const updatedGameData = {
-          ...currentGame.data,
-          mapObjects: updatedMapObjects
-        };
-
-        debouncedUpdateGame({ data: updatedGameData });
-      }
-      return;
-    }
-
-    // If not erasing and no existing material, place new material
-    if (!isErasing && selectedMaterialId) {
-      const mapObjectId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      const newMapObject = {
-        x: snappedX,
-        y: snappedY,
-        objectTypeId: selectedMaterialId
-      };
-
-      const updatedGameData = {
-        ...currentGame.data,
-        mapObjects: {
-          ...currentMapObjects,
-          [mapObjectId]: newMapObject
-        }
-      };
-
-      debouncedUpdateGame({ data: updatedGameData });
-    }
-  };
-
-  const handleStageMouseDown = (e) => {
-    if (!drawingMode) return;
-
-    const isRightClick = e.evt.button === 2;
-    if (!selectedMaterialId && !isRightClick) return;
-
-    // Prevent context menu on right click
-    if (isRightClick) {
-      e.evt.preventDefault();
-    }
-
-    setIsDrawing(true);
-    setIsRightClickDrawing(isRightClick);
-
-    const stage = e.target.getStage();
-    const pointerPosition = stage.getPointerPosition();
-
-    // Convert screen coordinates to world coordinates with offset
-    const screenCenterX = stageSize.width / 2;
-    const screenCenterY = stageSize.height / 2;
-    const worldX = pointerPosition.x - screenCenterX + playerPosition.x;
-    const worldY = pointerPosition.y - screenCenterY + playerPosition.y + (GRID_SIZE / 2);
-
-    addOrRemoveMaterialAtPosition(worldX, worldY, isRightClick);
-  };
-
-  const handleStageMouseMove = (e) => {
-    if (!isDrawing || !drawingMode) return;
-    if (!selectedMaterialId && !isRightClickDrawing) return;
-
-    const stage = e.target.getStage();
-    const pointerPosition = stage.getPointerPosition();
-
-    // Convert screen coordinates to world coordinates with offset
-    const screenCenterX = stageSize.width / 2;
-    const screenCenterY = stageSize.height / 2;
-    const worldX = pointerPosition.x - screenCenterX + playerPosition.x;
-    const worldY = pointerPosition.y - screenCenterY + playerPosition.y + (GRID_SIZE / 2);
-
-    addOrRemoveMaterialAtPosition(worldX, worldY, isRightClickDrawing);
-  };
-
-  const handleStageMouseUp = () => {
-    setIsDrawing(false);
-    setIsRightClickDrawing(false);
-  };
 
   const handleWheel = (e) => {
     e.evt.preventDefault();
@@ -244,15 +221,7 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
         scaleY={zoom}
         x={offset.x}
         y={offset.y}
-        onMouseDown={handleStageMouseDown}
-        onMouseMove={handleStageMouseMove}
-        onMouseUp={handleStageMouseUp}
         onWheel={handleWheel}
-        onContextMenu={(e) => {
-          if (drawingMode) {
-            e.evt.preventDefault();
-          }
-        }}
       >
         <Layer>
           {/* Render Player Shadow - below all other elements */}
@@ -266,45 +235,55 @@ export default function Map({ game, objectTypes, isEditing, updateGame, debounce
             listening={false}
           />
 
-          {/* Render map objects - materials first, then objects */}
-          {Object.entries(mapObjects)
-            .sort(([, mapObjectA], [, mapObjectB]) => {
-              const objectTypeA = objectTypes[mapObjectA.objectTypeId];
-              const objectTypeB = objectTypes[mapObjectB.objectTypeId];
-
-              const isMaterialA = (objectTypeA?.type || 'object') === 'material';
-              const isMaterialB = (objectTypeB?.type || 'object') === 'material';
-
-              // Materials first (return -1), then objects (return 1)
-              if (isMaterialA && !isMaterialB) return -1;
-              if (!isMaterialA && isMaterialB) return 1;
-              return 0;
-            })
-            .map(([uuid, mapObject]) => {
-              const objectType = objectTypes[mapObject.objectTypeId];
-              if (!objectType) return null;
-
-              return objectType.type === 'material' ? null : (
-                <MapObject
-                  key={uuid}
-                  uuid={uuid}
-                  mapObject={mapObject}
-                  objectType={objectType}
-                  playerPosition={playerPosition}
-                  stageSize={stageSize}
-                  isEditing={isEditing}
-                  onUpdatePosition={handleUpdatePosition}
-                />
-              );
+          {/* Render objects and player sorted by Y position for depth */}
+          {[
+            // Add player to the rendering list with current Y position
+            {
+              id: 'player',
+              y: playerPosition.y,
+              isPlayer: true
+            },
+            // Add all map objects (excluding materials)
+            ...Object.entries(mapObjects)
+              .filter(([uuid, mapObject]) => {
+                const objectType = objectTypes[mapObject.objectTypeId];
+                return objectType && objectType.type !== 'material';
+              })
+              .map(([uuid, mapObject]) => ({
+                id: uuid,
+                y: mapObject.y,
+                isPlayer: false,
+                mapObject,
+                objectType: objectTypes[mapObject.objectTypeId]
+              }))
+          ]
+            .sort((a, b) => a.y - b.y) // Sort by Y position (lower Y renders first/behind)
+            .map(item => {
+              if (item.isPlayer) {
+                return (
+                  <Player
+                    key="player"
+                    centerX={stageSize.width / 2}
+                    centerY={stageSize.height / 2}
+                    playerPosition={playerPosition}
+                    fill="#ff0000"
+                  />
+                );
+              } else {
+                return (
+                  <MapObject
+                    key={item.id}
+                    uuid={item.id}
+                    mapObject={item.mapObject}
+                    objectType={item.objectType}
+                    playerPosition={playerPosition}
+                    stageSize={stageSize}
+                    isEditing={isEditing}
+                    onUpdatePosition={handleUpdatePosition}
+                  />
+                );
+              }
             })}
-
-          {/* Render Player */}
-          <Player
-            centerX={stageSize.width / 2}
-            centerY={stageSize.height / 2}
-            playerPosition={playerPosition}
-            fill="#ff0000"
-          />
         </Layer>
       </Stage>
     </div>

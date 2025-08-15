@@ -25,3 +25,7 @@ games.data
 - color picker when specifying sprite
 
 should players be its own table to avoid overwriting? same time as mapObjects?
+
+- change scale, offset etc unit to be in grid units (i.e. width in grid units)
+store image in bucket rather than in db
+- hide/toggle hud on mobile

@@ -6,7 +6,7 @@ const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.La
 
 import MapObject from './MapObject';
 
-export default function ObjectTypeEditor({ isOpen, onClose, objectType, updateObjectType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage }) {
+export default function ObjectTypeEditor({ isOpen, onClose, objectType, updateObjectType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [jsonData, setJsonData] = useState('');
@@ -51,27 +51,37 @@ export default function ObjectTypeEditor({ isOpen, onClose, objectType, updateOb
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000 }}>
       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '500px' }}>
-        <h2>Create New {(objectType.type || 'object') === 'material' ? 'Material' : 'Object'}</h2>
+        <h2>Create New {objectType.type === 'stat' ? 'Stat' : objectType.type === 'item' ? 'Item' : 'Object'}</h2>
         <button onClick={handleClose} style={{ position: 'absolute', top: '10px', right: '10px' }}>×</button>
 
         <div>
-          <label>Describe the {(objectType.type || 'object') === 'material' ? 'material' : 'sprite'}:</label>
+          <label>Describe the {objectType.type === 'stat' ? 'stat icon' : objectType.type === 'item' ? 'item' : 'sprite'}:</label>
           <textarea
             defaultValue={objectType.description || ''}
             onBlur={(e) => updateObjectType({ ...objectType, description: e.target.value })}
-            placeholder={(objectType.type || 'object') === 'material' ?
-              "e.g., grass texture, stone floor, wooden planks" :
-              "e.g., a wooden treasure chest"}
+            placeholder={
+              objectType.type === 'stat' ?
+                "e.g., health bar icon, energy meter, strength symbol" :
+              objectType.type === 'item' ?
+                "e.g., wooden log, dollar bill, cup of water" :
+                "e.g., a wooden treasure chest"
+            }
             style={{ width: '100%', height: '80px' }}
           />
         </div>
         <div>
-          <label>{(objectType.type || 'object') === 'material' ? 'Material' : 'Object'} Name:</label>
+          <label>{objectType.type === 'stat' ? 'Stat' : objectType.type === 'item' ? 'Item' : 'Object'} Name:</label>
           <input
             type="text"
             defaultValue={objectType.title}
             onBlur={(e) => updateObjectType({ ...objectType, title: e.target.value })}
-            placeholder="Enter a name"
+            placeholder={
+              objectType.type === 'stat' ?
+                "e.g., Health, Energy, Thirst, Strength" :
+              objectType.type === 'item' ?
+                "e.g., Log, Dollar, Cup of Water" :
+                "Enter a name"
+            }
             style={{ width: '100%' }}
           />
         </div>
@@ -275,8 +285,20 @@ export default function ObjectTypeEditor({ isOpen, onClose, objectType, updateOb
           </div>
         )}
 
-        <button onClick={handleClose}>Cancel</button>
-        <button onClick={onClose} disabled={!objectType.title.trim()}>Save Object</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+          <div>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this object type? This action cannot be undone.')) {
+                  onDelete && onDelete(objectType.id);
+                }
+              }}
+              style={{ backgroundColor: '#dc3545', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '4px', marginRight: '10px' }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

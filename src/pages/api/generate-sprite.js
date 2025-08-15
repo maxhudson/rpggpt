@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     const { description, type = 'object' } = req.body;
 
-    // Different prompts for objects vs materials
+    // Different prompts for different object types
     let imagePrompt;
 
     if (type === 'material') {
@@ -25,6 +25,34 @@ top-down view like Pokemon/stardew valley
 Fill the entire 1024x1024 canvas edge to edge
 satisfying
 no building
+`;
+    } else if (type === 'stat') {
+      imagePrompt = `flat minimalist 2d game UI icon for player statistics - watercolor print style
+${description}
+clean simple icon design
+muted colors
+no strokes/gradients/textures
+just polygons
+clear readable symbol/meter/bar design
+professional game UI aesthetic
+IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
+Center the icon taking up most of the canvas space. 1024x1024 image.
+Simple recognizable symbol for game HUD display
+`;
+    } else if (type === 'item') {
+      imagePrompt = `flat minimalist 2d game inventory item - watercolor print style
+${description}
+collectible item design
+muted colors
+no strokes/gradients/textures
+just polygons
+top-down perspective like Pokemon/stardew valley items
+clear recognizable object
+afternoon sunlight coming from the top-left of the image
+mature elegant positive professional
+IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
+Center the item taking up most of the canvas space. 1024x1024 image.
+No platform/ground object sitting on (we'll be placing it on a texture of our own)
 `;
     } else {
       imagePrompt = `flat minimalist 2d architectural game map element - watercolor print style
