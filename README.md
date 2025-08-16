@@ -26,6 +26,12 @@ games.data
 
 should players be its own table to avoid overwriting? same time as mapObjects?
 
-- change scale, offset etc unit to be in grid units (i.e. width in grid units)
-store image in bucket rather than in db
 - hide/toggle hud on mobile
+
+
+rename objectType to elementType
+add game.objectTypeIds rather than objectType having a gameId
+store image in bucket rather than in db
+- change scale, offset etc unit to be in grid units (i.e. width in grid units)
+
+don't let zoom impact offset - offset should no longer be necessary thanks to playerPosition

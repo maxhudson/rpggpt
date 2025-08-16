@@ -3,10 +3,12 @@ import { supabase } from '@/lib/supabase';
 import ObjectTypeEditor from './ObjectTypeEditor';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, objectTypes, setObjectTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId }) {
+export default function HUD({ isEditing, setIsEditing, game, updateGame, objectTypes, setObjectTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd }) {
   const [showObjectEditor, setShowObjectEditor] = useState(false);
   const [currentObjectType, setCurrentObjectType] = useState(null);
   const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by objectType id
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragObjectTypeId, setDragObjectTypeId] = useState(null);
 
   const handleCreateNewObjectType = async (type = 'object') => {
     if (!game) return;
@@ -245,6 +247,77 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
     return quantities;
   };
 
+  const handleObjectTypeMouseDown = (e, objectTypeId) => {
+    e.preventDefault(); // Prevent default drag behavior
+    const startX = e.pageX;
+    const startY = e.pageY;
+    let hasDragged = false;
+    let createdObjectId = null;
+
+    const handleMouseMove = async (moveEvent) => {
+      const deltaX = moveEvent.pageX - startX;
+      const deltaY = moveEvent.pageY - startY;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+      if (distance > 10 && !hasDragged) {
+        hasDragged = true;
+
+        // Create the object first at the current mouse position
+        const mapObjectId = Date.now().toString();
+        createdObjectId = mapObjectId;
+
+        // Create object at mouse position (will be converted to world coordinates by drag handlers)
+        const newMapObject = {
+          x: 0, // Will be set by drag handlers
+          y: 0, // Will be set by drag handlers
+          objectTypeId: objectTypeId
+        };
+
+        const gameData = game.data;
+        const updatedGameData = {
+          ...gameData,
+          mapObjects: {
+            ...gameData.mapObjects,
+            [mapObjectId]: newMapObject
+          }
+        };
+
+        // Update game state immediately so the object appears
+        updateGame({ ...game, data: updatedGameData }, { updateSupabase: false, updateState: true });
+
+        // Then start dragging the newly created object using shared drag handlers
+        if (onDragStart) {
+          onDragStart(mapObjectId, { x: moveEvent.pageX, y: moveEvent.pageY }, true); // true = isHUDDrag
+        }
+
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      } else if (hasDragged && createdObjectId && onDragMove) {
+        // Continue dragging the created object
+        onDragMove(createdObjectId, { x: moveEvent.pageX, y: moveEvent.pageY });
+      }
+    };
+
+    const handleMouseUp = (upEvent) => {
+      if (!hasDragged) {
+        // This was a click, open the editor
+        handleEditObjectType(objectTypeId);
+      } else if (createdObjectId && onDragEnd) {
+        // End dragging the created object
+        onDragEnd(createdObjectId, { x: upEvent.pageX, y: upEvent.pageY });
+      }
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleCreateButtonClick = (type) => {
+    handleCreateNewObjectType(type);
+  };
+
   return (
     <>
       {/* Edit button - top right */}
@@ -273,6 +346,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
               return itemsWithQuantity.map(({ objectTypeId, objectType, quantity }) => objectType.type === 'material' ? null : (
                 <div
                   key={objectTypeId}
+                  onMouseDown={(e) => handleObjectTypeMouseDown(e, objectTypeId)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -284,16 +358,19 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
                     width: 40,
                     height: 40,
                     justifyContent: 'center',
+                    cursor: 'pointer',
                   }}
                 >
                   {objectType.imageData ? (
                     <img
                       src={objectType.imageData}
                       alt={objectType.title || 'Item'}
+                      draggable={false}
                       style={{
                         width: '24px',
                         height: '24px',
-                        objectFit: 'contain'
+                        objectFit: 'contain',
+                        pointerEvents: 'none'
                       }}
                     />
                   ) : <span style={{opacity: 0.5}}>?</span>}
@@ -314,6 +391,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
               ));
             })()}
             <div
+                onClick={() => handleCreateButtonClick(type)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -326,94 +404,13 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
                   height: 40,
                   justifyContent: 'center',
                   opacity: 0.5,
+                  cursor: 'pointer',
                 }}
               >+</div>
           </div>
         ))}
       </div>
 
-      {/* Object types and materials - bottom left (only when editing) */}
-      {isEditing && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 100 }}>
-          {/* Objects Section */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ margin: '0 0 10px 0', color: 'white' }}>Objects</h4>
-            {objectTypes && Object.entries(objectTypes)
-              .filter(([_, objectType]) => (objectType.type || 'object') === 'object')
-              .map(([objectTypeId, objectType]) => (
-                <div key={objectTypeId} style={{ marginBottom: '5px', backgroundColor: 'white', padding: '5px', borderRadius: '3px' }}>
-                  <span
-                    onClick={() => handleAddObjectToMap(objectTypeId)}
-                    style={{ cursor: 'pointer', marginRight: '10px' }}
-                  >
-                    {objectType.title || 'Untitled Object'}
-                  </span>
-                  <button
-                    onClick={() => handleEditObjectType(objectTypeId)}
-                    style={{ fontSize: '12px' }}
-                  >
-                    ✏️
-                  </button>
-                </div>
-              ))}
-            <button onClick={handleCreateNewObjectType} style={{ marginTop: '5px' }}>
-              + Object
-            </button>
-          </div>
-
-          {/* Stats Section */}
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ margin: '0 0 10px 0', color: 'white' }}>Stats</h4>
-            {objectTypes && Object.entries(objectTypes)
-              .filter(([_, objectType]) => objectType.type === 'stat')
-              .map(([objectTypeId, objectType]) => (
-                <div key={objectTypeId} style={{ marginBottom: '5px', backgroundColor: 'white', padding: '5px', borderRadius: '3px' }}>
-                  <span
-                    onClick={() => handleAddObjectToMap(objectTypeId)}
-                    style={{ cursor: 'pointer', marginRight: '10px' }}
-                  >
-                    {objectType.title || 'Untitled Stat'}
-                  </span>
-                  <button
-                    onClick={() => handleEditObjectType(objectTypeId)}
-                    style={{ fontSize: '12px' }}
-                  >
-                    ✏️
-                  </button>
-                </div>
-              ))}
-            <button onClick={() => handleCreateNewObjectType('stat')} style={{ marginTop: '5px' }}>
-              + Stat
-            </button>
-          </div>
-
-          {/* Items Section */}
-          <div>
-            <h4 style={{ margin: '0 0 10px 0', color: 'white' }}>Items</h4>
-            {objectTypes && Object.entries(objectTypes)
-              .filter(([_, objectType]) => objectType.type === 'item')
-              .map(([objectTypeId, objectType]) => (
-                <div key={objectTypeId} style={{ marginBottom: '5px', backgroundColor: 'white', padding: '5px', borderRadius: '3px' }}>
-                  <span
-                    onClick={() => handleAddObjectToMap(objectTypeId)}
-                    style={{ cursor: 'pointer', marginRight: '10px' }}
-                  >
-                    {objectType.title || 'Untitled Item'}
-                  </span>
-                  <button
-                    onClick={() => handleEditObjectType(objectTypeId)}
-                    style={{ fontSize: '12px' }}
-                  >
-                    ✏️
-                  </button>
-                </div>
-              ))}
-            <button onClick={() => handleCreateNewObjectType('item')} style={{ marginTop: '5px' }}>
-              + Item
-            </button>
-          </div>
-        </div>
-      )}
 
       {currentObjectType && (
         <ObjectTypeEditor

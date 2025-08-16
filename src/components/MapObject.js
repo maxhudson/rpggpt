@@ -8,7 +8,7 @@ const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Gr
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
 
-export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, isEditing, onUpdatePosition }) {
+export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, isEditing, onUpdatePosition, onDragStart, onDragMove, onDragEnd }) {
   const [image] = useImage(objectType?.imageData);
   const [isSelected, setIsSelected] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -18,7 +18,7 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
   // Grid snap size
   const GRID_SIZE = 20;
 
-  // Snap to grid function
+  // Snap to grid function - snaps to world grid, not relative to player
   const snapToGrid = (value) => {
     return Math.round(value / GRID_SIZE) * GRID_SIZE;
   };
@@ -119,19 +119,32 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
 
   const handleDragStart = (e) => {
     setIsDragging(true);
+
+    // Use shared drag handlers if available, otherwise fall back to local handling
+    if (onDragStart) {
+      const node = e.target;
+      const worldX = node.x() - screenCenterX + playerPosition.x;
+      const worldY = node.y() - screenCenterY + playerPosition.y;
+      onDragStart(uuid, { x: worldX, y: worldY });
+    }
   };
 
   const handleDragEnd = (e) => {
     setIsDragging(false);
 
-    if (!isEditing || !onUpdatePosition) return;
+    if (!isEditing) return;
 
     const node = e.target;
     const newX = snapToGrid(node.x() - screenCenterX + playerPosition.x);
     const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
 
-    // Update position in world coordinates
-    onUpdatePosition(uuid, { x: newX, y: newY });
+    // Use shared drag handlers if available, otherwise fall back to local handling
+    if (onDragEnd) {
+      onDragEnd(uuid, { x: newX, y: newY });
+    } else if (onUpdatePosition) {
+      // Fallback to old system
+      onUpdatePosition(uuid, { x: newX, y: newY });
+    }
   };
 
   const handleClick = (e) => {

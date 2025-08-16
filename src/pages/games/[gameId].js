@@ -25,6 +25,12 @@ export default function GamePage({session}) {
   var [drawingMode, setDrawingMode] = useState(false);
   var [selectedMaterialId, setSelectedMaterialId] = useState(null);
 
+  // Map state moved up from Map component
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
+
   // Create refs for state to avoid race conditions
   const stateRef = useRef({
     game: null,
@@ -116,6 +122,100 @@ export default function GamePage({session}) {
     stateRef.current.objectTypes = newObjectTypes;
   }
 
+  // Shared drag state
+  const [dragState, setDragState] = useState({
+    isDragging: false,
+    dragObjectId: null,
+    startPos: null,
+    isHUDDrag: false // Track if this is a HUD drag-to-create
+  });
+
+  // Grid snap size
+  const GRID_SIZE = 20;
+  const snapToGrid = (value) => {
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+  };
+
+  // Convert page coordinates to world coordinates (only for HUD drag-to-create)
+  const pageToWorldCoordinates = (pageX, pageY) => {
+    // Convert page coordinates to world coordinates accounting for zoom
+    const screenCenterX = stageSize.width / 2;
+    const screenCenterY = stageSize.height / 2;
+
+    // Calculate relative position from screen center, accounting for zoom
+    const relativeX = (pageX - screenCenterX) / zoom;
+    const relativeY = (pageY - screenCenterY) / zoom;
+
+    const worldX = playerPosition.x + relativeX;
+    const worldY = playerPosition.y + relativeY;
+
+    // Snap to grid for consistent positioning
+    return {
+      x: snapToGrid(worldX),
+      y: snapToGrid(worldY)
+    };
+  };
+
+  const handleDragStart = (objectId, startPos, isHUDDrag = false) => {
+    setDragState({
+      isDragging: true,
+      dragObjectId: objectId,
+      startPos: startPos,
+      isHUDDrag: isHUDDrag
+    });
+  };
+
+  const handleDragMove = (objectId, newPos) => {
+    if (dragState.isDragging && dragState.dragObjectId === objectId) {
+      // Only convert coordinates for HUD drag-to-create, MapObject handles its own coordinates
+      const worldPos = dragState.isHUDDrag ? pageToWorldCoordinates(newPos.x, newPos.y) : newPos;
+
+      // Update the object position immediately for responsive UI
+      const gameData = game.data;
+      const updatedGameData = {
+        ...gameData,
+        mapObjects: {
+          ...gameData.mapObjects,
+          [objectId]: {
+            ...gameData.mapObjects[objectId],
+            x: worldPos.x,
+            y: worldPos.y
+          }
+        }
+      };
+      updateGame({ ...game, data: updatedGameData }, { updateSupabase: false, updateState: true });
+    }
+  };
+
+  const handleDragEnd = (objectId, finalPos) => {
+    if (dragState.isDragging && dragState.dragObjectId === objectId) {
+      // Only convert coordinates for HUD drag-to-create, MapObject handles its own coordinates
+      const worldPos = dragState.isHUDDrag ? pageToWorldCoordinates(finalPos.x, finalPos.y) : finalPos;
+
+      // Final update to database
+      const gameData = game.data;
+      const updatedGameData = {
+        ...gameData,
+        mapObjects: {
+          ...gameData.mapObjects,
+          [objectId]: {
+            ...gameData.mapObjects[objectId],
+            x: worldPos.x,
+            y: worldPos.y
+          }
+        }
+      };
+      updateGame({ ...game, data: updatedGameData }, { updateSupabase: true, updateState: true });
+
+      setDragState({
+        isDragging: false,
+        dragObjectId: null,
+        startPos: null,
+        isHUDDrag: false
+      });
+    }
+  };
+
   return game && (
     <>
       <Head>
@@ -139,6 +239,10 @@ export default function GamePage({session}) {
           setDrawingMode={setDrawingMode}
           selectedMaterialId={selectedMaterialId}
           setSelectedMaterialId={setSelectedMaterialId}
+          stateRef={stateRef}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
         />
         <Map
           game={game}
@@ -149,6 +253,17 @@ export default function GamePage({session}) {
           drawingMode={drawingMode}
           selectedMaterialId={selectedMaterialId}
           stateRef={stateRef}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          stageSize={stageSize}
+          setStageSize={setStageSize}
+          zoom={zoom}
+          setZoom={setZoom}
+          offset={offset}
+          setOffset={setOffset}
+          playerPosition={playerPosition}
+          setPlayerPosition={setPlayerPosition}
         />
       </div>
     </>

@@ -8,11 +8,25 @@ const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.
 import MapObject from './MapObject';
 import Player from './Player';
 
-export default function Map({ game, objectTypes, isEditing, updateGame, stateRef }) {
-  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
+export default function Map({
+  game,
+  objectTypes,
+  isEditing,
+  updateGame,
+  stateRef,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  stageSize,
+  setStageSize,
+  zoom,
+  setZoom,
+  offset,
+  setOffset,
+  playerPosition,
+  setPlayerPosition
+}) {
+  const [dragCreateObject, setDragCreateObject] = useState(null);
   const keysPressed = useRef({});
 
   useEffect(() => {
@@ -176,12 +190,6 @@ export default function Map({ game, objectTypes, isEditing, updateGame, stateRef
     await updateGame({ data: updatedGameData });
   };
 
-  const GRID_SIZE = 20;
-  const snapToGrid = (value) => {
-    return Math.round(value / GRID_SIZE) * GRID_SIZE;
-  };
-
-
   const handleWheel = (e) => {
     e.evt.preventDefault();
 
@@ -189,13 +197,8 @@ export default function Map({ game, objectTypes, isEditing, updateGame, stateRef
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
 
-    const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
-    };
-
     // Determine zoom direction and amount
-    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const direction = e.evt.deltaY < 0 ? -1 : 1;
     const zoomFactor = 1.1;
     let newScale = direction > 0 ? oldScale * zoomFactor : oldScale / zoomFactor;
 
@@ -204,9 +207,10 @@ export default function Map({ game, objectTypes, isEditing, updateGame, stateRef
 
     setZoom(newScale);
 
+    // Update offset to keep zoom centered
     const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
+      x: -stageSize.width * (newScale - 1) / 2,
+      y: -stageSize.height * (newScale - 1) / 2,
     };
 
     setOffset(newPos);
@@ -280,6 +284,9 @@ export default function Map({ game, objectTypes, isEditing, updateGame, stateRef
                     stageSize={stageSize}
                     isEditing={isEditing}
                     onUpdatePosition={handleUpdatePosition}
+                    onDragStart={onDragStart}
+                    onDragMove={onDragMove}
+                    onDragEnd={onDragEnd}
                   />
                 );
               }
