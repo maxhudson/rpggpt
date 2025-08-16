@@ -39,7 +39,7 @@ export default function GamePage({session}) {
 
   const router = useRouter();
   const { gameId } = router.query;
-  console.log(gameId)
+
   useEffect(() => {
     if (gameId) {
       async function fetchGameData() {
@@ -138,13 +138,13 @@ export default function GamePage({session}) {
 
   // Convert page coordinates to world coordinates (only for HUD drag-to-create)
   const pageToWorldCoordinates = (pageX, pageY) => {
-    // Convert page coordinates to world coordinates accounting for zoom
+    // Convert page coordinates to world coordinates
     const screenCenterX = stageSize.width / 2;
     const screenCenterY = stageSize.height / 2;
 
-    // Calculate relative position from screen center, accounting for zoom
-    const relativeX = (pageX - screenCenterX) / zoom;
-    const relativeY = (pageY - screenCenterY) / zoom;
+    // Calculate relative position from screen center
+    const relativeX = pageX - screenCenterX;
+    const relativeY = pageY - screenCenterY;
 
     const worldX = playerPosition.x + relativeX;
     const worldY = playerPosition.y + relativeY;

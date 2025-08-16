@@ -8,7 +8,7 @@ const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Gr
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
 
-export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, isEditing, onUpdatePosition, onDragStart, onDragMove, onDragEnd }) {
+export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, zoom, offset, isEditing, onUpdatePosition, onDragStart, onDragMove, onDragEnd }) {
   const [image] = useImage(objectType?.imageData);
   const [isSelected, setIsSelected] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -123,8 +123,8 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragStart) {
       const node = e.target;
-      const worldX = node.x() - screenCenterX + playerPosition.x;
-      const worldY = node.y() - screenCenterY + playerPosition.y;
+      const worldX = (node.x() - offset.x) / zoom - screenCenterX + playerPosition.x;
+      const worldY = (node.y() - offset.y) / zoom - screenCenterY + playerPosition.y;
       onDragStart(uuid, { x: worldX, y: worldY });
     }
   };
@@ -135,15 +135,20 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     if (!isEditing) return;
 
     const node = e.target;
-    const newX = snapToGrid(node.x() - screenCenterX + playerPosition.x);
-    const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
+    // Use the exact inverse of dragBoundFunc conversion
+    // Step 1: Convert from screen coordinates to stage coordinates
+    const stageX = (node.x() - offset.x) / zoom;
+    const stageY = (node.y() - offset.y) / zoom;
+    // Step 2: Convert from stage coordinates to world coordinates
+    const worldX = stageX - screenCenterX + playerPosition.x;
+    const worldY = stageY - screenCenterY + playerPosition.y;
 
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragEnd) {
-      onDragEnd(uuid, { x: newX, y: newY });
+      onDragEnd(uuid, { x: worldX, y: worldY });
     } else if (onUpdatePosition) {
       // Fallback to old system
-      onUpdatePosition(uuid, { x: newX, y: newY });
+      onUpdatePosition(uuid, { x: worldX, y: worldY });
     }
   };
 
@@ -171,17 +176,22 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
           if (!isEditing) return pos;
 
           // Convert screen position to world coordinates
-          const worldX = pos.x - screenCenterX + playerPosition.x;
-          const worldY = pos.y - screenCenterY + playerPosition.y;
+          // Account for zoom offset: pos is in stage coordinates, need to convert to world
+          const stageX = (pos.x - offset.x) / zoom;
+          const stageY = (pos.y - offset.y) / zoom;
+          const worldX = stageX - screenCenterX + playerPosition.x;
+          const worldY = stageY - screenCenterY + playerPosition.y;
 
           // Snap to grid
           const snappedWorldX = snapToGrid(worldX);
           const snappedWorldY = snapToGrid(worldY);
 
           // Convert back to screen coordinates
+          const stageSnappedX = screenCenterX + (snappedWorldX - playerPosition.x);
+          const stageSnappedY = screenCenterY + (snappedWorldY - playerPosition.y);
           return {
-            x: screenCenterX + (snappedWorldX - playerPosition.x),
-            y: screenCenterY + (snappedWorldY - playerPosition.y)
+            x: stageSnappedX * zoom + offset.x,
+            y: stageSnappedY * zoom + offset.y
           };
         }}
       >

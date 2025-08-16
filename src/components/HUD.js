@@ -290,8 +290,10 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
           onDragStart(mapObjectId, { x: moveEvent.pageX, y: moveEvent.pageY }, true); // true = isHUDDrag
         }
 
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        // Immediately set the position for the first time
+        if (onDragMove) {
+          onDragMove(mapObjectId, { x: moveEvent.pageX, y: moveEvent.pageY });
+        }
       } else if (hasDragged && createdObjectId && onDragMove) {
         // Continue dragging the created object
         onDragMove(createdObjectId, { x: moveEvent.pageX, y: moveEvent.pageY });

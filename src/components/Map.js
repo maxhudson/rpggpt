@@ -191,29 +191,29 @@ export default function Map({
   };
 
   const handleWheel = (e) => {
-    e.evt.preventDefault();
+    // e.evt.preventDefault();
 
-    const stage = e.target.getStage();
-    const oldScale = stage.scaleX();
-    const pointer = stage.getPointerPosition();
+    // const stage = e.target.getStage();
+    // const oldScale = stage.scaleX();
+    // const pointer = stage.getPointerPosition();
 
-    // Determine zoom direction and amount
-    const direction = e.evt.deltaY < 0 ? -1 : 1;
-    const zoomFactor = 1.1;
-    let newScale = direction > 0 ? oldScale * zoomFactor : oldScale / zoomFactor;
+    // // Determine zoom direction and amount
+    // const direction = e.evt.deltaY < 0 ? -1 : 1;
+    // const zoomFactor = 1.1;
+    // let newScale = direction > 0 ? oldScale * zoomFactor : oldScale / zoomFactor;
 
-    // Clamp zoom between 0.5x and 2x
-    newScale = Math.max(0.5, Math.min(2, newScale));
+    // // Clamp zoom between 0.5x and 2x
+    // newScale = Math.max(0.5, Math.min(2, newScale));
 
-    setZoom(newScale);
+    // setZoom(newScale);
 
-    // Update offset to keep zoom centered
-    const newPos = {
-      x: -stageSize.width * (newScale - 1) / 2,
-      y: -stageSize.height * (newScale - 1) / 2,
-    };
+    // // Update offset to keep zoom centered
+    // const newPos = {
+    //   x: -stageSize.width * (newScale - 1) / 2,
+    //   y: -stageSize.height * (newScale - 1) / 2,
+    // };
 
-    setOffset(newPos);
+    // setOffset(newPos);
   };
 
   return (
@@ -282,6 +282,8 @@ export default function Map({
                     objectType={item.objectType}
                     playerPosition={playerPosition}
                     stageSize={stageSize}
+                    zoom={zoom}
+                    offset={offset}
                     isEditing={isEditing}
                     onUpdatePosition={handleUpdatePosition}
                     onDragStart={onDragStart}
