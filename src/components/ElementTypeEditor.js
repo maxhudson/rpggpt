@@ -14,8 +14,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
   const [isUploading, setIsUploading] = useState(false);
 
   const handleGenerate = async () => {
-    const description = elementType.data?.description || '';
-    if (!description.trim()) return;
+    const imageDescription = elementType.data.imageDescription || '';
+    if (!imageDescription.trim()) return;
 
     setIsGenerating(true);
     // Notify parent component that generation has started
@@ -29,7 +29,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ description, type: elementType.data.type }),
+        body: JSON.stringify({ description: imageDescription, type: elementType.data.type }),
       });
 
       if (!response.ok) {
@@ -73,7 +73,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         data: {
           ...elementType.data,
           originalWidth: selectedOption.originalWidth,
-          originalHeight: selectedOption.originalHeight
+          originalHeight: selectedOption.originalHeight,
+          imageTimestamp: Date.now() // Add timestamp for cache busting
         }
       };
       console.log(updatedElementType)
@@ -91,6 +92,32 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
     onClose();
   };
 
+  // Handle escape key and click outside to close
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    const handleClickOutside = (e) => {
+      // Check if click is on the backdrop (not on the modal content)
+      if (e.target.style.backgroundColor === 'rgba(0, 0, 0, 0.8)') {
+        handleClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    document.addEventListener('click', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -102,8 +129,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         <div>
           <label>Describe the {elementType.data.type === 'stat' ? 'stat icon' : elementType.data.type === 'item' ? 'item' : 'sprite'}:</label>
           <textarea
-            defaultValue={elementType.data?.description || ''}
-            onBlur={(e) => updateElementType({ ...elementType, data: { ...elementType.data, description: e.target.value } })}
+            defaultValue={elementType.data?.imageDescription || ''}
+            onBlur={(e) => updateElementType({ ...elementType, data: { ...elementType.data, imageDescription: e.target.value } })}
             placeholder={
               elementType.data.type === 'stat' ?
                 "e.g., health bar icon, energy meter, strength symbol" :
@@ -131,7 +158,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
           />
         </div>
 
-        <button onClick={handleGenerate} disabled={!(elementType.data.description || '').trim() || isGenerating}>
+        <button onClick={handleGenerate} disabled={!(elementType.data.imageDescription || '').trim() || isGenerating}>
           {isGenerating ? 'Generating...' : 'Generate Sprite'}
         </button>
 

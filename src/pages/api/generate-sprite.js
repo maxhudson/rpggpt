@@ -5,6 +5,17 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Game styles
+const gameStyles = {
+  "minimalist watercolor": "flat minimalist style - watercolor print aesthetic",
+  "low poly cartoon": "low-poly game map element"
+};
+
+// Common prompt components
+const baseStyle = "muted colors\nno strokes/gradients/textures\njust polygons\nbirds-eye top-down perspective like Pokemon/stardew valley";
+const objectLighting = "afternoon sunlight coming from the top-left of the image\nmature elegant positive professional";
+const transparentCanvas = "IMPORTANT: Use a completely transparent background (no black, no white, just transparent).\nCenter the object taking up most of the canvas space. 1024x1024 image.\nNo platform/ground/tile object at the base (we'll be placing what is generated on a texture of our own so it needs to just be the object with lighting coming from top-left)";
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -13,62 +24,43 @@ export default async function handler(req, res) {
   try {
     const { description, type = 'object' } = req.body;
 
-    // Different prompts for different object types
+    // Different prompts for different object types using "low poly cartoon" style
     let imagePrompt;
+    const style = gameStyles["low poly cartoon"];
 
     if (type === 'material') {
       imagePrompt = `seamless tileable texture/material pattern for 2d game
 ${description}
-flat minimalist style - watercolor print aesthetic
-muted colors, no strokes/gradients, just polygons
-top-down view like Pokemon/stardew valley
+${style}
+${baseStyle}
 Fill the entire 1024x1024 canvas edge to edge
 satisfying
-no building
-`;
+no building`;
     } else if (type === 'stat') {
-      imagePrompt = `flat minimalist 2d game UI icon for player statistics - watercolor print style
+      imagePrompt = `flat minimalist 2d game UI icon for player statistics - low poly cartoon style
 ${description}
 clean simple icon design
-muted colors
-no strokes/gradients/textures
-just polygons
+${baseStyle}
 clear readable symbol/meter/bar design
 professional game UI aesthetic
-IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
-Center the icon taking up most of the canvas space. 1024x1024 image.
-Simple recognizable symbol for game HUD display
-`;
+${transparentCanvas}
+Simple recognizable symbol for game HUD display`;
     } else if (type === 'item') {
-      imagePrompt = `flat minimalist 2d game inventory item - watercolor print style
+      imagePrompt = `flat minimalist 2d game inventory item - low poly cartoon style
 ${description}
 collectible item design
-muted colors
-no strokes/gradients/textures
-just polygons
-top-down perspective like Pokemon/stardew valley items
+${baseStyle} items
 clear recognizable object
-afternoon sunlight coming from the top-left of the image
-mature elegant positive professional
-IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
-Center the item taking up most of the canvas space. 1024x1024 image.
-No platform/ground object sitting on (we'll be placing it on a texture of our own)
-`;
+${objectLighting}
+${transparentCanvas}`;
     } else {
-      imagePrompt = `flat minimalist 2d architectural game map element - watercolor print style
+      imagePrompt = `${style}
 ${description}
-muted colors
-no strokes/gradients/textures
-just polygons
-birds-eye top-down perspective like Pokemon/stardew valley
+${baseStyle}
 head-on, not-isometric, not from a corner perspective
-afternoon sunlight coming from the top-left of the image
-mature elegant positive elegant professional technical
+${objectLighting} technical
 just see the front and the top of objects
-IMPORTANT: Use a completely transparent background (no black, no white, just transparent).
-Center the object taking up most of the canvas space. 1024x1024 image.
-No platform/ground object sitting on (we'll be placing it on a texture of our own)
-`;
+${transparentCanvas}`;
     }
 
     // Generate 3 images in parallel

@@ -4,6 +4,9 @@ import dynamic from 'next/dynamic';
 const Stage = dynamic(() => import('react-konva').then(mod => ({ default: mod.Stage })), { ssr: false });
 const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Layer })), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
+const Line = dynamic(() => import('react-konva').then(mod => ({ default: mod.Line })), { ssr: false });
+const Circle = dynamic(() => import('react-konva').then(mod => ({ default: mod.Circle })), { ssr: false });
+const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 
 import MapObject from './MapObject';
 import Player from './Player';
@@ -143,6 +146,16 @@ export default function Map({
     };
 
     const updatePlayerPosition = () => {
+      // Don't move player if user is typing in an input field
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.contentEditable === 'true'
+      );
+
+      if (isInputFocused) return;
+
       let deltaX = 0;
       let deltaY = 0;
 
@@ -227,6 +240,38 @@ export default function Map({
     setSelectedElementId(elementId);
   };
 
+  // Handle boundary point dragging
+  const handleBoundaryPointDrag = (pointIndex, newPosition) => {
+    if (!isEditing || !updateGame) return;
+
+    const boundaryPolygon = game?.map?.boundaryPolygon || [];
+    const updatedPolygon = [...boundaryPolygon];
+    updatedPolygon[pointIndex] = [newPosition.x, newPosition.y];
+
+    const updatedMap = {
+      elements: game.map.elements,
+      boundaryPolygon: updatedPolygon
+    };
+
+    updateGame({ ...game, map: updatedMap });
+  };
+
+  // Convert world coordinates to screen coordinates
+  const worldToScreen = (worldX, worldY) => {
+    return {
+      x: stageSize.width / 2 + (worldX - playerPosition.x),
+      y: stageSize.height / 2 + (worldY - playerPosition.y)
+    };
+  };
+
+  // Convert screen coordinates to world coordinates
+  const screenToWorld = (screenX, screenY) => {
+    return {
+      x: playerPosition.x + (screenX - stageSize.width / 2),
+      y: playerPosition.y + (screenY - stageSize.height / 2)
+    };
+  };
+
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#cdceac' }}>
       <Stage
@@ -234,6 +279,57 @@ export default function Map({
         height={stageSize.height}
       >
         <Layer>
+          {/* Render checkerboard grid when in edit mode */}
+          {/* {isEditing && (() => {
+            const gridSize = 20;
+            const gridElements = [];
+
+            // Calculate visible grid bounds based on player position and screen size
+            const leftBound = Math.floor((playerPosition.x - stageSize.width / 2) / gridSize) - 1;
+            const rightBound = Math.ceil((playerPosition.x + stageSize.width / 2) / gridSize) + 1;
+            const topBound = Math.floor((playerPosition.y - stageSize.height / 2) / gridSize) - 1;
+            const bottomBound = Math.ceil((playerPosition.y + stageSize.height / 2) / gridSize) + 1;
+
+            for (let gridX = leftBound; gridX <= rightBound; gridX++) {
+              for (let gridY = topBound; gridY <= bottomBound; gridY++) {
+                // Checkerboard pattern: only render tiles where (x + y) is even
+                if ((gridX + gridY) % 2 === 0) {
+                  const worldX = gridX * gridSize;
+                  const worldY = gridY * gridSize;
+                  const screenPos = worldToScreen(worldX, worldY);
+
+                  gridElements.push(
+                    <Rect
+                      key={`grid-${gridX}-${gridY}`}
+                      x={screenPos.x}
+                      y={screenPos.y}
+                      width={gridSize}
+                      height={gridSize}
+                      fill="rgba(0, 0, 0, 0.1)"
+                      listening={false}
+                    />
+                  );
+                }
+              }
+            }
+
+            return gridElements;
+          })()} */}
+
+          {/* Render red dot at world coordinates (0,0) when in edit mode */}
+          {isEditing && (() => {
+            const originScreenPos = worldToScreen(0, 0);
+            return (
+              <Circle
+                x={originScreenPos.x}
+                y={originScreenPos.y}
+                radius={1}
+                fill="red"
+                listening={false}
+              />
+            );
+          })()}
+
           {/* Render Player Shadow - below all other elements */}
           <Ellipse
             x={stageSize.width / 2}
@@ -307,6 +403,51 @@ export default function Map({
                 );
               }
             })}
+
+          {/* Render boundary polygon if in editing mode */}
+          {isEditing && game?.map?.boundaryPolygon && game.map.boundaryPolygon.length >= 3 && (
+            <>
+              {/* Boundary polygon outline */}
+              <Line
+                points={game.map.boundaryPolygon.flatMap(([worldX, worldY]) => {
+                  const screenPos = worldToScreen(worldX, worldY);
+                  return [screenPos.x, screenPos.y];
+                })}
+                closed={true}
+                stroke="#ff6b6b"
+                strokeWidth={2}
+                dash={[10, 5]}
+                listening={false}
+              />
+
+              {/* Draggable boundary points */}
+              {game.map.boundaryPolygon.map(([worldX, worldY], pointIndex) => {
+                const screenPos = worldToScreen(worldX, worldY);
+                return (
+                  <Circle
+                    key={`boundary-point-${pointIndex}`}
+                    x={screenPos.x}
+                    y={screenPos.y}
+                    radius={8}
+                    fill="#ff6b6b"
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    draggable={true}
+                    onDragMove={(e) => {
+                      const worldPos = screenToWorld(e.target.x(), e.target.y());
+                      handleBoundaryPointDrag(pointIndex, worldPos);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.getStage().container().style.cursor = 'pointer';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.getStage().container().style.cursor = 'default';
+                    }}
+                  />
+                );
+              })}
+            </>
+          )}
         </Layer>
       </Stage>
     </div>

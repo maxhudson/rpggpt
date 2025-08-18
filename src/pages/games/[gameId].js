@@ -60,7 +60,7 @@ export default function GamePage({session}) {
         stateRef.current.game = gameData;
 
         // Calculate next element ID from existing map
-        const existingIds = Object.keys(gameData.map.elements).map(id => parseInt(id));
+        const existingIds = Object.keys(gameData.map.elements).map(id => parseInt(id) || 0);
         const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
         setNextElementId(maxId + 1);
 
@@ -227,14 +227,15 @@ export default function GamePage({session}) {
     const elementId = nextElementId.toString();
     setNextElementId(prev => prev + 1);
 
-    const currentElements = game.map.elements || {};
+    const currentGame = stateRef.current.game;
+    const currentElements = currentGame.map.elements || {};
     const updatedElements = {
       ...currentElements,
       [elementId]: [elementTypeId, x, y]
     };
     const updatedMap = {
       elements: updatedElements,
-      boundaryPolygon: game.map.boundaryPolygon || null
+      boundaryPolygon: currentGame.map.boundaryPolygon || null
     };
 
     return { elementId, updatedMap };

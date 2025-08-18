@@ -12,7 +12,7 @@ const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: 
 export default function MapObject({ elementId, elementTypeId, x, y, elementType, playerPosition, stageSize, isEditing, isSelected, onUpdatePosition, onSelect, onDragStart, onDragMove, onDragEnd }) {
   // Generate dynamic image URL from Supabase storage
   const imageUrl = elementTypeId && elementTypeId !== 'preview-current' && !elementTypeId.startsWith('preview-option-')
-    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png`
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png${elementType.data.imageTimestamp ? `?t=${elementType.data.imageTimestamp}` : ''}`
     : elementType.data.imageData; // Only for preview purposes
 
   const [image] = useImage(imageUrl);
@@ -51,13 +51,11 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     collisionRadius = 0.25,
     shadowRadius = 0.5
   } = elementType.data;
-  console.log('----', elementType.data)
+
   // Calculate display dimensions
   const displayWidth = width * K.gridSize;
   const displayHeight = (originalHeight && originalWidth) ?
     displayWidth * (originalHeight / originalWidth) : displayWidth;
-
-  console.log('Display dimensions:', { displayWidth, displayHeight });
 
   // Calculate position relative to player and center on screen
   const screenCenterX = stageSize.width / 2;
@@ -67,7 +65,7 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
   const relativeY = y - playerPosition.y;
 
   const screenX = screenCenterX + relativeX;
-  const screenY = screenCenterY + relativeY;
+  const screenY = screenCenterY + relativeY; // Center vertically
 
   // Calculate shadow dimensions
   const shadowWidth = displayWidth * shadowRadius * 2;
@@ -126,29 +124,29 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
         onDragEnd={handleDragEnd}
         onClick={handleClick}
         onTap={handleClick}
-        dragBoundFunc={(pos) => {
-          if (!isEditing) return pos;
+        // dragBoundFunc={(pos) => {
+        //   if (!isEditing) return pos;
 
-          // Convert screen position to world coordinates
-          const worldX = pos.x - screenCenterX + playerPosition.x;
-          const worldY = pos.y - screenCenterY + playerPosition.y;
+        //   // Convert screen position to world coordinates
+        //   const worldX = pos.x - screenCenterX + playerPosition.x;
+        //   const worldY = pos.y - screenCenterY + playerPosition.y;
 
-          // Snap to grid
-          const snappedWorldX = snapToGrid(worldX);
-          const snappedWorldY = snapToGrid(worldY);
+        //   // Snap to grid
+        //   const snappedWorldX = snapToGrid(worldX);
+        //   const snappedWorldY = snapToGrid(worldY);
 
-          // Convert back to screen coordinates
-          return {
-            x: screenCenterX + (snappedWorldX - playerPosition.x),
-            y: screenCenterY + (snappedWorldY - playerPosition.y)
-          };
-        }}
+        //   // Convert back to screen coordinates
+        //   return {
+        //     x: screenCenterX + (snappedWorldX - playerPosition.x),
+        //     y: screenCenterY + (snappedWorldY - playerPosition.y)
+        //   };
+        // }}
       >
         {/* Shadow */}
         {shadowRadius > 0 && (
           <Ellipse
             x={0}
-            y={displayHeight * 0.4} // Position shadow below object
+            y={0} // Position shadow below object
             radiusX={shadowWidth / 2}
             radiusY={shadowHeight / 2}
             fill={isSelected || isDragging ? "rgba(0, 0, 0, 0.6)" : "rgba(0, 0, 0, 0.1)"}
@@ -161,7 +159,7 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
           <Image
             image={image}
             x={-displayWidth / 2 + (displayWidth * offsetX)}
-            y={-displayHeight / 2 + (displayHeight * offsetY)}
+            y={-displayHeight + K.gridSize / 2 + (displayHeight * offsetY)}
             width={displayWidth}
             height={displayHeight}
           />

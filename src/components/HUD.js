@@ -224,7 +224,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
         createdElementId = elementId;
 
         // Update game state immediately so the element appears
-        updateGame({ ...game, map: updatedMap }, { updateSupabase: false, updateState: true });
+        const currentGame = stateRef.current.game;
+        updateGame({ ...currentGame, map: updatedMap }, { updateSupabase: false, updateState: true });
 
         // Then start dragging the newly created element using shared drag handlers
         if (onDragStart) {
@@ -310,7 +311,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                     ) : (
                       <>
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png`}
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png${elementType.data.imageTimestamp ? `?t=${elementType.data.imageTimestamp}` : ''}`}
                           alt={elementType.title || 'Item'}
                           draggable={false}
                           style={{

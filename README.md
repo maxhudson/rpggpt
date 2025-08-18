@@ -1,37 +1,65 @@
-games.data
+# RPG Game Platform
 
-{
-  playerPosition: {x: 0, y: 0},
-  objectTypes: {
-    uuid: {
-      title,
-      imageDescription, //description of the image
-      imageData, //base64 string - chatgpt-generated image
-      originalWidth, //width of imageData
-      originalHeight, //height of imageData
-      scale, //to determine display size relative to original width/height ()
-      boundingRadius,
-      shadowRadius, //ellipse width: originalWidth * scale * shadowRadius * 2
-    }
+A platform that allows users to create top-down-perspective RPG games without writing code.
+
+## Game Data Schema
+
+```javascript
+game = {
+  id: string,
+  user_id: string,
+  title: string,
+  map: {
+    elements: {
+      [elementId]: [elementTypeId, x, y] // Token-optimized storage: [type, x, y]
+    },
+    boundaryPolygon: [[x1, y1], [x2, y2], ...] // Array of coordinate pairs defining map boundary
   },
-  mapObjects: {
-    uuid: {x, y}
+  element_type_ids: [elementTypeId1, elementTypeId2, ...] // References to element types
+}
+```
+
+## Element Types Schema
+
+```javascript
+elementTypes = {
+  [elementTypeId]: {
+    id: elementTypeId,
+    data: {
+      title: string,
+      imageDescription: string, // Description of the image for generation
+      imageData: string, // Base64 string - ChatGPT-generated image or preview
+      originalWidth: number, // Width of imageData in pixels
+      originalHeight: number, // Height of imageData in pixels
+      width: number, // Display width in grid units (K.gridSize = 20px)
+      offsetX: number, // X offset in grid units
+      offsetY: number, // Y offset in grid units
+      collisionRadius: number, // Collision radius in grid units
+      shadowRadius: number, // Shadow ellipse radius multiplier
+      type: string // Element type identifier ('object', 'item', 'stat')
+    }
   }
 }
+```
 
+## Key Files
 
+### Core Components
+- **`src/components/Map.js`** - Main map rendering, player movement, boundary collision detection, boundary editing
+- **`src/components/HUD.js`** - Game editing interface, element type management, drag-to-create functionality
+- **`src/components/MapObject.js`** - Individual map element rendering and interaction
+- **`src/components/ElementTypeEditor.js`** - Element type creation and editing interface
+- **`src/components/Player.js`** - Player character rendering
 
-- object sort order
-- color picker when specifying sprite
+### Pages
+- **`src/pages/index.js`** - Home page with game listing and create game functionality
+- **`src/pages/games/[gameId].js`** - Main game page with map and HUD integration
+- **`src/pages/login.js`** - Authentication page
 
-should players be its own table to avoid overwriting? same time as mapObjects?
+### API Routes
+- **`src/pages/api/generate-sprite.js`** - ChatGPT image generation for element types
+- **`src/pages/api/upload-element-image.js`** - Supabase storage upload for element images
 
-- hide/toggle hud on mobile
-
-
-rename objectType to elementType
-add game.objectTypeIds rather than objectType having a gameId
-store image in bucket rather than in db
-- change scale, offset etc unit to be in grid units (i.e. width in grid units)
-
-don't let zoom impact offset - offset should no longer be necessary thanks to playerPosition
+### Configuration
+- **`src/k.js`** - Global constants (grid size, etc.)
+- **`src/lib/supabase.js`** - Supabase client configuration
