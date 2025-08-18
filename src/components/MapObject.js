@@ -19,9 +19,33 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
   const [isDragging, setIsDragging] = useState(false);
   const groupRef = useRef();
   const transformerRef = useRef();
+  const isShiftPressed = useRef(false);
 
   // Snap to grid function - snaps to world grid, not relative to player
   const snapToGrid = K.snapToGrid;
+
+  // Track shift key state for conditional grid snapping
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Shift') {
+        isShiftPressed.current = true;
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.key === 'Shift') {
+        isShiftPressed.current = false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Handle selection
   useEffect(() => {
@@ -124,23 +148,28 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
         onDragEnd={handleDragEnd}
         onClick={handleClick}
         onTap={handleClick}
-        // dragBoundFunc={(pos) => {
-        //   if (!isEditing) return pos;
+        dragBoundFunc={(pos) => {
+          if (!isEditing) return pos;
 
-        //   // Convert screen position to world coordinates
-        //   const worldX = pos.x - screenCenterX + playerPosition.x;
-        //   const worldY = pos.y - screenCenterY + playerPosition.y;
+          // Convert screen position to world coordinates
+          const worldX = pos.x - screenCenterX + playerPosition.x;
+          const worldY = pos.y - screenCenterY + playerPosition.y;
 
-        //   // Snap to grid
-        //   const snappedWorldX = snapToGrid(worldX);
-        //   const snappedWorldY = snapToGrid(worldY);
+          // Only snap to grid when shift is pressed
+          if (isShiftPressed.current) {
+            const snappedWorldX = snapToGrid(worldX);
+            const snappedWorldY = snapToGrid(worldY);
 
-        //   // Convert back to screen coordinates
-        //   return {
-        //     x: screenCenterX + (snappedWorldX - playerPosition.x),
-        //     y: screenCenterY + (snappedWorldY - playerPosition.y)
-        //   };
-        // }}
+            // Convert back to screen coordinates
+            return {
+              x: screenCenterX + (snappedWorldX - playerPosition.x),
+              y: screenCenterY + (snappedWorldY - playerPosition.y)
+            };
+          }
+
+          // No snapping - return original position
+          return pos;
+        }}
       >
         {/* Shadow */}
         {shadowRadius > 0 && (
@@ -195,8 +224,13 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
           onTransformEnd={(e) => {
             const node = transformerRef.current.nodes()[0];
             if (node && onUpdatePosition) {
-              const newX = snapToGrid(node.x() - screenCenterX + playerPosition.x);
-              const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
+              // Convert screen position to world coordinates
+              const worldX = node.x() - screenCenterX + playerPosition.x;
+              const worldY = node.y() - screenCenterY + playerPosition.y;
+
+              // Only snap to grid when shift is pressed
+              const newX = isShiftPressed.current ? snapToGrid(worldX) : worldX;
+              const newY = isShiftPressed.current ? snapToGrid(worldY) : worldY;
 
               // Update position in world coordinates
               onUpdatePosition(elementId, { x: newX, y: newY });
