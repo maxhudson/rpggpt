@@ -11,6 +11,7 @@ const Path = dynamic(() => import('react-konva').then(mod => ({ default: mod.Pat
 
 import MapObject from './MapObject';
 import Player from './Player';
+import EditablePath from './EditablePath';
 
 export default function Map({
   game,
@@ -23,8 +24,11 @@ export default function Map({
   onDragEnd,
   stageSize,
   setStageSize,
-  playerPosition,
-  setPlayerPosition
+  player,
+  selectedPolygonId,
+  setSelectedPolygonId,
+  onDeselectAll,
+  session
 }) {
   const keysPressed = useRef({});
   const [selectedElementId, setSelectedElementId] = useState(null);
@@ -147,7 +151,7 @@ export default function Map({
     };
 
     const updatePlayerPosition = () => {
-      // Don't move player if user is typing in an input field
+      // Don't move player if user is typing in an input field or if a modal is open
       const activeElement = document.activeElement;
       const isInputFocused = activeElement && (
         activeElement.tagName === 'INPUT' ||
@@ -155,7 +159,10 @@ export default function Map({
         activeElement.contentEditable === 'true'
       );
 
-      if (isInputFocused) return;
+      // Check if any modal dialogs are open (ElementTypeEditor has z-index 1000)
+      const hasModalOpen = document.querySelector('[style*="z-index: 1000"]') !== null;
+
+      if (isInputFocused || hasModalOpen) return;
 
       let deltaX = 0;
       let deltaY = 0;
@@ -166,26 +173,38 @@ export default function Map({
       if (keysPressed.current['d']) deltaX += moveSpeed;
 
       if (deltaX !== 0 || deltaY !== 0) {
-        setPlayerPosition(prev => {
-          const newX = prev.x + deltaX;
-          const newY = prev.y + deltaY;
+        const currentPlayer = stateRef.current.player;
+        const currentPlayerPos = currentPlayer.position;
+        const newX = currentPlayerPos.x + deltaX;
+        const newY = currentPlayerPos.y + deltaY;
 
-          // Check collision for each axis separately to allow sliding along walls
-          let finalX = prev.x;
-          let finalY = prev.y;
+        // Check collision for each axis separately to allow sliding along walls
+        let finalX = currentPlayerPos.x;
+        let finalY = currentPlayerPos.y;
 
-          // Check X movement
-          if (deltaX !== 0 && !checkCollision(newX, prev.y, prev) && !checkBoundaryCollision(newX, prev.y)) {
-            finalX = newX;
-          }
+        // Check X movement
+        if (deltaX !== 0 && !checkCollision(newX, currentPlayerPos.y, currentPlayerPos) && !checkBoundaryCollision(newX, currentPlayerPos.y)) {
+          finalX = newX;
+        }
 
-          // Check Y movement
-          if (deltaY !== 0 && !checkCollision(finalX, newY, prev) && !checkBoundaryCollision(finalX, newY)) {
-            finalY = newY;
-          }
+        // Check Y movement
+        if (deltaY !== 0 && !checkCollision(finalX, newY, currentPlayerPos) && !checkBoundaryCollision(finalX, newY)) {
+          finalY = newY;
+        }
 
-          return { x: finalX, y: finalY };
-        });
+        // Update player position in game state
+        if (finalX !== currentPlayerPos.x || finalY !== currentPlayerPos.y) {
+          const currentGame = stateRef.current.game;
+          const updatedPlayers = {
+            ...currentGame.players,
+            [session.user.id]: {
+              ...currentPlayer,
+              position: { x: finalX, y: finalY }
+            }
+          };
+          const updatedGame = { ...currentGame, players: updatedPlayers };
+          updateGame(updatedGame, { updateSupabase: true, updateState: true });
+        }
       }
     };
 
@@ -239,6 +258,12 @@ export default function Map({
 
   const handleElementSelect = (elementId) => {
     setSelectedElementId(elementId);
+    setSelectedPolygonId(null); // Clear polygon selection when selecting an element
+  };
+
+  const handlePolygonSelect = (polygonId) => {
+    setSelectedPolygonId(polygonId);
+    setSelectedElementId(null); // Clear element selection when selecting a polygon
   };
 
   // Handle boundary point dragging
@@ -257,19 +282,70 @@ export default function Map({
     updateGame({ ...game, map: updatedMap });
   };
 
+  // Handle background polygon point dragging
+  const handleBackgroundPolygonPointDrag = (polygonId, pointIndex, newPosition, isShiftPressed) => {
+    if (!isEditing || !updateGame) return;
+
+    const currentPolygon = game?.background?.[polygonId];
+    if (!currentPolygon) return;
+
+    const updatedPoints = [...currentPolygon.points];
+
+    // Apply grid snapping if shift is pressed
+    const finalPosition = isShiftPressed ?
+      [snapToGrid(newPosition.x), snapToGrid(newPosition.y)] :
+      [newPosition.x, newPosition.y];
+
+    updatedPoints[pointIndex] = finalPosition;
+
+    const updatedBackground = {
+      ...game.background,
+      [polygonId]: {
+        ...currentPolygon,
+        points: updatedPoints
+      }
+    };
+
+    updateGame({ ...game, background: updatedBackground });
+  };
+
+  // Handle background polygon dragging (entire polygon)
+  const handleBackgroundPolygonDrag = (polygonId, newPoints) => {
+    if (!isEditing || !updateGame) return;
+
+    const currentPolygon = game?.background?.[polygonId];
+    if (!currentPolygon) return;
+
+    const updatedBackground = {
+      ...game.background,
+      [polygonId]: {
+        ...currentPolygon,
+        points: newPoints
+      }
+    };
+
+    updateGame({ ...game, background: updatedBackground });
+  };
+
+  // Grid snap function
+  const snapToGrid = (value) => {
+    const gridSize = 20; // K.gridSize
+    return Math.round(value / gridSize) * gridSize;
+  };
+
   // Convert world coordinates to screen coordinates
   const worldToScreen = (worldX, worldY) => {
     return {
-      x: stageSize.width / 2 + (worldX - playerPosition.x),
-      y: stageSize.height / 2 + (worldY - playerPosition.y)
+      x: stageSize.width / 2 + (worldX - player.position.x),
+      y: stageSize.height / 2 + (worldY - player.position.y)
     };
   };
 
   // Convert screen coordinates to world coordinates
   const screenToWorld = (screenX, screenY) => {
     return {
-      x: playerPosition.x + (screenX - stageSize.width / 2),
-      y: playerPosition.y + (screenY - stageSize.height / 2)
+      x: player.position.x + (screenX - stageSize.width / 2),
+      y: player.position.y + (screenY - stageSize.height / 2)
     };
   };
 
@@ -278,6 +354,14 @@ export default function Map({
       <Stage
         width={stageSize.width}
         height={stageSize.height}
+        onClick={(e) => {
+          // Only deselect if clicking on the stage itself (empty space)
+          if (e.target === e.target.getStage()) {
+            if (onDeselectAll) {
+              onDeselectAll();
+            }
+          }
+        }}
       >
         <Layer>
           {/* Render checkerboard grid when in edit mode */}
@@ -286,10 +370,10 @@ export default function Map({
             const gridElements = [];
 
             // Calculate visible grid bounds based on player position and screen size
-            const leftBound = Math.floor((playerPosition.x - stageSize.width / 2) / gridSize) - 1;
-            const rightBound = Math.ceil((playerPosition.x + stageSize.width / 2) / gridSize) + 1;
-            const topBound = Math.floor((playerPosition.y - stageSize.height / 2) / gridSize) - 1;
-            const bottomBound = Math.ceil((playerPosition.y + stageSize.height / 2) / gridSize) + 1;
+            const leftBound = Math.floor((player.position.x - stageSize.width / 2) / gridSize) - 1;
+            const rightBound = Math.ceil((player.position.x + stageSize.width / 2) / gridSize) + 1;
+            const topBound = Math.floor((player.position.y - stageSize.height / 2) / gridSize) - 1;
+            const bottomBound = Math.ceil((player.position.y + stageSize.height / 2) / gridSize) + 1;
 
             for (let gridX = leftBound; gridX <= rightBound; gridX++) {
               for (let gridY = topBound; gridY <= bottomBound; gridY++) {
@@ -331,35 +415,21 @@ export default function Map({
             );
           })()}
 
-          {/* Render background polygons */}
-          {game?.background && Object.entries(game.background).map(([polygonId, polygon]) => {
-            if (polygon.type === 'path' && polygon.points && polygon.points.length >= 3) {
-              // Convert world coordinates to screen coordinates and create SVG path
-              const screenPoints = polygon.points.map(([worldX, worldY]) => {
-                const screenPos = worldToScreen(worldX, worldY);
-                return [screenPos.x, screenPos.y];
-              });
-
-              // Create SVG path string
-              const pathData = screenPoints.reduce((path, [x, y], index) => {
-                if (index === 0) {
-                  return `M ${x} ${y}`;
-                } else {
-                  return `${path} L ${x} ${y}`;
-                }
-              }, '') + ' Z'; // Close the path
-
-              return (
-                <Path
-                  key={`background-${polygonId}`}
-                  data={pathData}
-                  fill={polygon.fill || 'gray'}
-                  listening={false}
-                />
-              );
-            }
-            return null;
-          })}
+          {/* Render background polygons using EditablePath component */}
+          {game?.background && Object.entries(game.background).map(([polygonId, polygon]) => (
+            <EditablePath
+              key={`editable-path-${polygonId}`}
+              polygonId={polygonId}
+              polygon={polygon}
+              isEditing={isEditing}
+              isSelected={selectedPolygonId === polygonId}
+              worldToScreen={worldToScreen}
+              screenToWorld={screenToWorld}
+              onPointDrag={handleBackgroundPolygonPointDrag}
+              onPolygonSelect={handlePolygonSelect}
+              onPolygonDrag={handleBackgroundPolygonDrag}
+            />
+          ))}
 
           {/* Render Player Shadow - below all other elements */}
           <Ellipse
@@ -377,7 +447,7 @@ export default function Map({
             // Add player to the rendering list with current Y position
             {
               id: 'player',
-              y: playerPosition.y,
+              y: player.position.y,
               isPlayer: true
             },
             // Add all map elements (excluding materials)
@@ -408,7 +478,7 @@ export default function Map({
                     key="player"
                     centerX={stageSize.width / 2}
                     centerY={stageSize.height / 2}
-                    playerPosition={playerPosition}
+                    playerPosition={player.position}
                     fill="#ff0000"
                   />
                 );
@@ -421,7 +491,7 @@ export default function Map({
                     x={item.x}
                     y={item.y}
                     elementType={item.elementType}
-                    playerPosition={playerPosition}
+                    playerPosition={player.position}
                     stageSize={stageSize}
                     isEditing={isEditing}
                     isSelected={selectedElementId === item.elementId}

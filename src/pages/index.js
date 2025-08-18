@@ -58,7 +58,14 @@ export default function Home({session}) {
           ]
         },
         background: {},
-        element_type_ids: []
+        element_type_ids: [],
+        players: {
+          [session.user.id]: {
+            inventory: {},
+            money: 100, // Starting money
+            position: { x: 0, y: 0 } // Starting position
+          }
+        }
       };
 
       const { data, error } = await supabase

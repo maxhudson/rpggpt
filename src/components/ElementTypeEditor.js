@@ -7,8 +7,8 @@ const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.La
 import MapObject from './MapObject';
 import K from '../k';
 
-export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart }) {
-  const [isGenerating, setIsGenerating] = useState(false);
+export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart, elementTypes }) {
+  const [activeGenerations, setActiveGenerations] = useState(0);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [jsonData, setJsonData] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -17,7 +17,9 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
     const imageDescription = elementType.data.imageDescription || '';
     if (!imageDescription.trim()) return;
 
-    setIsGenerating(true);
+    // Increment active generations counter
+    setActiveGenerations(prev => prev + 1);
+
     // Notify parent component that generation has started
     if (onGeneratingStart) {
       onGeneratingStart();
@@ -29,7 +31,11 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ description: imageDescription, type: elementType.data.type }),
+        body: JSON.stringify({
+          description: imageDescription,
+          type: elementType.data.type,
+          count: 1 // Generate only 1 option per click
+        }),
       });
 
       if (!response.ok) {
@@ -38,13 +44,18 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
 
       const data = await response.json();
 
-      // Set as tentative images (3 options) instead of auto-applying
-      onSetTentativeImages(data.options);
+      // Add new options to existing tentative images instead of replacing them
+      const newOptions = data.options || [data]; // Handle both single and multiple option responses
+      const existingOptions = tentativeImages || [];
+      const combinedOptions = [...existingOptions, ...newOptions];
+
+      onSetTentativeImages(combinedOptions);
     } catch (error) {
       console.error('Error generating sprite:', error);
       alert('Failed to generate sprite. Please try again.');
     } finally {
-      setIsGenerating(false);
+      // Decrement active generations counter
+      setActiveGenerations(prev => prev - 1);
     }
   };
 
@@ -88,7 +99,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
   };
 
   const handleClose = () => {
-    setIsGenerating(false);
+    setActiveGenerations(0);
     onClose();
   };
 
@@ -158,9 +169,16 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
           />
         </div>
 
-        <button onClick={handleGenerate} disabled={!(elementType.data.imageDescription || '').trim() || isGenerating}>
-          {isGenerating ? 'Generating...' : 'Generate Sprite'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+          <button onClick={handleGenerate} disabled={!(elementType.data.imageDescription || '').trim()}>
+            {activeGenerations > 0 ? `Generating... (${activeGenerations})` : 'Generate 1 Option'}
+          </button>
+          {tentativeImages && tentativeImages.length > 0 && (
+            <span style={{ fontSize: '12px', color: '#666' }}>
+              {tentativeImages.length} option{tentativeImages.length !== 1 ? 's' : ''} generated
+            </span>
+          )}
+        </div>
 
         <div>
           <label>Width (grid units):</label>
@@ -216,6 +234,180 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
             style={{ width: '100%' }}
           />
         </div>
+
+        <div>
+          <label>Price (for buying/selling):</label>
+          <input
+            type="text"
+            defaultValue={(elementType.data?.price || 0).toString()}
+            onBlur={(e) => updateElementType({ ...elementType, data: { ...elementType.data, price: parseFloat(e.target.value) || 0 } })}
+            placeholder="0"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div>
+          <label>Actions:</label>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <input
+                type="checkbox"
+                checked={elementType.data?.actions?.craft === 1}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    actions: {
+                      ...elementType.data.actions,
+                      craft: e.target.checked ? 1 : 0
+                    }
+                  }
+                })}
+              />
+              Craft
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <input
+                type="checkbox"
+                checked={elementType.data?.actions?.sell === 1}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    actions: {
+                      ...elementType.data.actions,
+                      sell: e.target.checked ? 1 : 0
+                    }
+                  }
+                })}
+              />
+              Sell
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <input
+                type="checkbox"
+                checked={elementType.data?.actions?.buy === 1}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    actions: {
+                      ...elementType.data.actions,
+                      buy: e.target.checked ? 1 : 0
+                    }
+                  }
+                })}
+              />
+              Buy
+            </label>
+          </div>
+        </div>
+
+        {elementType.data?.type === 'item' && (
+          <div>
+            <label>Crafting Requirements (what's needed to craft this item):</label>
+            <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '5px' }}>
+              {Object.entries(elementType.data?.craftingRequirements || {}).map(([reqElementTypeId, quantity]) => {
+                const reqElementType = elementTypes?.[reqElementTypeId];
+                const reqElementName = reqElementType?.data?.title || `Unknown Item (ID: ${reqElementTypeId})`;
+                return (
+                  <div key={reqElementTypeId} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '5px' }}>
+                    <span style={{ fontSize: '12px', minWidth: '150px' }}>
+                      {reqElementName}
+                    </span>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const newRequirements = { ...elementType.data.craftingRequirements };
+                        if (parseInt(e.target.value) > 0) {
+                          newRequirements[reqElementTypeId] = parseInt(e.target.value);
+                        } else {
+                          delete newRequirements[reqElementTypeId];
+                        }
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            craftingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ width: '60px' }}
+                      min="0"
+                    />
+                    <button
+                      onClick={() => {
+                        const newRequirements = { ...elementType.data.craftingRequirements };
+                        delete newRequirements[reqElementTypeId];
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            craftingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ backgroundColor: 'red', color: 'white', padding: '2px 6px', fontSize: '12px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                <select
+                  id={`craft-req-select-${elementType.id}`}
+                  style={{ width: '150px' }}
+                  defaultValue=""
+                >
+                  <option value="">Select item...</option>
+                  {elementTypes && Object.entries(elementTypes)
+                    .filter(([id, et]) => et.data?.type === 'item' && id !== elementType.id.toString())
+                    .map(([id, et]) => (
+                      <option key={id} value={id}>
+                        {et.data?.title || `Item ${id}`}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  id={`craft-req-qty-${elementType.id}`}
+                  style={{ width: '80px' }}
+                  min="1"
+                />
+                <button
+                  onClick={() => {
+                    const selectInput = document.getElementById(`craft-req-select-${elementType.id}`);
+                    const qtyInput = document.getElementById(`craft-req-qty-${elementType.id}`);
+                    const elementTypeId = selectInput.value;
+                    const quantity = parseInt(qtyInput.value);
+
+                    if (elementTypeId && quantity > 0) {
+                      const newRequirements = {
+                        ...elementType.data.craftingRequirements,
+                        [elementTypeId]: quantity
+                      };
+                      updateElementType({
+                        ...elementType,
+                        data: {
+                          ...elementType.data,
+                          craftingRequirements: newRequirements
+                        }
+                      });
+                      selectInput.value = '';
+                      qtyInput.value = '';
+                    }
+                  }}
+                  style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Add Requirement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Code Editor Toggle */}
         <div style={{ marginTop: '20px' }}>

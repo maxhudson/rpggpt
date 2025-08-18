@@ -22,7 +22,16 @@ game = {
       points: [[x, y], [x, y], ...] // Array of coordinate pairs defining polygon shape
     }
   },
-  element_type_ids: [elementTypeId1, elementTypeId2, ...] // References to element types
+  element_type_ids: [elementTypeId1, elementTypeId2, ...], // References to element types
+  players: {
+    [userId]: {
+      inventory: {
+        [elementTypeId]: quantity // Player's items
+      },
+      money: number, // Player's currency
+      position: { x: number, y: number } // Player's world position
+    }
+  }
 }
 ```
 
@@ -43,7 +52,16 @@ elementTypes = {
       offsetY: number, // Y offset in grid units
       collisionRadius: number, // Collision radius in grid units
       shadowRadius: number, // Shadow ellipse radius multiplier
-      type: string // Element type identifier ('object', 'item', 'stat')
+      type: string, // Element type identifier ('object', 'item', 'stat')
+      price: number, // Price for buying/selling (optional)
+      actions: {
+        craft: number, // 1 = enabled, 0 = disabled
+        sell: number, // 1 = enabled, 0 = disabled
+        buy: number // 1 = enabled, 0 = disabled
+      },
+      craftingRequirements: {
+        [elementTypeId]: quantity // Required items for crafting
+      }
     }
   }
 }
@@ -70,3 +88,46 @@ elementTypes = {
 ### Configuration
 - **`src/k.js`** - Global constants (grid size, etc.)
 - **`src/lib/supabase.js`** - Supabase client configuration
+
+### TODO
+
+- Credit/subscription system for ChatGPT API usage
+- Simulation system
+- Minigame - pokemon style
+- Pluralize titles
+
+
+### Examples
+
+#### Lemonade Stand
+
+PLANTS:
+- Palm Tree
+- Cactus
+- Flower Bed
+
+BUILDINGS:
+- Surf Shop
+
+OBJECTS:
+- Lemonade Cart - craft, sell
+- Grocery Store - buy
+
+ITEMS:
+- Dollars
+- Paper Cups
+- Lemons
+- Servings of Ice
+- Spoonfuls of Sugar
+- Cups of Water
+- Lemonade (to craft: you need to go to the crafting screen and pick the lemonade recipe, then press keyboard letters to select items from inventory)
+
+DAY CYCLE
+- Weather
+- Mood
+- Day of week
+- Chores/time-sensitive activities w/ penalties
+
+ACTIVITIES
+- Make lemonade (crafting - combine items to produce other items)
+- Sell/market: Pick a phrase

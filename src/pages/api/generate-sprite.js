@@ -8,7 +8,7 @@ const openai = new OpenAI({
 // Game styles
 const gameStyles = {
   "minimalist watercolor": "flat minimalist style - watercolor print aesthetic",
-  "low poly cartoon": "low-poly game map element"
+  "low poly cartoon": "low-poly game map element - no stroke/border"
 };
 
 // Common prompt components
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { description, type = 'object' } = req.body;
+    const { description, type = 'object', count = 3 } = req.body;
 
     // Different prompts for different object types using "low poly cartoon" style
     let imagePrompt;
@@ -41,7 +41,7 @@ no building`;
 ${description}
 clean simple icon design
 ${baseStyle}
-clear readable symbol/meter/bar design
+clear readable symbol design
 professional game UI aesthetic
 ${transparentCanvas}
 Simple recognizable symbol for game HUD display`;
@@ -63,8 +63,8 @@ just see the front and the top of objects
 ${transparentCanvas}`;
     }
 
-    // Generate 3 images in parallel
-    const promises = Array(3).fill().map(() =>
+    // Generate the requested number of images in parallel
+    const promises = Array(count).fill().map(() =>
       openai.images.generate({
         model: "gpt-image-1",
         prompt: imagePrompt
@@ -73,7 +73,7 @@ ${transparentCanvas}`;
 
     const results = await Promise.all(promises);
 
-    // Process all 3 images
+    // Process all generated images
     const options = [];
 
     for (let i = 0; i < results.length; i++) {

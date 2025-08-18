@@ -3,16 +3,20 @@ import { supabase } from '@/lib/supabase';
 import ElementTypeEditor from './ElementTypeEditor';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement }) {
+export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, playerPosition, selectedPolygonId }) {
+
+  // Get player data
+  const players = game.players[session.user.id];
   const [activeElementTypeId, setActiveElementTypeId] = useState(null);
   const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by elementType id
   const [generatingImages, setGeneratingImages] = useState({}); // Track which element types are generating images
   const [isDragging, setIsDragging] = useState(false);
   const [dragElementTypeId, setDragElementTypeId] = useState(null);
+  const [selectedPolygonColor, setSelectedPolygonColor] = useState('#808080');
 
   // Derive the active element type object from the ID and elementTypes
   const activeElementType = activeElementTypeId ? elementTypes[activeElementTypeId] : null;
-  console.log('---', activeElementType)
+
   const handleCreateNewElementType = async (type = 'object') => {
     if (!game) return;
 
@@ -194,9 +198,9 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
       quantities[elementTypeId] = (quantities[elementTypeId] || 0) + 1;
     });
 
-    // Count elements in inventory (if it exists)
-    if (game && game.inventory) {
-      Object.entries(game.inventory).forEach(([elementTypeId, count]) => {
+    // Count elements in player inventory
+    if (players && players.inventory) {
+      Object.entries(players.inventory).forEach(([elementTypeId, count]) => {
         quantities[elementTypeId] = (quantities[elementTypeId] || 0) + count;
       });
     }
@@ -256,6 +260,50 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleCreatePolygon = async (playerPosition) => {
+    // Get next polygon ID
+    const existingIds = Object.keys(game.background || {}).map(id => parseInt(id)).filter(id => !isNaN(id));
+    const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+
+    // Create rectangle polygon centered on player position
+    const size = 100; // Rectangle size
+    const newPolygon = {
+      type: 'path',
+      fill: selectedPolygonColor,
+      points: [
+        [playerPosition.x - size/2, playerPosition.y - size/2], // Top-left
+        [playerPosition.x + size/2, playerPosition.y - size/2], // Top-right
+        [playerPosition.x + size/2, playerPosition.y + size/2], // Bottom-right
+        [playerPosition.x - size/2, playerPosition.y + size/2]  // Bottom-left
+      ]
+    };
+
+    // Update game background
+    const updatedBackground = {
+      ...game.background,
+      [nextId]: newPolygon
+    };
+
+    await updateGame({ ...game, background: updatedBackground });
+  };
+
+  const handleUpdatePolygonColor = async (polygonId, newColor) => {
+    if (!polygonId || !game.background?.[polygonId]) return;
+
+    const currentPolygon = game.background[polygonId];
+    const updatedPolygon = {
+      ...currentPolygon,
+      fill: newColor
+    };
+
+    const updatedBackground = {
+      ...game.background,
+      [polygonId]: updatedPolygon
+    };
+
+    await updateGame({ ...game, background: updatedBackground });
   };
 
   return (
@@ -363,6 +411,64 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
         ))}
       </div>
 
+      {/* Money Display - bottom left */}
+      {players && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          left: '20px',
+          zIndex: 100,
+          backgroundColor: '#E6E2D2',
+          border: '1px solid #8B7355',
+          borderRadius: '4px',
+          padding: '8px 12px',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          color: '#4A4A4A'
+        }}>
+          {players.money || 0} coins
+        </div>
+      )}
+
+      {/* Polygon Drawing Controls - bottom right when editing */}
+      {isEditing && (
+        <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end' }}>
+          <input
+            type="color"
+            value={selectedPolygonId && game?.background?.[selectedPolygonId] ?
+              game.background[selectedPolygonId].fill || '#808080' :
+              selectedPolygonColor}
+            onChange={(e) => {
+              if (selectedPolygonId && game?.background?.[selectedPolygonId]) {
+                handleUpdatePolygonColor(selectedPolygonId, e.target.value);
+              } else {
+                setSelectedPolygonColor(e.target.value);
+              }
+            }}
+            style={{
+              width: '40px',
+              height: '30px',
+              border: '1px solid #ccc',
+              cursor: 'pointer'
+            }}
+          />
+          <button
+            onClick={() => handleCreatePolygon(playerPosition)}
+            style={{
+              backgroundColor: '#E6E2D2',
+              border: '1px solid #ccc',
+              padding: '8px 12px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}
+          >
+            Add Polygon
+          </button>
+        </div>
+      )}
+
       {activeElementType && (
         <ElementTypeEditor
           isOpen={true}
@@ -375,6 +481,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           onRejectTentativeImage={() => handleRejectTentativeImage(activeElementTypeId)}
           onDelete={handleDeleteElementType}
           onGeneratingStart={() => setGeneratingImages(prev => ({ ...prev, [activeElementTypeId]: true }))}
+          elementTypes={elementTypes}
         />
       )}
     </>
