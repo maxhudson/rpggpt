@@ -15,6 +15,13 @@ game = {
     },
     boundaryPolygon: [[x1, y1], [x2, y2], ...] // Array of coordinate pairs defining map boundary
   },
+  background: {
+    [id]: { // ID starting with 1
+      type: 'path', // Polygon type
+      fill: string, // Fill color (e.g., 'gray', '#ff0000')
+      points: [[x, y], [x, y], ...] // Array of coordinate pairs defining polygon shape
+    }
+  },
   element_type_ids: [elementTypeId1, elementTypeId2, ...] // References to element types
 }
 ```

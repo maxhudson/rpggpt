@@ -7,6 +7,7 @@ const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.
 const Line = dynamic(() => import('react-konva').then(mod => ({ default: mod.Line })), { ssr: false });
 const Circle = dynamic(() => import('react-konva').then(mod => ({ default: mod.Circle })), { ssr: false });
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
+const Path = dynamic(() => import('react-konva').then(mod => ({ default: mod.Path })), { ssr: false });
 
 import MapObject from './MapObject';
 import Player from './Player';
@@ -329,6 +330,36 @@ export default function Map({
               />
             );
           })()}
+
+          {/* Render background polygons */}
+          {game?.background && Object.entries(game.background).map(([polygonId, polygon]) => {
+            if (polygon.type === 'path' && polygon.points && polygon.points.length >= 3) {
+              // Convert world coordinates to screen coordinates and create SVG path
+              const screenPoints = polygon.points.map(([worldX, worldY]) => {
+                const screenPos = worldToScreen(worldX, worldY);
+                return [screenPos.x, screenPos.y];
+              });
+
+              // Create SVG path string
+              const pathData = screenPoints.reduce((path, [x, y], index) => {
+                if (index === 0) {
+                  return `M ${x} ${y}`;
+                } else {
+                  return `${path} L ${x} ${y}`;
+                }
+              }, '') + ' Z'; // Close the path
+
+              return (
+                <Path
+                  key={`background-${polygonId}`}
+                  data={pathData}
+                  fill={polygon.fill || 'gray'}
+                  listening={false}
+                />
+              );
+            }
+            return null;
+          })}
 
           {/* Render Player Shadow - below all other elements */}
           <Ellipse

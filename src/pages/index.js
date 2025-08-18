@@ -57,6 +57,7 @@ export default function Home({session}) {
             [-500, 500]   // Bottom-left
           ]
         },
+        background: {},
         element_type_ids: []
       };
 
