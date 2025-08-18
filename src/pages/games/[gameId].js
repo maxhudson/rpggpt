@@ -1,4 +1,3 @@
-
 import Head from "next/head";
 import { Geist, Geist_Mono } from "next/font/google";
 import { supabase } from '@/lib/supabase';
@@ -21,21 +20,22 @@ const geistMono = Geist_Mono({
 export default function GamePage({session}) {
   var [game, setGame] = useState(null);
   var [isEditing, setIsEditing] = useState(false);
-  var [objectTypes, _setObjectTypes] = useState({});
+  var [elementTypes, _setElementTypes] = useState({});
   var [drawingMode, setDrawingMode] = useState(false);
   var [selectedMaterialId, setSelectedMaterialId] = useState(null);
 
   // Map state moved up from Map component
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
 
   // Create refs for state to avoid race conditions
   const stateRef = useRef({
     game: null,
-    objectTypes: {}
+    elementTypes: {}
   });
+
+  // Track next element ID for map elements
+  const [nextElementId, setNextElementId] = useState(1);
 
   const router = useRouter();
   const { gameId } = router.query;
@@ -59,24 +59,30 @@ export default function GamePage({session}) {
         setGame(gameData);
         stateRef.current.game = gameData;
 
-        // Fetch object types for this game
-        const { data: objectTypesData, error: objectTypesError } = await supabase
-          .from('object_types')
-          .select('*')
-          .eq('game_id', gameId);
+        // Calculate next element ID from existing map
+        const existingIds = Object.keys(gameData.map.elements).map(id => parseInt(id));
+        const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+        setNextElementId(maxId + 1);
 
-        if (objectTypesError) {
-          console.log(objectTypesError);
-          return;
+        // Fetch element types for this game using element_type_ids
+        if (gameData.element_type_ids && gameData.element_type_ids.length > 0) {
+          const { data: elementTypesData, error: elementTypesError } = await supabase
+            .from('element_types')
+            .select('*')
+            .in('id', gameData.element_type_ids);
+
+          if (elementTypesError) {
+            console.log(elementTypesError);
+            return;
+          }
+
+          // Convert array to object with id as key, preserving full element type structure
+          const elementTypesObj = _.keyBy(elementTypesData, 'id');
+
+          setElementTypes(elementTypesObj);
+
+          stateRef.current.elementTypes = elementTypesObj;
         }
-
-        // Convert array to object with id as key
-        const objectTypesObj = {};
-        objectTypesData.forEach(ot => {
-          objectTypesObj[ot.id] = ot.data;
-        });
-        setObjectTypes(objectTypesObj);
-        stateRef.current.objectTypes = objectTypesObj;
       }
 
       fetchGameData();
@@ -117,15 +123,15 @@ export default function GamePage({session}) {
     debouncedUpdateGame(updatedGame);
   }
 
-  const setObjectTypes = (newObjectTypes) => {
-    _setObjectTypes(newObjectTypes);
-    stateRef.current.objectTypes = newObjectTypes;
+  const setElementTypes = (newElementTypes) => {
+    _setElementTypes(newElementTypes);
+    stateRef.current.elementTypes = newElementTypes;
   }
 
   // Shared drag state
   const [dragState, setDragState] = useState({
     isDragging: false,
-    dragObjectId: null,
+    dragElementId: null,
     startPos: null,
     isHUDDrag: false // Track if this is a HUD drag-to-create
   });
@@ -156,64 +162,82 @@ export default function GamePage({session}) {
     };
   };
 
-  const handleDragStart = (objectId, startPos, isHUDDrag = false) => {
+  const handleDragStart = (elementId, startPos, isHUDDrag = false) => {
     setDragState({
       isDragging: true,
-      dragObjectId: objectId,
+      dragElementId: elementId,
       startPos: startPos,
       isHUDDrag: isHUDDrag
     });
   };
 
-  const handleDragMove = (objectId, newPos) => {
-    if (dragState.isDragging && dragState.dragObjectId === objectId) {
+  const handleDragMove = (elementId, newPos) => {
+    if (dragState.isDragging && dragState.dragElementId === elementId) {
       // Only convert coordinates for HUD drag-to-create, MapObject handles its own coordinates
       const worldPos = dragState.isHUDDrag ? pageToWorldCoordinates(newPos.x, newPos.y) : newPos;
 
-      // Update the object position immediately for responsive UI
-      const gameData = game.data;
-      const updatedGameData = {
-        ...gameData,
-        mapObjects: {
-          ...gameData.mapObjects,
-          [objectId]: {
-            ...gameData.mapObjects[objectId],
-            x: worldPos.x,
-            y: worldPos.y
-          }
-        }
-      };
-      updateGame({ ...game, data: updatedGameData }, { updateSupabase: false, updateState: true });
+      // Update the element position immediately for responsive UI
+      const currentElements = game.map?.elements || {};
+      const existingElement = currentElements[elementId];
+      if (existingElement) {
+        const updatedElements = {
+          ...currentElements,
+          [elementId]: [existingElement[0], worldPos.x, worldPos.y] // [elementTypeId, x, y]
+        };
+        const updatedMap = {
+          elements: updatedElements,
+          boundaryPolygon: game.map?.boundaryPolygon || null
+        };
+        updateGame({ ...game, map: updatedMap }, { updateSupabase: false, updateState: true });
+      }
     }
   };
 
-  const handleDragEnd = (objectId, finalPos) => {
-    if (dragState.isDragging && dragState.dragObjectId === objectId) {
+  const handleDragEnd = (elementId, finalPos) => {
+    if (dragState.isDragging && dragState.dragElementId === elementId) {
       // Only convert coordinates for HUD drag-to-create, MapObject handles its own coordinates
       const worldPos = dragState.isHUDDrag ? pageToWorldCoordinates(finalPos.x, finalPos.y) : finalPos;
 
       // Final update to database
-      const gameData = game.data;
-      const updatedGameData = {
-        ...gameData,
-        mapObjects: {
-          ...gameData.mapObjects,
-          [objectId]: {
-            ...gameData.mapObjects[objectId],
-            x: worldPos.x,
-            y: worldPos.y
-          }
-        }
-      };
-      updateGame({ ...game, data: updatedGameData }, { updateSupabase: true, updateState: true });
+      const currentElements = game.map?.elements || {};
+      const existingElement = currentElements[elementId];
+      if (existingElement) {
+        const updatedElements = {
+          ...currentElements,
+          [elementId]: [existingElement[0], worldPos.x, worldPos.y] // [elementTypeId, x, y]
+        };
+        const updatedMap = {
+          elements: updatedElements,
+          boundaryPolygon: game.map?.boundaryPolygon || null
+        };
+        updateGame({ ...game, map: updatedMap }, { updateSupabase: true, updateState: true });
+      }
 
       setDragState({
         isDragging: false,
-        dragObjectId: null,
+        dragElementId: null,
         startPos: null,
         isHUDDrag: false
       });
     }
+  };
+
+  // Helper function to create new map element
+  const createMapElement = (elementTypeId, x = 0, y = 0) => {
+    const elementId = nextElementId.toString();
+    setNextElementId(prev => prev + 1);
+
+    const currentElements = game.map.elements || {};
+    const updatedElements = {
+      ...currentElements,
+      [elementId]: [elementTypeId, x, y]
+    };
+    const updatedMap = {
+      elements: updatedElements,
+      boundaryPolygon: game.map.boundaryPolygon || null
+    };
+
+    return { elementId, updatedMap };
   };
 
   return game && (
@@ -232,8 +256,8 @@ export default function GamePage({session}) {
           setIsEditing={setIsEditing}
           game={game}
           updateGame={updateGame}
-          objectTypes={objectTypes}
-          setObjectTypes={setObjectTypes}
+          elementTypes={elementTypes}
+          setElementTypes={setElementTypes}
           session={session}
           drawingMode={drawingMode}
           setDrawingMode={setDrawingMode}
@@ -243,10 +267,11 @@ export default function GamePage({session}) {
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
+          createMapElement={createMapElement}
         />
         <Map
           game={game}
-          objectTypes={objectTypes}
+          elementTypes={elementTypes}
           isEditing={isEditing}
           updateGame={updateGame}
           debouncedUpdateGame={updateGameForDrawing}
@@ -258,10 +283,6 @@ export default function GamePage({session}) {
           onDragEnd={handleDragEnd}
           stageSize={stageSize}
           setStageSize={setStageSize}
-          zoom={zoom}
-          setZoom={setZoom}
-          offset={offset}
-          setOffset={setOffset}
           playerPosition={playerPosition}
           setPlayerPosition={setPlayerPosition}
         />

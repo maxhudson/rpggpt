@@ -1,24 +1,25 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import ObjectTypeEditor from './ObjectTypeEditor';
+import ElementTypeEditor from './ElementTypeEditor';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, objectTypes, setObjectTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd }) {
-  const [showObjectEditor, setShowObjectEditor] = useState(false);
-  const [currentObjectType, setCurrentObjectType] = useState(null);
-  const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by objectType id
+export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement }) {
+  const [activeElementTypeId, setActiveElementTypeId] = useState(null);
+  const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by elementType id
+  const [generatingImages, setGeneratingImages] = useState({}); // Track which element types are generating images
   const [isDragging, setIsDragging] = useState(false);
-  const [dragObjectTypeId, setDragObjectTypeId] = useState(null);
+  const [dragElementTypeId, setDragElementTypeId] = useState(null);
 
-  const handleCreateNewObjectType = async (type = 'object') => {
+  // Derive the active element type object from the ID and elementTypes
+  const activeElementType = activeElementTypeId ? elementTypes[activeElementTypeId] : null;
+  console.log('---', activeElementType)
+  const handleCreateNewElementType = async (type = 'object') => {
     if (!game) return;
 
-    const objectTypeId = Date.now().toString();
-    const newObjectTypeData = {
+    const newElementTypeData = {
       title: '',
-      scale: type === 'stat' ? 0.1 : 0.1,
+      width: type === 'stat' ? 0.5 : 1, // Width in grid units
       type: type,
-      imageData: null,
       originalWidth: 100,
       originalHeight: 100,
       offsetX: 0,
@@ -27,232 +28,188 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
       shadowRadius: type === 'stat' ? 0.1 : 0.25,
     };
 
-    // Insert into object_types table
-    const { data: objectTypeData, error } = await supabase
-      .from('object_types')
+    // Insert into element_types table (let Supabase generate the ID)
+    const { data: elementTypeData, error } = await supabase
+      .from('element_types')
       .insert({
-        id: objectTypeId,
-        game_id: game.id,
         user_id: session.user.id,
-        data: newObjectTypeData
+        data: newElementTypeData
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating object type:', error);
+      console.error('Error creating element type:', error);
       return;
     }
 
     // Update local state
-    setObjectTypes(prev => ({
+    setElementTypes(prev => ({
       ...prev,
-      [objectTypeId]: newObjectTypeData
+      [elementTypeData.id]: { id: elementTypeData.id, data: newElementTypeData }
     }));
 
-    setCurrentObjectType({ id: objectTypeId, ...newObjectTypeData });
-    setShowObjectEditor(true);
+    // Add this element type to the game's element_type_ids
+    const updatedElementTypeIds = [...(game.element_type_ids || []), elementTypeData.id];
+    await updateGame({ ...game, element_type_ids: updatedElementTypeIds });
+
+    setActiveElementTypeId(elementTypeData.id);
   };
 
-  const handleUpdateObjectType = async (updatedObjectType) => {
-    if (!currentObjectType) return;
+  const handleUpdateElementType = async (updatedElementType) => {
+    if (!activeElementTypeId) return;
 
-    // Update in object_types table
+    // Update in element_types table
     const { error } = await supabase
-      .from('object_types')
-      .update({ data: updatedObjectType })
-      .eq('id', currentObjectType.id);
+      .from('element_types')
+      .update({data: updatedElementType.data})
+      .eq('id', activeElementTypeId);
 
     if (error) {
-      console.error('Error updating object type:', error);
+      console.error('Error updating element type:', error);
       return;
     }
 
     // Update local state
-    setObjectTypes(prev => ({
+    setElementTypes(prev => ({
       ...prev,
-      [currentObjectType.id]: updatedObjectType
+      [activeElementTypeId]: updatedElementType
     }));
-
-    setCurrentObjectType({ ...currentObjectType, ...updatedObjectType });
   };
 
   const handleCloseEditor = () => {
-    setShowObjectEditor(false);
-    setCurrentObjectType(null);
+    setActiveElementTypeId(null);
   };
 
-  const handleAddObjectToMap = async (objectTypeId) => {
-    if (!game || !game.data) return;
-
-    const mapObjectId = Date.now().toString();
-    const newMapObject = {
-      x: 0,
-      y: 0,
-      objectTypeId: objectTypeId
-    };
-
-    const gameData = game.data;
-    const updatedGameData = {
-      ...gameData,
-      mapObjects: {
-        ...gameData.mapObjects,
-        [mapObjectId]: newMapObject
-      }
-    };
-
-    await updateGame({ data: updatedGameData });
+  const handleEditElementType = (elementTypeId) => {
+    setActiveElementTypeId(elementTypeId);
   };
 
-  const handleEditObjectType = (objectTypeId) => {
-    const objectType = objectTypes[objectTypeId];
-    setCurrentObjectType({ id: objectTypeId, ...objectType });
-    setShowObjectEditor(true);
-  };
-
-  const handleSetTentativeImages = (objectTypeId, options) => {
+  const handleSetTentativeImages = (elementTypeId, options) => {
     setTentativeImages(prev => ({
       ...prev,
-      [objectTypeId]: options
+      [elementTypeId]: options
     }));
+    // Clear generating state when tentative images are ready
+    setGeneratingImages(prev => {
+      const newState = { ...prev };
+      delete newState[elementTypeId];
+      return newState;
+    });
   };
 
-  const handleAcceptTentativeImage = async (objectTypeId, selectedOption) => {
-    const tentativeOptions = tentativeImages[objectTypeId];
-    if (!tentativeOptions || !selectedOption) return;
-
-    const updatedObjectType = {
-      ...objectTypes[objectTypeId],
-      imageData: selectedOption.imageData,
-      originalWidth: selectedOption.originalWidth,
-      originalHeight: selectedOption.originalHeight
-    };
+  const handleAcceptTentativeImage = async (updatedElementType) => {
+    const elementTypeId = activeElementTypeId;
 
     // Update in database
     const { error } = await supabase
-      .from('object_types')
-      .update({ data: updatedObjectType })
-      .eq('id', objectTypeId);
+      .from('element_types')
+      .update({ data: updatedElementType.data })
+      .eq('id', elementTypeId);
 
     if (error) {
-      console.error('Error updating object type:', error);
+      console.error('Error updating element type:', error);
       return;
     }
 
     // Update local state
-    setObjectTypes(prev => ({
+    setElementTypes(prev => ({
       ...prev,
-      [objectTypeId]: updatedObjectType
+      [elementTypeId]: updatedElementType
     }));
 
     // Clear tentative images
     setTentativeImages(prev => {
       const newState = { ...prev };
-      delete newState[objectTypeId];
+      delete newState[elementTypeId];
       return newState;
     });
-
-    // Update current object type if it's the one being edited
-    if (currentObjectType && currentObjectType.id === objectTypeId) {
-      setCurrentObjectType({ id: objectTypeId, ...updatedObjectType });
-    }
   };
 
-  const handleRejectTentativeImage = (objectTypeId) => {
+  const handleRejectTentativeImage = (elementTypeId) => {
     setTentativeImages(prev => {
       const newState = { ...prev };
-      delete newState[objectTypeId];
+      delete newState[elementTypeId];
       return newState;
     });
   };
 
-  const handleSelectMaterialForDrawing = (objectTypeId) => {
-    setSelectedMaterialId(objectTypeId);
-    setDrawingMode(true);
-  };
-
-  const handleToggleDrawingMode = () => {
-    setDrawingMode(!drawingMode);
-    if (!drawingMode) {
-      setSelectedMaterialId(null);
-    }
-  };
-
-  const handleDeleteObjectType = async (objectTypeId) => {
-    if (!objectTypeId) return;
+  const handleDeleteElementType = async (elementTypeId) => {
+    if (!elementTypeId) return;
 
     try {
       // Delete from database
       const { error } = await supabase
-        .from('object_types')
+        .from('element_types')
         .delete()
-        .eq('id', objectTypeId);
+        .eq('id', elementTypeId);
 
       if (error) {
-        console.error('Error deleting object type:', error);
-        alert('Failed to delete object type. Please try again.');
+        console.error('Error deleting element type:', error);
+        alert('Failed to delete element type. Please try again.');
         return;
       }
 
       // Remove from local state
-      setObjectTypes(prev => {
+      setElementTypes(prev => {
         const newState = { ...prev };
-        delete newState[objectTypeId];
+        delete newState[elementTypeId];
         return newState;
       });
+
+      // Remove from game's element_type_ids
+      const updatedElementTypeIds = (game.element_type_ids || []).filter(id => id !== elementTypeId);
+      await updateGame({ ...game, element_type_ids: updatedElementTypeIds });
 
       // Clear tentative images if they exist
       setTentativeImages(prev => {
         const newState = { ...prev };
-        delete newState[objectTypeId];
+        delete newState[elementTypeId];
         return newState;
       });
 
-      // Close editor if this object type was being edited
-      if (currentObjectType && currentObjectType.id === objectTypeId) {
-        setShowObjectEditor(false);
-        setCurrentObjectType(null);
+      // Close editor if this element type was being edited
+      if (activeElementTypeId === elementTypeId) {
+        setActiveElementTypeId(null);
       }
 
       // Clear selected material if it was the deleted one
-      if (selectedMaterialId === objectTypeId) {
+      if (selectedMaterialId === elementTypeId) {
         setSelectedMaterialId(null);
       }
 
     } catch (error) {
-      console.error('Error deleting object type:', error);
-      alert('Failed to delete object type. Please try again.');
+      console.error('Error deleting element type:', error);
+      alert('Failed to delete element type. Please try again.');
     }
   };
 
-  // Calculate quantities of each objectType in mapObjects and inventory
-  const calculateObjectQuantities = () => {
+  // Calculate quantities of each elementType in map and inventory
+  const calculateElementQuantities = () => {
     const quantities = {};
 
-    // Count objects in mapObjects
-    if (game && game.data && game.data.mapObjects) {
-      Object.values(game.data.mapObjects).forEach(mapObject => {
-        const objectTypeId = mapObject.objectTypeId;
-        quantities[objectTypeId] = (quantities[objectTypeId] || 0) + 1;
-      });
-    }
+    // Count elements in map
+    Object.values(game.map.elements).forEach(mapElement => {
+      const elementTypeId = mapElement[0]; // [elementTypeId, x, y]
+      quantities[elementTypeId] = (quantities[elementTypeId] || 0) + 1;
+    });
 
-    // Count objects in inventory (if it exists)
-    if (game && game.data && game.data.inventory) {
-      Object.entries(game.data.inventory).forEach(([objectTypeId, count]) => {
-        quantities[objectTypeId] = (quantities[objectTypeId] || 0) + count;
+    // Count elements in inventory (if it exists)
+    if (game && game.inventory) {
+      Object.entries(game.inventory).forEach(([elementTypeId, count]) => {
+        quantities[elementTypeId] = (quantities[elementTypeId] || 0) + count;
       });
     }
 
     return quantities;
   };
 
-  const handleObjectTypeMouseDown = (e, objectTypeId) => {
+  const handleElementTypeMouseDown = (e, elementTypeId) => {
     e.preventDefault(); // Prevent default drag behavior
     const startX = e.pageX;
     const startY = e.pageY;
     let hasDragged = false;
-    let createdObjectId = null;
+    let createdElementId = null;
 
     const handleMouseMove = async (moveEvent) => {
       const deltaX = moveEvent.pageX - startX;
@@ -262,51 +219,35 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
       if (distance > 10 && !hasDragged) {
         hasDragged = true;
 
-        // Create the object first at the current mouse position
-        const mapObjectId = Date.now().toString();
-        createdObjectId = mapObjectId;
+        // Create the element first at the current mouse position
+        const { elementId, updatedMap } = createMapElement(elementTypeId, 0, 0);
+        createdElementId = elementId;
 
-        // Create object at mouse position (will be converted to world coordinates by drag handlers)
-        const newMapObject = {
-          x: 0, // Will be set by drag handlers
-          y: 0, // Will be set by drag handlers
-          objectTypeId: objectTypeId
-        };
+        // Update game state immediately so the element appears
+        updateGame({ ...game, map: updatedMap }, { updateSupabase: false, updateState: true });
 
-        const gameData = game.data;
-        const updatedGameData = {
-          ...gameData,
-          mapObjects: {
-            ...gameData.mapObjects,
-            [mapObjectId]: newMapObject
-          }
-        };
-
-        // Update game state immediately so the object appears
-        updateGame({ ...game, data: updatedGameData }, { updateSupabase: false, updateState: true });
-
-        // Then start dragging the newly created object using shared drag handlers
+        // Then start dragging the newly created element using shared drag handlers
         if (onDragStart) {
-          onDragStart(mapObjectId, { x: moveEvent.pageX, y: moveEvent.pageY }, true); // true = isHUDDrag
+          onDragStart(elementId, { x: moveEvent.pageX, y: moveEvent.pageY }, true); // true = isHUDDrag
         }
 
         // Immediately set the position for the first time
         if (onDragMove) {
-          onDragMove(mapObjectId, { x: moveEvent.pageX, y: moveEvent.pageY });
+          onDragMove(elementId, { x: moveEvent.pageX, y: moveEvent.pageY });
         }
-      } else if (hasDragged && createdObjectId && onDragMove) {
-        // Continue dragging the created object
-        onDragMove(createdObjectId, { x: moveEvent.pageX, y: moveEvent.pageY });
+      } else if (hasDragged && createdElementId && onDragMove) {
+        // Continue dragging the created element
+        onDragMove(createdElementId, { x: moveEvent.pageX, y: moveEvent.pageY });
       }
     };
 
     const handleMouseUp = (upEvent) => {
       if (!hasDragged) {
         // This was a click, open the editor
-        handleEditObjectType(objectTypeId);
-      } else if (createdObjectId && onDragEnd) {
-        // End dragging the created object
-        onDragEnd(createdObjectId, { x: upEvent.pageX, y: upEvent.pageY });
+        handleEditElementType(elementTypeId);
+      } else if (createdElementId && onDragEnd) {
+        // End dragging the created element
+        onDragEnd(createdElementId, { x: upEvent.pageX, y: upEvent.pageY });
       }
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -314,10 +255,6 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleCreateButtonClick = (type) => {
-    handleCreateNewObjectType(type);
   };
 
   return (
@@ -333,67 +270,79 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
       {/* Inventory Display - top left */}
       <div style={{ position: 'fixed', top: '20px', left: '20px', zIndex: 100, display: 'flex', gap: '1px'}}>
         {_.map(['object', 'item', 'stat'], (type) => (
-          <div>
+          <div key={type}>
             {(() => {
-              const quantities = calculateObjectQuantities();
-              const itemsWithQuantity = Object.entries(objectTypes)
-                .map(([objectTypeId, objectType]) => ({
-                  objectTypeId,
-                  objectType,
-                  quantity: quantities[objectTypeId] || 0
+              const quantities = calculateElementQuantities();
+              const itemsWithQuantity = Object.entries(elementTypes)
+                .map(([elementTypeId, elementType]) => ({
+                  elementTypeId,
+                  elementType,
+                  quantity: quantities[elementTypeId] || 0
                 }))
-                .filter(item => (item.objectType.type || 'object') === type)// && item.quantity > 0)
-                // .filter(item => item.quantity > 0);
+                .filter(item => (item.elementType.data.type || 'object') === type);
 
-              return itemsWithQuantity.map(({ objectTypeId, objectType, quantity }) => objectType.type === 'material' ? null : (
-                <div
-                  key={objectTypeId}
-                  onMouseDown={(e) => handleObjectTypeMouseDown(e, objectTypeId)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginBottom: '1px',
-                    fontSize: '12px',
-                    backgroundColor: '#E6E2D2',
-                    padding: '8px',
-                    position: 'relative',
-                    width: 40,
-                    height: 40,
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {objectType.imageData ? (
-                    <img
-                      src={objectType.imageData}
-                      alt={objectType.title || 'Item'}
-                      draggable={false}
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        objectFit: 'contain',
-                        pointerEvents: 'none'
-                      }}
-                    />
-                  ) : <span style={{opacity: 0.5}}>?</span>}
-                  {/* <span style={{ flex: 1 }}>
-                    {objectType.title || 'Untitled Item'}
-                  </span> */}
-                  <span style={{
-                    fontSize: '9px',
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    padding: '1px 3px',
-                    zIndex: 1,
-                  }}>
-                    {quantity}
-                  </span>
-                </div>
-              ));
+              return itemsWithQuantity.map(({ elementTypeId, elementType, quantity }) => {
+                const isGenerating = generatingImages[elementTypeId];
+                const hasTentativeImages = tentativeImages[elementTypeId];
+
+                return (
+                  <div
+                    key={elementTypeId}
+                    onMouseDown={(e) => handleElementTypeMouseDown(e, elementTypeId)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginBottom: '1px',
+                      fontSize: '12px',
+                      backgroundColor: '#E6E2D2',
+                      padding: '8px',
+                      position: 'relative',
+                      width: 40,
+                      height: 40,
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isGenerating ? (
+                      <span style={{ fontSize: '16px', fontWeight: 'bold' }}>...</span>
+                    ) : hasTentativeImages ? (
+                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ff6600' }}>!!</span>
+                    ) : (
+                      <>
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png`}
+                          alt={elementType.title || 'Item'}
+                          draggable={false}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            objectFit: 'contain',
+                            pointerEvents: 'none'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'inline';
+                          }}
+                        />
+                        <span style={{opacity: 0.5, display: 'none'}}>?</span>
+                      </>
+                    )}
+                    <span style={{
+                      fontSize: '9px',
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      padding: '1px 3px',
+                      zIndex: 1,
+                    }}>
+                      {quantity}
+                    </span>
+                  </div>
+                );
+              });
             })()}
             <div
-                onClick={() => handleCreateButtonClick(type)}
+                onClick={() => handleCreateNewElementType(type)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -413,18 +362,18 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, objectT
         ))}
       </div>
 
-
-      {currentObjectType && (
-        <ObjectTypeEditor
-          isOpen={showObjectEditor}
+      {activeElementType && (
+        <ElementTypeEditor
+          isOpen={true}
           onClose={handleCloseEditor}
-          objectType={currentObjectType}
-          updateObjectType={handleUpdateObjectType}
-          tentativeImages={tentativeImages[currentObjectType.id]}
-          onSetTentativeImages={(options) => handleSetTentativeImages(currentObjectType.id, options)}
-          onAcceptTentativeImage={(selectedOption) => handleAcceptTentativeImage(currentObjectType.id, selectedOption)}
-          onRejectTentativeImage={() => handleRejectTentativeImage(currentObjectType.id)}
-          onDelete={handleDeleteObjectType}
+          elementType={activeElementType}
+          updateElementType={handleUpdateElementType}
+          tentativeImages={tentativeImages[activeElementTypeId]}
+          onSetTentativeImages={(options) => handleSetTentativeImages(activeElementTypeId, options)}
+          onAcceptTentativeImage={(selectedOption) => handleAcceptTentativeImage(selectedOption)}
+          onRejectTentativeImage={() => handleRejectTentativeImage(activeElementTypeId)}
+          onDelete={handleDeleteElementType}
+          onGeneratingStart={() => setGeneratingImages(prev => ({ ...prev, [activeElementTypeId]: true }))}
         />
       )}
     </>

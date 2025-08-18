@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import useImage from 'use-image';
+import K from '@/k';
 
 const Image = dynamic(() => import('react-konva').then(mod => ({ default: mod.Image })), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
@@ -8,20 +9,19 @@ const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Gr
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
 
-export default function MapObject({ uuid, mapObject, objectType, playerPosition, stageSize, zoom, offset, isEditing, onUpdatePosition, onDragStart, onDragMove, onDragEnd }) {
-  const [image] = useImage(objectType?.imageData);
-  const [isSelected, setIsSelected] = useState(false);
+export default function MapObject({ elementId, elementTypeId, x, y, elementType, playerPosition, stageSize, isEditing, isSelected, onUpdatePosition, onSelect, onDragStart, onDragMove, onDragEnd }) {
+  // Generate dynamic image URL from Supabase storage
+  const imageUrl = elementTypeId && elementTypeId !== 'preview-current' && !elementTypeId.startsWith('preview-option-')
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png`
+    : elementType.data.imageData; // Only for preview purposes
+
+  const [image] = useImage(imageUrl);
   const [isDragging, setIsDragging] = useState(false);
   const groupRef = useRef();
   const transformerRef = useRef();
 
-  // Grid snap size
-  const GRID_SIZE = 20;
-
   // Snap to grid function - snaps to world grid, not relative to player
-  const snapToGrid = (value) => {
-    return Math.round(value / GRID_SIZE) * GRID_SIZE;
-  };
+  const snapToGrid = K.snapToGrid;
 
   // Handle selection
   useEffect(() => {
@@ -42,73 +42,29 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     }
   }, [isSelected]);
 
-  if (!mapObject) return null;
-
-  // Handle missing objectType - render as black rectangle
-  if (!objectType) {
-    const screenCenterX = stageSize.width / 2;
-    const screenCenterY = stageSize.height / 2;
-    const relativeX = mapObject.x - playerPosition.x;
-    const relativeY = mapObject.y - playerPosition.y;
-    const screenX = screenCenterX + relativeX;
-    const screenY = screenCenterY + relativeY;
-
-    return (
-      <Group
-        x={screenX}
-        y={screenY}
-        draggable={isEditing}
-        onDragEnd={(e) => {
-          if (!isEditing || !onUpdatePosition) return;
-          const node = e.target;
-          const newX = snapToGrid(node.x() - screenCenterX + playerPosition.x);
-          const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
-          onUpdatePosition(uuid, { x: newX, y: newY });
-        }}
-        dragBoundFunc={(pos) => {
-          if (!isEditing) return pos;
-          const worldX = pos.x - screenCenterX + playerPosition.x;
-          const worldY = pos.y - screenCenterY + playerPosition.y;
-          const snappedWorldX = snapToGrid(worldX);
-          const snappedWorldY = snapToGrid(worldY);
-          return {
-            x: screenCenterX + (snappedWorldX - playerPosition.x),
-            y: screenCenterY + (snappedWorldY - playerPosition.y)
-          };
-        }}
-      >
-        <Rect
-          x={-10}
-          y={-10}
-          width={20}
-          height={20}
-          fill="black"
-        />
-      </Group>
-    );
-  }
-
   const {
     originalWidth,
     originalHeight,
-    scale = 1,
+    width = 1, // Width in grid units (1 = 20px)
     offsetX = 0,
     offsetY = 0,
     collisionRadius = 0.25,
     shadowRadius = 0.5
-  } = objectType;
+  } = elementType.data;
+  console.log('----', elementType.data)
+  // Calculate display dimensions
+  const displayWidth = width * K.gridSize;
+  const displayHeight = (originalHeight && originalWidth) ?
+    displayWidth * (originalHeight / originalWidth) : displayWidth;
 
-  // Calculate display dimensions - materials are always 30px
-  const isMaterial = (objectType.type || 'object') === 'material';
-  const displayWidth = isMaterial ? 20 : originalWidth * scale;
-  const displayHeight = isMaterial ? 20 : originalHeight * scale;
+  console.log('Display dimensions:', { displayWidth, displayHeight });
 
   // Calculate position relative to player and center on screen
   const screenCenterX = stageSize.width / 2;
   const screenCenterY = stageSize.height / 2;
 
-  const relativeX = mapObject.x - playerPosition.x;
-  const relativeY = mapObject.y - playerPosition.y;
+  const relativeX = x - playerPosition.x;
+  const relativeY = y - playerPosition.y;
 
   const screenX = screenCenterX + relativeX;
   const screenY = screenCenterY + relativeY;
@@ -123,9 +79,9 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragStart) {
       const node = e.target;
-      const worldX = (node.x() - offset.x) / zoom - screenCenterX + playerPosition.x;
-      const worldY = (node.y() - offset.y) / zoom - screenCenterY + playerPosition.y;
-      onDragStart(uuid, { x: worldX, y: worldY });
+      const worldX = node.x() - screenCenterX + playerPosition.x;
+      const worldY = node.y() - screenCenterY + playerPosition.y;
+      onDragStart(elementId, { x: worldX, y: worldY });
     }
   };
 
@@ -135,20 +91,16 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     if (!isEditing) return;
 
     const node = e.target;
-    // Use the exact inverse of dragBoundFunc conversion
-    // Step 1: Convert from screen coordinates to stage coordinates
-    const stageX = (node.x() - offset.x) / zoom;
-    const stageY = (node.y() - offset.y) / zoom;
-    // Step 2: Convert from stage coordinates to world coordinates
-    const worldX = stageX - screenCenterX + playerPosition.x;
-    const worldY = stageY - screenCenterY + playerPosition.y;
+    // Convert from screen coordinates to world coordinates
+    const worldX = node.x() - screenCenterX + playerPosition.x;
+    const worldY = node.y() - screenCenterY + playerPosition.y;
 
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragEnd) {
-      onDragEnd(uuid, { x: worldX, y: worldY });
+      onDragEnd(elementId, { x: worldX, y: worldY });
     } else if (onUpdatePosition) {
       // Fallback to old system
-      onUpdatePosition(uuid, { x: worldX, y: worldY });
+      onUpdatePosition(elementId, { x: worldX, y: worldY });
     }
   };
 
@@ -158,7 +110,9 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
     // Prevent event bubbling
     e.cancelBubble = true;
 
-    setIsSelected(!isSelected);
+    if (onSelect) {
+      onSelect(elementId);
+    }
   };
 
   return (
@@ -176,27 +130,22 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
           if (!isEditing) return pos;
 
           // Convert screen position to world coordinates
-          // Account for zoom offset: pos is in stage coordinates, need to convert to world
-          const stageX = (pos.x - offset.x) / zoom;
-          const stageY = (pos.y - offset.y) / zoom;
-          const worldX = stageX - screenCenterX + playerPosition.x;
-          const worldY = stageY - screenCenterY + playerPosition.y;
+          const worldX = pos.x - screenCenterX + playerPosition.x;
+          const worldY = pos.y - screenCenterY + playerPosition.y;
 
           // Snap to grid
           const snappedWorldX = snapToGrid(worldX);
           const snappedWorldY = snapToGrid(worldY);
 
           // Convert back to screen coordinates
-          const stageSnappedX = screenCenterX + (snappedWorldX - playerPosition.x);
-          const stageSnappedY = screenCenterY + (snappedWorldY - playerPosition.y);
           return {
-            x: stageSnappedX * zoom + offset.x,
-            y: stageSnappedY * zoom + offset.y
+            x: screenCenterX + (snappedWorldX - playerPosition.x),
+            y: screenCenterY + (snappedWorldY - playerPosition.y)
           };
         }}
       >
-        {/* Shadow - only for objects, not materials */}
-        {shadowRadius > 0 && !isMaterial && (
+        {/* Shadow */}
+        {shadowRadius > 0 && (
           <Ellipse
             x={0}
             y={displayHeight * 0.4} // Position shadow below object
@@ -207,14 +156,12 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
           />
         )}
 
-        {/* Object image */}
+        {/* Element image */}
         {image && (
           <Image
             image={image}
             x={-displayWidth / 2 + (displayWidth * offsetX)}
-            y={(objectType.type || 'object') === 'material' ?
-              (-displayHeight + (displayHeight * offsetY)) :
-              (-displayHeight / 2 + (displayHeight * offsetY))}
+            y={-displayHeight / 2 + (displayHeight * offsetY)}
             width={displayWidth}
             height={displayHeight}
           />
@@ -234,7 +181,7 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
         )} */}
       </Group>
 
-      {/* Transformer for selected objects */}
+      {/* Transformer for selected elements */}
       {isSelected && isEditing && (
         <Transformer
           ref={transformerRef}
@@ -254,7 +201,7 @@ export default function MapObject({ uuid, mapObject, objectType, playerPosition,
               const newY = snapToGrid(node.y() - screenCenterY + playerPosition.y);
 
               // Update position in world coordinates
-              onUpdatePosition(uuid, { x: newX, y: newY });
+              onUpdatePosition(elementId, { x: newX, y: newY });
             }
           }}
         />

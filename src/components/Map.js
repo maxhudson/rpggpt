@@ -10,7 +10,7 @@ import Player from './Player';
 
 export default function Map({
   game,
-  objectTypes,
+  elementTypes,
   isEditing,
   updateGame,
   stateRef,
@@ -19,15 +19,11 @@ export default function Map({
   onDragEnd,
   stageSize,
   setStageSize,
-  zoom,
-  setZoom,
-  offset,
-  setOffset,
   playerPosition,
   setPlayerPosition
 }) {
-  const [dragCreateObject, setDragCreateObject] = useState(null);
   const keysPressed = useRef({});
+  const [selectedElementId, setSelectedElementId] = useState(null);
 
   useEffect(() => {
     const updateSize = () => {
@@ -47,54 +43,37 @@ export default function Map({
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Check for collisions with objects - allows walking away from inside boundary
+  // Check for collisions with elements - allows walking away from inside boundary
   const checkCollision = (newX, newY, currentPlayerPos) => {
     const currentState = stateRef.current;
-    if (!currentState?.game?.data?.mapObjects || !currentState?.objectTypes) {
+    const mapElements = currentState?.game?.map?.elements || {};
+    if (!mapElements || !currentState?.elementTypes) {
       console.log('No collision data available');
       return false;
     }
 
     const playerRadius = 10; // Player collision radius
-    const currentMapObjects = Object.values(currentState.game.data.mapObjects);
-    const currentObjectTypes = currentState.objectTypes;
+    const currentMapElements = Object.entries(mapElements);
+    const currentElementTypes = currentState.elementTypes;
 
-    console.log('Checking collision:', {
-      newX, newY,
-      currentPlayerPos,
-      mapObjectsCount: currentMapObjects.length,
-      objectTypesCount: Object.keys(currentObjectTypes).length
-    });
+    const hasCollision = currentMapElements.some(([elementId, mapElement]) => {
+      const [elementTypeId, x, y] = mapElement; // [elementTypeId, x, y]
+      const elementType = currentElementTypes[elementTypeId];
+      if (!elementType) return false;
 
-    const hasCollision = currentMapObjects.some(obj => {
-      const objType = currentObjectTypes[obj.objectTypeId];
-      if (!objType || objType.type === 'material') return false; // No collision with materials
-
-      const collisionRadius = objType.collisionRadius || 0.25;
-      const objDisplayWidth = objType.type === 'material' ? 20 : (objType.originalWidth || 100) * (objType.scale || 1);
-      const boundaryDistance = playerRadius + (objDisplayWidth * collisionRadius);
+      const collisionRadius = elementType.data.collisionRadius || 0.25;
+      const elementDisplayWidth = (elementType.data.width || 1) * 20; // K.gridSize
+      const boundaryDistance = playerRadius + (elementDisplayWidth * collisionRadius);
 
       const currentDistance = Math.sqrt(
-        Math.pow(obj.x - currentPlayerPos.x, 2) +
-        Math.pow(obj.y - currentPlayerPos.y, 2)
+        Math.pow(x - currentPlayerPos.x, 2) +
+        Math.pow(y - currentPlayerPos.y, 2)
       );
 
       const newDistance = Math.sqrt(
-        Math.pow(obj.x - newX, 2) +
-        Math.pow(obj.y - newY, 2)
+        Math.pow(x - newX, 2) +
+        Math.pow(y - newY, 2)
       );
-
-      console.log('Object collision check:', {
-        objId: obj.objectTypeId,
-        objPos: { x: obj.x, y: obj.y },
-        objType: objType.title,
-        collisionRadius,
-        objDisplayWidth,
-        boundaryDistance,
-        currentDistance,
-        newDistance,
-        wouldCollide: newDistance < boundaryDistance
-      });
 
       // If currently inside boundary, allow movement that increases distance (walking away)
       if (currentDistance < boundaryDistance) {
@@ -113,11 +92,50 @@ export default function Map({
     return hasCollision;
   };
 
+  // Check if player is within boundary polygon
+  const checkBoundaryCollision = (newX, newY) => {
+    const boundaryPolygon = game?.map?.boundaryPolygon;
+    if (!boundaryPolygon || boundaryPolygon.length < 3) return false;
+
+    // Point-in-polygon test using ray casting algorithm
+    let inside = false;
+    for (let i = 0, j = boundaryPolygon.length - 1; i < boundaryPolygon.length; j = i++) {
+      const xi = boundaryPolygon[i][0], yi = boundaryPolygon[i][1];
+      const xj = boundaryPolygon[j][0], yj = boundaryPolygon[j][1];
+
+      if (((yi > newY) !== (yj > newY)) && (newX < (xj - xi) * (newY - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+
+    return !inside; // Return true if outside boundary (collision)
+  };
+
   useEffect(() => {
     const moveSpeed = 1;
 
     const handleKeyDown = (e) => {
       keysPressed.current[e.key.toLowerCase()] = true;
+
+      // Handle delete/backspace for selected elements
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId && isEditing) {
+        e.preventDefault();
+
+        // Use stateRef to access current game state and updateGame function
+        const currentGame = stateRef.current.game;
+        if (!updateGame || !selectedElementId || !currentGame?.map?.elements) return;
+
+        const updatedElements = { ...currentGame.map.elements };
+        delete updatedElements[selectedElementId];
+
+        const updatedMap = {
+          elements: updatedElements,
+          boundaryPolygon: currentGame.map.boundaryPolygon || null
+        };
+
+        updateGame({ ...currentGame, map: updatedMap });
+        setSelectedElementId(null);
+      }
     };
 
     const handleKeyUp = (e) => {
@@ -143,12 +161,12 @@ export default function Map({
           let finalY = prev.y;
 
           // Check X movement
-          if (deltaX !== 0 && !checkCollision(newX, prev.y, prev)) {
+          if (deltaX !== 0 && !checkCollision(newX, prev.y, prev) && !checkBoundaryCollision(newX, prev.y)) {
             finalX = newX;
           }
 
           // Check Y movement
-          if (deltaY !== 0 && !checkCollision(finalX, newY, prev)) {
+          if (deltaY !== 0 && !checkCollision(finalX, newY, prev) && !checkBoundaryCollision(finalX, newY)) {
             finalY = newY;
           }
 
@@ -167,53 +185,46 @@ export default function Map({
       window.removeEventListener('keyup', handleKeyUp);
       clearInterval(intervalId);
     };
-  }, []);
+  }, [selectedElementId, isEditing]);
 
-  const { mapObjects = {} } = game.data;
+  const mapElements = game.map.elements;
 
-  const handleUpdatePosition = async (uuid, newPosition) => {
-    if (!updateGame) return;
+  const handleDeleteElement = async (elementId) => {
+    if (!updateGame || !elementId) return;
 
-    const gameData = game.data;
-    const updatedGameData = {
-      ...gameData,
-      mapObjects: {
-        ...gameData.mapObjects,
-        [uuid]: {
-          ...gameData.mapObjects[uuid],
-          x: newPosition.x,
-          y: newPosition.y
-        }
-      }
+    const updatedElements = { ...mapElements };
+    delete updatedElements[elementId];
+
+    const updatedMap = {
+      elements: updatedElements,
+      boundaryPolygon: game.map.boundaryPolygon || null
     };
 
-    await updateGame({ data: updatedGameData });
+    await updateGame({ ...game, map: updatedMap });
+    setSelectedElementId(null);
   };
 
-  const handleWheel = (e) => {
-    // e.evt.preventDefault();
+  const handleUpdatePosition = async (elementId, newPosition) => {
+    if (!updateGame) return;
 
-    // const stage = e.target.getStage();
-    // const oldScale = stage.scaleX();
-    // const pointer = stage.getPointerPosition();
+    const existingElement = mapElements[elementId];
+    if (existingElement) {
+      const updatedElements = {
+        ...mapElements,
+        [elementId]: [existingElement[0], newPosition.x, newPosition.y] // [elementTypeId, x, y]
+      };
 
-    // // Determine zoom direction and amount
-    // const direction = e.evt.deltaY < 0 ? -1 : 1;
-    // const zoomFactor = 1.1;
-    // let newScale = direction > 0 ? oldScale * zoomFactor : oldScale / zoomFactor;
+      const updatedMap = {
+        elements: updatedElements,
+        boundaryPolygon: game.map.boundaryPolygon || null
+      };
 
-    // // Clamp zoom between 0.5x and 2x
-    // newScale = Math.max(0.5, Math.min(2, newScale));
+      await updateGame({ ...game, map: updatedMap });
+    }
+  };
 
-    // setZoom(newScale);
-
-    // // Update offset to keep zoom centered
-    // const newPos = {
-    //   x: -stageSize.width * (newScale - 1) / 2,
-    //   y: -stageSize.height * (newScale - 1) / 2,
-    // };
-
-    // setOffset(newPos);
+  const handleElementSelect = (elementId) => {
+    setSelectedElementId(elementId);
   };
 
   return (
@@ -221,11 +232,6 @@ export default function Map({
       <Stage
         width={stageSize.width}
         height={stageSize.height}
-        scaleX={zoom}
-        scaleY={zoom}
-        x={offset.x}
-        y={offset.y}
-        onWheel={handleWheel}
       >
         <Layer>
           {/* Render Player Shadow - below all other elements */}
@@ -239,7 +245,7 @@ export default function Map({
             listening={false}
           />
 
-          {/* Render objects and player sorted by Y position for depth */}
+          {/* Render elements and player sorted by Y position for depth */}
           {[
             // Add player to the rendering list with current Y position
             {
@@ -247,19 +253,25 @@ export default function Map({
               y: playerPosition.y,
               isPlayer: true
             },
-            // Add all map objects (excluding materials)
-            ...Object.entries(mapObjects)
-              .filter(([uuid, mapObject]) => {
-                const objectType = objectTypes[mapObject.objectTypeId];
-                return objectType && objectType.type !== 'material';
+            // Add all map elements (excluding materials)
+            ...Object.entries(mapElements)
+              .filter(([elementId, mapElement]) => {
+                const [elementTypeId] = mapElement; // [elementTypeId, x, y]
+                const elementType = elementTypes[elementTypeId];
+                return elementType;
               })
-              .map(([uuid, mapObject]) => ({
-                id: uuid,
-                y: mapObject.y,
-                isPlayer: false,
-                mapObject,
-                objectType: objectTypes[mapObject.objectTypeId]
-              }))
+              .map(([elementId, mapElement]) => {
+                const [elementTypeId, x, y] = mapElement; // [elementTypeId, x, y]
+                return {
+                  id: elementId,
+                  y: y,
+                  isPlayer: false,
+                  elementId,
+                  elementTypeId,
+                  x,
+                  elementType: elementTypes[elementTypeId]
+                };
+              })
           ]
             .sort((a, b) => a.y - b.y) // Sort by Y position (lower Y renders first/behind)
             .map(item => {
@@ -277,15 +289,17 @@ export default function Map({
                 return (
                   <MapObject
                     key={item.id}
-                    uuid={item.id}
-                    mapObject={item.mapObject}
-                    objectType={item.objectType}
+                    elementId={item.elementId}
+                    elementTypeId={item.elementTypeId}
+                    x={item.x}
+                    y={item.y}
+                    elementType={item.elementType}
                     playerPosition={playerPosition}
                     stageSize={stageSize}
-                    zoom={zoom}
-                    offset={offset}
                     isEditing={isEditing}
+                    isSelected={selectedElementId === item.elementId}
                     onUpdatePosition={handleUpdatePosition}
+                    onSelect={handleElementSelect}
                     onDragStart={onDragStart}
                     onDragMove={onDragMove}
                     onDragEnd={onDragEnd}
