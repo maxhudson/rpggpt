@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import ElementTypeEditor from './ElementTypeEditor';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, playerPosition, selectedPolygonId }) {
-
-  // Get player data
-  const players = game.players[session.user.id];
+export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, player, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, selectedPolygonId, nearbyInteractiveElements, onCraft, onSell, onBuy }) {
   const [activeElementTypeId, setActiveElementTypeId] = useState(null);
   const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by elementType id
+  const tentativeImagesRef = useRef({}); // Ref for avoiding race conditions with async API responses
   const [generatingImages, setGeneratingImages] = useState({}); // Track which element types are generating images
   const [isDragging, setIsDragging] = useState(false);
   const [dragElementTypeId, setDragElementTypeId] = useState(null);
   const [selectedPolygonColor, setSelectedPolygonColor] = useState('#808080');
+
+  tentativeImagesRef.current = tentativeImages; // Keep ref in sync with state
 
   // Derive the active element type object from the ID and elementTypes
   const activeElementType = activeElementTypeId ? elementTypes[activeElementTypeId] : null;
@@ -199,8 +199,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
     });
 
     // Count elements in player inventory
-    if (players && players.inventory) {
-      Object.entries(players.inventory).forEach(([elementTypeId, count]) => {
+    if (player && player.inventory) {
+      Object.entries(player.inventory).forEach(([elementTypeId, count]) => {
         quantities[elementTypeId] = (quantities[elementTypeId] || 0) + count;
       });
     }
@@ -262,7 +262,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleCreatePolygon = async (playerPosition) => {
+  const handleCreatePolygon = async () => {
     // Get next polygon ID
     const existingIds = Object.keys(game.background || {}).map(id => parseInt(id)).filter(id => !isNaN(id));
     const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
@@ -273,10 +273,10 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
       type: 'path',
       fill: selectedPolygonColor,
       points: [
-        [playerPosition.x - size/2, playerPosition.y - size/2], // Top-left
-        [playerPosition.x + size/2, playerPosition.y - size/2], // Top-right
-        [playerPosition.x + size/2, playerPosition.y + size/2], // Bottom-right
-        [playerPosition.x - size/2, playerPosition.y + size/2]  // Bottom-left
+        [player.position.x - size/2, player.position.y - size/2], // Top-left
+        [player.position.x + size/2, player.position.y - size/2], // Top-right
+        [player.position.x + size/2, player.position.y + size/2], // Bottom-right
+        [player.position.x - size/2, player.position.y + size/2]  // Bottom-left
       ]
     };
 
@@ -318,7 +318,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
 
       {/* Inventory Display - top left */}
       <div style={{ position: 'fixed', top: '20px', left: '20px', zIndex: 100, display: 'flex', gap: '1px'}}>
-        {_.map(['object', 'item', 'stat'], (type) => (
+        {_.map(isEditing ? ['object', 'plant', 'building', 'tool', 'item', 'stat'] : ['tool', 'item', 'stat'], (type) => (
           <div key={type}>
             {(() => {
               const quantities = calculateElementQuantities();
@@ -376,57 +376,157 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                         <span style={{opacity: 0.5, display: 'none'}}>?</span>
                       </>
                     )}
-                    <span style={{
-                      fontSize: '9px',
-                      position: 'absolute',
-                      bottom: 0,
-                      right: 0,
-                      padding: '1px 3px',
-                      zIndex: 1,
-                    }}>
-                      {quantity}
-                    </span>
+                    {quantity > 0 && (
+                      <span style={{
+                        fontSize: '9px',
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        padding: '0px 2px',
+                        zIndex: 1,
+                        fontWeight: 'bold',
+                        opacity: 0.7,
+                      }}>
+                        {quantity}
+                      </span>
+                    )}
                   </div>
                 );
               });
             })()}
-            <div
-                onClick={() => handleCreateNewElementType(type)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '1px',
-                  fontSize: '12px',
-                  backgroundColor: '#E6E2D2',
-                  padding: '8px',
-                  position: 'relative',
-                  width: 40,
-                  height: 40,
-                  justifyContent: 'center',
-                  opacity: 0.5,
-                  cursor: 'pointer',
-                }}
-              >+</div>
+            {isEditing && (
+              <div
+                  onClick={() => handleCreateNewElementType(type)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '1px',
+                    fontSize: '12px',
+                    backgroundColor: '#E6E2D2',
+                    padding: '8px',
+                    position: 'relative',
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    opacity: 0.5,
+                    cursor: 'pointer',
+                  }}
+                >+</div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Money Display - bottom left */}
-      {players && (
+      {/* Money Display - bottom left - only show when not editing */}
+      {player && !isEditing && (
         <div style={{
           position: 'fixed',
           bottom: '20px',
           left: '20px',
           zIndex: 100,
-          backgroundColor: '#E6E2D2',
-          border: '1px solid #8B7355',
-          borderRadius: '4px',
           padding: '8px 12px',
-          fontSize: '14px',
+          fontSize: '17px',
           fontWeight: 'bold',
           color: '#4A4A4A'
         }}>
-          {players.money || 0} coins
+          ${player.money || 0}
+        </div>
+      )}
+
+      {/* Action Buttons - bottom center when near interactive elements and not editing */}
+      {!isEditing && nearbyInteractiveElements && nearbyInteractiveElements.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          alignItems: 'center'
+        }}>
+          {nearbyInteractiveElements.slice(0, 1).map(({ elementType, elementId }) => (
+            <div key={elementId} style={{
+              backgroundColor: 'rgba(230, 226, 210, 0.95)',
+              border: '2px solid #8B7355',
+              borderRadius: '8px',
+              padding: '15px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              alignItems: 'center',
+              minWidth: '200px'
+            }}>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#4A4A4A',
+                textAlign: 'center'
+              }}>
+                {elementType.data.title || 'Interactive Element'}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {elementType.data.actions?.craft === 1 && (
+                  <button
+                    onClick={() => onCraft(elementType)}
+                    style={{
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Craft
+                  </button>
+                )}
+
+                {elementType.data.actions?.sell === 1 && (
+                  <button
+                    onClick={() => onSell(elementType)}
+                    style={{
+                      backgroundColor: '#FF9800',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Sell
+                  </button>
+                )}
+
+                {elementType.data.actions?.buy === 1 && (
+                  <button
+                    onClick={() => onBuy(elementType)}
+                    style={{
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Buy
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -453,7 +553,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
             }}
           />
           <button
-            onClick={() => handleCreatePolygon(playerPosition)}
+            onClick={handleCreatePolygon}
             style={{
               backgroundColor: '#E6E2D2',
               border: '1px solid #ccc',
@@ -482,6 +582,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           onDelete={handleDeleteElementType}
           onGeneratingStart={() => setGeneratingImages(prev => ({ ...prev, [activeElementTypeId]: true }))}
           elementTypes={elementTypes}
+          updateGame={updateGame}
+          stateRef={stateRef}
         />
       )}
     </>

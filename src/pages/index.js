@@ -47,7 +47,6 @@ export default function Home({session}) {
     try {
       const newGame = {
         user_id: session.user.id,
-        title: `New Game ${new Date().toLocaleDateString()}`,
         map: {
           elements: {},
           boundaryPolygon: [

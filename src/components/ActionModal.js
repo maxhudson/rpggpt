@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ElementTypeIcon from './ElementTypeIcon';
 
 export default function ActionModal({
@@ -8,6 +8,8 @@ export default function ActionModal({
   elementTypes,
   player
 }) {
+  const [quantities, setQuantities] = useState({});
+
   if (!activeAction) return null;
 
   const { type, elementType } = activeAction;
@@ -25,17 +27,19 @@ export default function ActionModal({
           });
           return { id, elementType: et, isAffordable: canAfford };
         });
-    } else if (type === 'sell') {
-      // Show items in player inventory
+    }
+    else if (type === 'sell') {
+      // Show items in player inventory that have a price
       return Object.entries(player.inventory)
-        .filter(([id, qty]) => qty > 0 && elementTypes[id])
+        .filter(([id, qty]) => qty > 0 && elementTypes[id] && elementTypes[id].data?.price > 0)
         .map(([id, qty]) => ({
           id,
           elementType: elementTypes[id],
           quantity: qty,
           isAffordable: true
         }));
-    } else if (type === 'buy') {
+    }
+    else if (type === 'buy') {
       // Show all items with prices
       return Object.entries(elementTypes)
         .filter(([id, et]) => et.data?.type === 'item' && et.data?.price > 0)
@@ -127,44 +131,180 @@ export default function ActionModal({
             {getEmptyMessage()}
           </p>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-            gap: '10px'
-          }}>
-            {availableItems.map(({ id, elementType: itemType, quantity, isAffordable }) => (
-              <div key={id}>
-                <ElementTypeIcon
-                  elementType={itemType}
-                  quantity={quantity}
-                  isAffordable={isAffordable}
-                  onClick={isAffordable ? () => onAction(itemType) : undefined}
-                  showQuantity={type === 'sell'}
-                  size="medium"
-                />
-                {type === 'craft' && itemType.data.craftingRequirements && (
-                  <div style={{
-                    fontSize: '10px',
-                    color: '#666',
-                    marginTop: '5px',
-                    textAlign: 'center'
+          // Unified layout for all action types with quantity inputs
+          <div>
+            <div style={{ marginBottom: '20px' }}>
+              {availableItems.map(({ id, elementType: itemType, quantity: availableQty }) => {
+                const selectedQuantity = quantities[id] || 0;
+
+                // Calculate display info based on action type
+                let displayInfo = {};
+                if (type === 'buy') {
+                  const price = itemType.data.price || 0;
+                  displayInfo = {
+                    subtitle: `$${price} each`,
+                    total: `$${selectedQuantity * price}`,
+                    maxQuantity: 999 // No limit for buying
+                  };
+                } else if (type === 'sell') {
+                  const price = itemType.data.price || 0;
+                  displayInfo = {
+                    subtitle: `$${price} each (have ${availableQty})`,
+                    total: `$${selectedQuantity * price}`,
+                    maxQuantity: availableQty
+                  };
+                } else if (type === 'craft') {
+                  const outputQuantity = itemType.data?.craftingOutputQuantity || 1;
+                  const requirements = itemType.data.craftingRequirements || {};
+                  const maxCraftable = Math.min(...Object.entries(requirements).map(([reqId, reqQty]) => {
+                    return Math.floor((player.inventory[reqId] || 0) / reqQty);
+                  }));
+                  displayInfo = {
+                    subtitle: `Makes ${outputQuantity} each`,
+                    total: `${selectedQuantity * outputQuantity} items`,
+                    maxQuantity: maxCraftable
+                  };
+                }
+
+                return (
+                  <div key={id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    marginBottom: '10px'
                   }}>
-                    Requires:
-                    {Object.entries(itemType.data.craftingRequirements).map(([reqId, reqQty]) => {
-                      const reqType = elementTypes[reqId];
-                      const hasEnough = (player.inventory[reqId] || 0) >= reqQty;
-                      return (
-                        <div key={reqId} style={{
-                          color: hasEnough ? '#4CAF50' : '#f44336'
-                        }}>
-                          {reqQty}x {reqType?.data?.title || `Item ${reqId}`}
+                    <ElementTypeIcon
+                      elementType={itemType}
+                      size="small"
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold' }}>
+                        {itemType.data.title || 'Unnamed Item'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        {displayInfo.subtitle}
+                      </div>
+                      {type === 'craft' && itemType.data.craftingRequirements && (
+                        <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                          Requires: {Object.entries(itemType.data.craftingRequirements).map(([reqId, reqQty]) => {
+                            const reqType = elementTypes[reqId];
+                            const hasEnough = (player.inventory[reqId] || 0) >= reqQty * selectedQuantity;
+                            return (
+                              <span key={reqId} style={{ color: hasEnough ? '#4CAF50' : '#f44336', marginRight: '8px' }}>
+                                {reqQty * selectedQuantity}x {reqType?.data?.title || `Item ${reqId}`}
+                              </span>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ fontSize: '12px' }}>Qty:</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={displayInfo.maxQuantity}
+                        value={selectedQuantity}
+                        onChange={(e) => setQuantities(prev => ({
+                          ...prev,
+                          [id]: Math.max(0, Math.min(displayInfo.maxQuantity, parseInt(e.target.value) || 0))
+                        }))}
+                        style={{
+                          width: '60px',
+                          padding: '4px',
+                          border: '1px solid #ccc',
+                          borderRadius: '2px'
+                        }}
+                      />
+                      <div style={{ fontSize: '12px', minWidth: '60px', textAlign: 'right' }}>
+                        {displayInfo.total}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              })}
+            </div>
+
+            {/* Total and action button */}
+            {(() => {
+              let totalDisplay = '';
+              let buttonText = '';
+              let canPerformAction = false;
+              let hasItems = false;
+
+              if (type === 'buy') {
+                const totalCost = availableItems.reduce((sum, { id, elementType: itemType }) => {
+                  const quantity = quantities[id] || 0;
+                  const price = itemType.data.price || 0;
+                  return sum + (quantity * price);
+                }, 0);
+                totalDisplay = `Total: $${totalCost}`;
+                buttonText = totalCost === 0 ? 'Select Items' : totalCost > player.money ? 'Not Enough Money' : 'Buy Items';
+                canPerformAction = totalCost > 0 && totalCost <= player.money;
+                hasItems = totalCost > 0;
+              } else if (type === 'sell') {
+                const totalEarnings = availableItems.reduce((sum, { id, elementType: itemType }) => {
+                  const quantity = quantities[id] || 0;
+                  const price = itemType.data.price || 0;
+                  return sum + (quantity * price);
+                }, 0);
+                totalDisplay = `Total: $${totalEarnings}`;
+                buttonText = totalEarnings === 0 ? 'Select Items' : 'Sell Items';
+                canPerformAction = totalEarnings > 0;
+                hasItems = totalEarnings > 0;
+              } else if (type === 'craft') {
+                const totalItems = availableItems.reduce((sum, { id, elementType: itemType }) => {
+                  const quantity = quantities[id] || 0;
+                  const outputQuantity = itemType.data?.craftingOutputQuantity || 1;
+                  return sum + (quantity * outputQuantity);
+                }, 0);
+                totalDisplay = `Total: ${totalItems} items`;
+                buttonText = totalItems === 0 ? 'Select Items' : 'Craft Items';
+
+                // Check if we have enough materials for all selected crafts
+                canPerformAction = totalItems > 0 && availableItems.every(({ id, elementType: itemType }) => {
+                  const quantity = quantities[id] || 0;
+                  if (quantity === 0) return true;
+                  const requirements = itemType.data.craftingRequirements || {};
+                  return Object.entries(requirements).every(([reqId, reqQty]) => {
+                    return (player.inventory[reqId] || 0) >= reqQty * quantity;
+                  });
+                });
+                hasItems = totalItems > 0;
+              }
+
+              return (
+                <div style={{
+                  borderTop: '2px solid #ddd',
+                  paddingTop: '15px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                    {totalDisplay}
+                  </div>
+                  <button
+                    onClick={() => onAction({ quantities, type })}
+                    disabled={!canPerformAction}
+                    style={{
+                      backgroundColor: canPerformAction ? '#4CAF50' : '#ccc',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '10px 20px',
+                      fontSize: '16px',
+                      cursor: canPerformAction ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    {buttonText}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

@@ -37,14 +37,20 @@ export default function GamePage({session}) {
   const [currentPolygonPoints, setCurrentPolygonPoints] = useState([]);
 
   // Action system state
-  const [nearbyInteractiveElements, setNearbyInteractiveElements] = useState([]);
+  const [nearbyInteractiveElementIds, _setNearbyInteractiveElementIds] = useState([]);
   const [activeAction, setActiveAction] = useState(null); // { type: 'craft'|'sell'|'buy', elementType: {...} }
+
+  const setNearbyInteractiveElementIds = (newIds) => {
+    _setNearbyInteractiveElementIds(newIds);
+    stateRef.current.nearbyInteractiveElementIds = newIds;
+  };
 
   // Create refs for state to avoid race conditions
   const stateRef = useRef({
     game: null,
     elementTypes: {},
-    player: null
+    player: null,
+    nearbyInteractiveElementIds: []
   });
 
   // Track next element ID for map elements
@@ -280,7 +286,7 @@ export default function GamePage({session}) {
   // Detect nearby interactive elements
   useEffect(() => {
     if (!stateRef.current.game || !stateRef.current.elementTypes || isEditing || !stateRef.current.player) {
-      setNearbyInteractiveElements([]);
+      setNearbyInteractiveElementIds([]);
       return;
     }
 
@@ -311,7 +317,6 @@ export default function GamePage({session}) {
         nearby.push({
           elementId,
           elementTypeId,
-          elementType,
           distance,
           x,
           y
@@ -321,7 +326,7 @@ export default function GamePage({session}) {
 
     // Sort by distance (closest first)
     nearby.sort((a, b) => a.distance - b.distance);
-    setNearbyInteractiveElements(nearby);
+    setNearbyInteractiveElementIds(nearby);
   }, [game, elementTypes, isEditing]);
 
   // Helper function to ensure player data exists
@@ -368,73 +373,136 @@ export default function GamePage({session}) {
   };
 
   // Modal action handlers
-  const handleModalAction = async (itemElementType) => {
+  const handleModalAction = async (actionData) => {
     if (!activeAction) return;
 
     const playerData = await ensurePlayerData();
     const currentGame = stateRef.current.game;
 
-    if (activeAction.type === 'craft') {
-      const craftingRequirements = itemElementType.data.craftingRequirements || {};
-      const playerInventory = playerData.inventory || {};
+    // Handle new batch operations format
+    if (actionData.quantities && actionData.type) {
+      const { quantities, type } = actionData;
+      let updatedInventory = { ...playerData.inventory };
+      let updatedMoney = playerData.money || 0;
+      let totalProcessed = 0;
 
-      // Check if player has all required items
-      for (const [reqElementTypeId, requiredQuantity] of Object.entries(craftingRequirements)) {
-        const playerQuantity = playerInventory[reqElementTypeId] || 0;
-        if (playerQuantity < requiredQuantity) {
-          const requiredElementType = elementTypes[reqElementTypeId];
-          const itemName = requiredElementType?.data?.title || `Item ${reqElementTypeId}`;
-          alert(`You need ${requiredQuantity} ${itemName} but only have ${playerQuantity}`);
+      if (type === 'craft') {
+        // Process all craft operations
+        for (const [itemId, quantity] of Object.entries(quantities)) {
+          if (quantity <= 0) continue;
+
+          const itemElementType = elementTypes[itemId];
+          if (!itemElementType) continue;
+
+          const craftingRequirements = itemElementType.data.craftingRequirements || {};
+
+          // Check if we have enough materials for this quantity
+          let canCraft = true;
+          for (const [reqElementTypeId, reqQty] of Object.entries(craftingRequirements)) {
+            const totalRequired = reqQty * quantity;
+            const available = updatedInventory[reqElementTypeId] || 0;
+            if (available < totalRequired) {
+              canCraft = false;
+              break;
+            }
+          }
+
+          if (!canCraft) continue;
+
+          // Consume required items
+          for (const [reqElementTypeId, reqQty] of Object.entries(craftingRequirements)) {
+            const totalRequired = reqQty * quantity;
+            console.log(totalRequired, reqQty, quantity, reqElementTypeId, updatedInventory);
+            updatedInventory[reqElementTypeId] -= totalRequired;
+            if (updatedInventory[reqElementTypeId] <= 0) {
+              delete updatedInventory[reqElementTypeId];
+            }
+          }
+
+          // Add crafted items to inventory
+          const outputQuantity = itemElementType.data?.craftingOutputQuantity || 1;
+          const totalOutput = outputQuantity * quantity;
+          updatedInventory[itemId] = (updatedInventory[itemId] || 0) + totalOutput;
+          totalProcessed += totalOutput;
+        }
+
+        if (totalProcessed > 0) {
+          alert(`Crafted ${totalProcessed} items!`);
+        }
+
+      } else if (type === 'sell') {
+        let totalEarnings = 0;
+
+        // Process all sell operations
+        for (const [itemId, quantity] of Object.entries(quantities)) {
+          if (quantity <= 0) continue;
+
+          const itemElementType = elementTypes[itemId];
+          if (!itemElementType) continue;
+
+          const available = updatedInventory[itemId] || 0;
+          const actualQuantity = Math.min(quantity, available);
+
+          if (actualQuantity <= 0) continue;
+
+          const sellPrice = itemElementType.data.price || 0;
+          const earnings = sellPrice * actualQuantity;
+
+          // Remove items from inventory
+          updatedInventory[itemId] -= actualQuantity;
+          if (updatedInventory[itemId] <= 0) {
+            delete updatedInventory[itemId];
+          }
+
+          // Add money
+          updatedMoney += earnings;
+          totalEarnings += earnings;
+          totalProcessed += actualQuantity;
+        }
+
+        if (totalProcessed > 0) {
+          alert(`Sold ${totalProcessed} items for $${totalEarnings}!`);
+        }
+
+      } else if (type === 'buy') {
+        let totalCost = 0;
+
+        // Calculate total cost first
+        for (const [itemId, quantity] of Object.entries(quantities)) {
+          if (quantity <= 0) continue;
+          const itemElementType = elementTypes[itemId];
+          if (!itemElementType) continue;
+          const price = itemElementType.data.price || 0;
+          totalCost += price * quantity;
+        }
+
+        if (totalCost > updatedMoney) {
+          alert(`Not enough money! Need $${totalCost} but only have $${updatedMoney}`);
           return;
         }
-      }
 
-      // Consume required items
-      const updatedInventory = { ...playerInventory };
-      for (const [reqElementTypeId, requiredQuantity] of Object.entries(craftingRequirements)) {
-        updatedInventory[reqElementTypeId] -= requiredQuantity;
-        if (updatedInventory[reqElementTypeId] <= 0) {
-          delete updatedInventory[reqElementTypeId];
+        // Process all buy operations
+        for (const [itemId, quantity] of Object.entries(quantities)) {
+          if (quantity <= 0) continue;
+
+          const itemElementType = elementTypes[itemId];
+          if (!itemElementType) continue;
+
+          const price = itemElementType.data.price || 0;
+          const cost = price * quantity;
+
+          // Add items to inventory
+          updatedInventory[itemId] = (updatedInventory[itemId] || 0) + quantity;
+          totalProcessed += quantity;
+        }
+
+        // Subtract total cost
+        updatedMoney -= totalCost;
+
+        if (totalProcessed > 0) {
+          alert(`Bought ${totalProcessed} items for $${totalCost}!`);
         }
       }
-
-      // Add crafted item to inventory
-      const craftedItemId = itemElementType.id.toString();
-      updatedInventory[craftedItemId] = (updatedInventory[craftedItemId] || 0) + 1;
-
-      // Update game data
-      const updatedPlayers = {
-        ...currentGame.players,
-        [session.user.id]: {
-          ...playerData,
-          inventory: updatedInventory
-        }
-      };
-
-      await updateGame({ ...currentGame, players: updatedPlayers });
-      alert(`Crafted 1 ${itemElementType.data.title}!`);
-
-    } else if (activeAction.type === 'sell') {
-      const playerInventory = playerData.inventory || {};
-      const itemId = itemElementType.id.toString();
-      const playerQuantity = playerInventory[itemId] || 0;
-
-      if (playerQuantity <= 0) {
-        alert(`You don't have any ${itemElementType.data.title} to sell`);
-        return;
-      }
-
-      const sellPrice = itemElementType.data.price || 10;
-
-      // Remove item from inventory
-      const updatedInventory = { ...playerInventory };
-      updatedInventory[itemId] -= 1;
-      if (updatedInventory[itemId] <= 0) {
-        delete updatedInventory[itemId];
-      }
-
-      // Add money
-      const updatedMoney = (playerData.money || 0) + sellPrice;
 
       // Update game data
       const updatedPlayers = {
@@ -447,42 +515,125 @@ export default function GamePage({session}) {
       };
 
       await updateGame({ ...currentGame, players: updatedPlayers });
-      alert(`Sold 1 ${itemElementType.data.title} for ${sellPrice} coins!`);
+    } else {
+      // Handle legacy single-item operations (fallback)
+      const itemElementType = actionData;
 
-    } else if (activeAction.type === 'buy') {
-      const buyPrice = itemElementType.data.price || 10;
-      const playerMoney = playerData.money || 0;
+      if (activeAction.type === 'craft') {
+        const craftingRequirements = itemElementType.data.craftingRequirements || {};
+        const playerInventory = playerData.inventory || {};
 
-      if (playerMoney < buyPrice) {
-        alert(`You need ${buyPrice} coins but only have ${playerMoney}`);
-        return;
-      }
-
-      // Add item to inventory
-      const updatedInventory = { ...playerData.inventory };
-      const itemId = itemElementType.id.toString();
-      updatedInventory[itemId] = (updatedInventory[itemId] || 0) + 1;
-
-      // Subtract money
-      const updatedMoney = playerMoney - buyPrice;
-
-      // Update game data
-      const updatedPlayers = {
-        ...currentGame.players,
-        [session.user.id]: {
-          ...playerData,
-          inventory: updatedInventory,
-          money: updatedMoney
+        // Check if player has all required items
+        for (const [reqElementTypeId, requiredQuantity] of Object.entries(craftingRequirements)) {
+          const playerQuantity = playerInventory[reqElementTypeId] || 0;
+          if (playerQuantity < requiredQuantity) {
+            const requiredElementType = elementTypes[reqElementTypeId];
+            const itemName = requiredElementType?.data?.title || `Item ${reqElementTypeId}`;
+            alert(`You need ${requiredQuantity} ${itemName} but only have ${playerQuantity}`);
+            return;
+          }
         }
-      };
 
-      await updateGame({ ...currentGame, players: updatedPlayers });
-      alert(`Bought 1 ${itemElementType.data.title} for ${buyPrice} coins!`);
+        // Consume required items
+        const updatedInventory = { ...playerInventory };
+        for (const [reqElementTypeId, requiredQuantity] of Object.entries(craftingRequirements)) {
+          updatedInventory[reqElementTypeId] -= requiredQuantity;
+          if (updatedInventory[reqElementTypeId] <= 0) {
+            delete updatedInventory[reqElementTypeId];
+          }
+        }
+
+        // Add crafted item to inventory
+        const craftedItemId = itemElementType.id.toString();
+        const outputQuantity = itemElementType.data?.craftingOutputQuantity || 1;
+        updatedInventory[craftedItemId] = (updatedInventory[craftedItemId] || 0) + outputQuantity;
+
+        // Update game data
+        const updatedPlayers = {
+          ...currentGame.players,
+          [session.user.id]: {
+            ...playerData,
+            inventory: updatedInventory
+          }
+        };
+
+        await updateGame({ ...currentGame, players: updatedPlayers });
+      } else if (activeAction.type === 'sell') {
+        const playerInventory = playerData.inventory || {};
+        const itemId = itemElementType.id.toString();
+        const playerQuantity = playerInventory[itemId] || 0;
+
+        if (playerQuantity <= 0) {
+          alert(`You don't have any ${itemElementType.data.title} to sell`);
+          return;
+        }
+
+        const sellPrice = itemElementType.data.price || 10;
+
+        // Remove item from inventory
+        const updatedInventory = { ...playerInventory };
+        updatedInventory[itemId] -= 1;
+        if (updatedInventory[itemId] <= 0) {
+          delete updatedInventory[itemId];
+        }
+
+        // Add money
+        const updatedMoney = (playerData.money || 0) + sellPrice;
+
+        // Update game data
+        const updatedPlayers = {
+          ...currentGame.players,
+          [session.user.id]: {
+            ...playerData,
+            inventory: updatedInventory,
+            money: updatedMoney
+          }
+        };
+
+        await updateGame({ ...currentGame, players: updatedPlayers });
+        alert(`Sold 1 ${itemElementType.data.title} for ${sellPrice} coins!`);
+
+      } else if (activeAction.type === 'buy') {
+        const buyPrice = itemElementType.data.price || 10;
+        const playerMoney = playerData.money || 0;
+
+        if (playerMoney < buyPrice) {
+          alert(`You need ${buyPrice} coins but only have ${playerMoney}`);
+          return;
+        }
+
+        // Add item to inventory
+        const updatedInventory = { ...playerData.inventory };
+        const itemId = itemElementType.id.toString();
+        updatedInventory[itemId] = (updatedInventory[itemId] || 0) + 1;
+
+        // Subtract money
+        const updatedMoney = playerMoney - buyPrice;
+
+        // Update game data
+        const updatedPlayers = {
+          ...currentGame.players,
+          [session.user.id]: {
+            ...playerData,
+            inventory: updatedInventory,
+            money: updatedMoney
+          }
+        };
+
+        await updateGame({ ...currentGame, players: updatedPlayers });
+        alert(`Bought 1 ${itemElementType.data.title} for ${buyPrice} coins!`);
+      }
     }
 
     setActiveAction(null);
   };
 
+  // Compute nearby interactive elements from IDs and current elementTypes
+  const nearbyInteractiveElements = nearbyInteractiveElementIds.map(({ elementId, elementTypeId, distance, x, y }) => {
+    const elementType = elementTypes[elementTypeId];
+    return elementType ? { elementId, elementTypeId, elementType, distance, x, y } : null;
+  }).filter(Boolean);
+  console.log(nearbyInteractiveElementIds, nearbyInteractiveElements);
   return game && player && (
     <>
       <Head>
@@ -513,6 +664,10 @@ export default function GamePage({session}) {
           createMapElement={createMapElement}
           player={player}
           selectedPolygonId={selectedPolygonId}
+          nearbyInteractiveElements={nearbyInteractiveElements}
+          onCraft={handleCraft}
+          onSell={handleSell}
+          onBuy={handleBuy}
         />
         <Map
           game={game}
@@ -533,104 +688,9 @@ export default function GamePage({session}) {
           setSelectedPolygonId={setSelectedPolygonId}
           onDeselectAll={handleDeselectAll}
           session={session}
+          setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
         />
 
-        {/* Action Buttons - bottom center when near interactive elements */}
-        {!isEditing && nearbyInteractiveElements.length > 0 && (
-          <div style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            alignItems: 'center'
-          }}>
-            {nearbyInteractiveElements.slice(0, 1).map(({ elementType, elementId }) => (
-              <div key={elementId} style={{
-                backgroundColor: 'rgba(230, 226, 210, 0.95)',
-                border: '2px solid #8B7355',
-                borderRadius: '8px',
-                padding: '15px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                alignItems: 'center',
-                minWidth: '200px'
-              }}>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#4A4A4A',
-                  textAlign: 'center'
-                }}>
-                  {elementType.data.title || 'Interactive Element'}
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {elementType.data.actions?.craft === 1 && (
-                    <button
-                      onClick={() => handleCraft(elementType)}
-                      style={{
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Craft
-                    </button>
-                  )}
-
-                  {elementType.data.actions?.sell === 1 && (
-                    <button
-                      onClick={() => handleSell(elementType)}
-                      style={{
-                        backgroundColor: '#FF9800',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Sell
-                    </button>
-                  )}
-
-                  {elementType.data.actions?.buy === 1 && (
-                    <button
-                      onClick={() => handleBuy(elementType)}
-                      style={{
-                        backgroundColor: '#2196F3',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '8px 12px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px'
-                      }}
-                    >
-                      Buy
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Action Modal */}
         <ActionModal

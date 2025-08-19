@@ -7,7 +7,7 @@ const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.La
 import MapObject from './MapObject';
 import K from '../k';
 
-export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart, elementTypes }) {
+export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart, elementTypes, updateGame, stateRef }) {
   const [activeGenerations, setActiveGenerations] = useState(0);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [jsonData, setJsonData] = useState('');
@@ -153,7 +153,23 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
           />
         </div>
         <div>
-          <label>{elementType.data.type === 'stat' ? 'Stat' : elementType.data.type === 'item' ? 'Item' : 'Object'} Name:</label>
+          <label>Type:</label>
+          <select
+            value={elementType.data.type || 'object'}
+            onChange={(e) => updateElementType({ ...elementType, data: { ...elementType.data, type: e.target.value } })}
+            style={{ width: '100%', marginBottom: '10px' }}
+          >
+            <option value="object">Object</option>
+            <option value="plant">Plant</option>
+            <option value="building">Buildable</option>
+            <option value="tool">Tool</option>
+            <option value="item">Item</option>
+            <option value="stat">Stat</option>
+          </select>
+        </div>
+
+        <div>
+          <label>{elementType.data.type === 'stat' ? 'Stat' : elementType.data.type === 'item' ? 'Item' : elementType.data.type === 'tool' ? 'Tool' : elementType.data.type === 'plant' ? 'Plant' : elementType.data.type === 'building' ? 'Building' : 'Object'} Name:</label>
           <input
             type="text"
             defaultValue={elementType.data?.title}
@@ -163,6 +179,12 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                 "e.g., Health, Energy, Thirst, Strength" :
               elementType.data.type === 'item' ?
                 "e.g., Log, Dollar, Cup of Water" :
+              elementType.data.type === 'tool' ?
+                "e.g., Axe, Hammer, Fishing Rod" :
+              elementType.data.type === 'plant' ?
+                "e.g., Oak Tree, Rose Bush, Wheat" :
+              elementType.data.type === 'building' ?
+                "e.g., House, Shop, Barn" :
                 "Enter a name"
             }
             style={{ width: '100%' }}
@@ -301,6 +323,106 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
               Buy
             </label>
           </div>
+
+          {elementType.data?.type === 'item' && (
+            <div style={{ marginTop: '10px', paddingLeft: '20px' }}>
+              <label>Craft Output Quantity:</label>
+              <input
+                type="number"
+                value={elementType.data?.craftingOutputQuantity || 1}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    craftingOutputQuantity: parseInt(e.target.value) || 1
+                  }
+                })}
+                placeholder="1"
+                style={{ width: '80px', marginLeft: '10px' }}
+                min="1"
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                How many items are produced when crafted (e.g., 8 planks from 1 log)
+              </div>
+            </div>
+          )}
+
+          {elementType.data?.type === 'item' && (
+            <div style={{ marginTop: '10px', paddingLeft: '20px' }}>
+              <label>Crafting Time (seconds):</label>
+              <input
+                type="number"
+                value={elementType.data?.craftingTime || 0}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    craftingTime: parseInt(e.target.value) || 0
+                  }
+                })}
+                placeholder="0"
+                style={{ width: '80px', marginLeft: '10px' }}
+                min="0"
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                Time in seconds to craft this item (0 = instant)
+              </div>
+            </div>
+          )}
+
+          {elementType.data?.type === 'item' && (
+            <div style={{ marginTop: '10px', paddingLeft: '20px' }}>
+              <label>Initial Inventory Quantity:</label>
+              <input
+                type="number"
+                value={elementType.data?.initialInventoryQuantity || 0}
+                onChange={(e) => updateElementType({
+                  ...elementType,
+                  data: {
+                    ...elementType.data,
+                    initialInventoryQuantity: parseInt(e.target.value) || 0
+                  }
+                })}
+                placeholder="0"
+                style={{ width: '80px', marginLeft: '10px' }}
+                min="0"
+              />
+              <button
+                onClick={async () => {
+                  const quantity = elementType.data?.initialInventoryQuantity || 0;
+                  if (quantity === 0) {
+                    alert('Set an initial inventory quantity first.');
+                    return;
+                  }
+
+                  if (!confirm(`This will set all existing players' inventory of "${elementType.data?.title}" to ${quantity}. Are you sure?`)) {
+                    return;
+                  }
+
+                  try {
+                    const currentGame = stateRef.current.game;
+                    const updatedPlayers = { ...currentGame.players };
+
+                    Object.keys(updatedPlayers).forEach(playerId => {
+                      if (!updatedPlayers[playerId].inventory) {
+                        updatedPlayers[playerId].inventory = {};
+                      }
+                      updatedPlayers[playerId].inventory[elementType.id] = quantity;
+                    });
+
+                    await updateGame({ ...currentGame, players: updatedPlayers });
+                    alert(`Successfully updated all players' ${elementType.data?.title} inventory to ${quantity}!`);
+                  } catch (error) {
+                    console.error('Error overriding inventory:', error);
+                    alert('Failed to override inventory. Please try again.');
+                  }
+                }}
+                style={{ backgroundColor: '#dc3545', color: 'white', padding: '5px 10px', fontSize: '12px', marginLeft: '10px' }}
+              >
+                Override All Players
+              </button>
+            </div>
+          )}
         </div>
 
         {elementType.data?.type === 'item' && (

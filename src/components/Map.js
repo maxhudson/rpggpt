@@ -28,7 +28,8 @@ export default function Map({
   selectedPolygonId,
   setSelectedPolygonId,
   onDeselectAll,
-  session
+  session,
+  setNearbyInteractiveElementIds
 }) {
   const keysPressed = useRef({});
   const [selectedElementId, setSelectedElementId] = useState(null);
@@ -204,6 +205,9 @@ export default function Map({
           };
           const updatedGame = { ...currentGame, players: updatedPlayers };
           updateGame(updatedGame, { updateSupabase: true, updateState: true });
+
+          // Update nearby interactive elements after player movement
+          updateNearbyInteractiveElements();
         }
       }
     };
@@ -347,6 +351,68 @@ export default function Map({
       x: player.position.x + (screenX - stageSize.width / 2),
       y: player.position.y + (screenY - stageSize.height / 2)
     };
+  };
+
+  // Function to detect nearby interactive elements and update only if changed
+  const updateNearbyInteractiveElements = () => {
+    if (!stateRef.current.game || !stateRef.current.elementTypes || isEditing || !stateRef.current.player || !setNearbyInteractiveElementIds) {
+      const currentNearbyIds = stateRef.current.nearbyInteractiveElementIds || [];
+      if (currentNearbyIds.length > 0) {
+        setNearbyInteractiveElementIds([]);
+      }
+      return;
+    }
+
+    const interactionDistance = 60; // Distance in pixels for interaction
+    const mapElements = stateRef.current.game.map?.elements || {};
+    const nearby = [];
+
+    Object.entries(mapElements).forEach(([elementId, mapElement]) => {
+      const [elementTypeId, x, y] = mapElement;
+      const elementType = stateRef.current.elementTypes[elementTypeId];
+
+      if (!elementType || !elementType.data.actions) return;
+
+      // Check if any actions are enabled
+      const hasActions = elementType.data.actions.craft === 1 ||
+                        elementType.data.actions.sell === 1 ||
+                        elementType.data.actions.buy === 1;
+
+      if (!hasActions) return;
+
+      // Calculate distance from player
+      const distance = Math.sqrt(
+        Math.pow(x - stateRef.current.player.position.x, 2) +
+        Math.pow(y - stateRef.current.player.position.y, 2)
+      );
+
+      if (distance <= interactionDistance) {
+        nearby.push({
+          elementId,
+          elementTypeId,
+          distance,
+          x,
+          y
+        });
+      }
+    });
+
+    // Sort by distance (closest first)
+    nearby.sort((a, b) => a.distance - b.distance);
+
+    // Compare with current nearby elements to avoid unnecessary updates
+    const currentNearbyIds = stateRef.current.nearbyInteractiveElementIds || [];
+    const hasChanged = nearby.length !== currentNearbyIds.length ||
+      nearby.some((newItem, index) => {
+        const currentItem = currentNearbyIds[index];
+        return !currentItem ||
+               newItem.elementId !== currentItem.elementId ||
+               newItem.elementTypeId !== currentItem.elementTypeId;
+      });
+
+    if (hasChanged) {
+      setNearbyInteractiveElementIds(nearby);
+    }
   };
 
   return (

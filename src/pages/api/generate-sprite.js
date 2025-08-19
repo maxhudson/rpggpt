@@ -8,11 +8,12 @@ const openai = new OpenAI({
 // Game styles
 const gameStyles = {
   "minimalist watercolor": "flat minimalist style - watercolor print aesthetic",
-  "low poly cartoon": "low-poly game map element - no stroke/border"
+  "low poly cartoon": "low-poly game element - no stroke/border - no strokes/gradients/textures\njust polygons",
+  "oil": "oil painting brushstroke style, mature, classic colors with a bit of 3d-model - hd/4k"
 };
 
 // Common prompt components
-const baseStyle = "muted colors\nno strokes/gradients/textures\njust polygons\nbirds-eye top-down perspective like Pokemon/stardew valley";
+const baseStyle = "muted colors\n\nbirds-eye top-down perspective like Pokemon/stardew valley";
 const objectLighting = "afternoon sunlight coming from the top-left of the image\nmature elegant positive professional";
 const transparentCanvas = "IMPORTANT: Use a completely transparent background (no black, no white, just transparent).\nCenter the object taking up most of the canvas space. 1024x1024 image.\nNo platform/ground/tile object at the base (we'll be placing what is generated on a texture of our own so it needs to just be the object with lighting coming from top-left)";
 
@@ -46,7 +47,8 @@ professional game UI aesthetic
 ${transparentCanvas}
 Simple recognizable symbol for game HUD display`;
     } else if (type === 'item') {
-      imagePrompt = `flat minimalist 2d game inventory item - low poly cartoon style
+      imagePrompt = `
+${style} - inventory item (no stroke/border)
 ${description}
 collectible item design
 ${baseStyle} items
