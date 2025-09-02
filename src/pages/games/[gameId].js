@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default function GamePage({session}) {
+export default function GamePage({session, userProfile}) {
   var [game, setGame] = useState(null);
   var [isEditing, setIsEditing] = useState(false);
   var [elementTypes, _setElementTypes] = useState({});
@@ -298,14 +298,27 @@ export default function GamePage({session}) {
       const [elementTypeId, x, y] = mapElement;
       const elementType = stateRef.current.elementTypes[elementTypeId];
 
-      if (!elementType || !elementType.data.actions) return;
+      if (!elementType) return;
 
       // Check if any actions are enabled
-      const hasActions = elementType.data.actions.craft === 1 ||
-                        elementType.data.actions.sell === 1 ||
-                        elementType.data.actions.buy === 1;
+      const hasActions = elementType.data.actions?.craft === 1 ||
+                        elementType.data.actions?.sell === 1 ||
+                        elementType.data.actions?.buy === 1;
 
-      if (!hasActions) return;
+      // Check if element has tool data and player has compatible tools
+      const hasToolData = elementType.data.toolData && Object.keys(elementType.data.toolData).length > 0;
+      let hasCompatibleTool = false;
+
+      if (hasToolData && stateRef.current.player?.inventory) {
+        // Check if player has any tools that can be used on this element
+        Object.keys(elementType.data.toolData).forEach(toolElementTypeId => {
+          if (stateRef.current.player.inventory[toolElementTypeId] > 0) {
+            hasCompatibleTool = true;
+          }
+        });
+      }
+
+      if (!hasActions && !hasCompatibleTool) return;
 
       // Calculate distance from player
       const distance = Math.sqrt(
@@ -314,12 +327,22 @@ export default function GamePage({session}) {
       );
 
       if (distance <= interactionDistance) {
+
+        console.log(hasToolData, 'has tool data', {
+          elementId,
+          elementTypeId,
+          distance,
+          x,
+          y,
+          hasToolData: hasCompatibleTool
+        })
         nearby.push({
           elementId,
           elementTypeId,
           distance,
           x,
-          y
+          y,
+          hasToolData: hasCompatibleTool
         });
       }
     });
@@ -327,7 +350,7 @@ export default function GamePage({session}) {
     // Sort by distance (closest first)
     nearby.sort((a, b) => a.distance - b.distance);
     setNearbyInteractiveElementIds(nearby);
-  }, [game, elementTypes, isEditing]);
+  }, [game, elementTypes, isEditing, player?.inventory]);
 
   // Helper function to ensure player data exists
   const ensurePlayerData = async () => {
@@ -335,9 +358,22 @@ export default function GamePage({session}) {
     let playerData = currentGame.players?.[session.user.id];
 
     if (!playerData) {
+      // Create initial inventory from element types with initialInventoryQuantity
+      const initialInventory = {};
+      const currentElementTypes = stateRef.current.elementTypes;
+
+      if (currentElementTypes) {
+        Object.entries(currentElementTypes).forEach(([elementTypeId, elementType]) => {
+          const initialQuantity = elementType.data?.initialInventoryQuantity;
+          if (initialQuantity && initialQuantity > 0) {
+            initialInventory[elementTypeId] = initialQuantity;
+          }
+        });
+      }
+
       // Create new player data
       playerData = {
-        inventory: {},
+        inventory: initialInventory,
         money: 100,
         position: { x: 0, y: 0 }
       };
@@ -370,6 +406,95 @@ export default function GamePage({session}) {
 
   const handleBuy = async (elementType) => {
     setActiveAction({ type: 'buy', elementType });
+  };
+
+  const handleUseTool = async (elementId, toolElementTypeId) => {
+    const playerData = await ensurePlayerData();
+    const currentGame = stateRef.current.game;
+
+    // Get the map element and its type
+    const mapElement = currentGame.map.elements[elementId];
+    if (!mapElement) return;
+
+    const [elementTypeId, x, y] = mapElement;
+    const elementType = elementTypes[elementTypeId];
+    if (!elementType || !elementType.data.toolData || !elementType.data.toolData[toolElementTypeId]) return;
+
+    const toolConfig = elementType.data.toolData[toolElementTypeId];
+    const toolElementType = elementTypes[toolElementTypeId];
+
+    // Check if player has the tool
+    if (!playerData.inventory[toolElementTypeId] || playerData.inventory[toolElementTypeId] <= 0) {
+      alert(`You don't have a ${toolElementType?.data?.title || 'tool'} to use!`);
+      return;
+    }
+
+    let updatedInventory = { ...playerData.inventory };
+    let updatedMoney = playerData.money || 0;
+    let canUseTool = true;
+
+    // Check if player can afford the costs
+    for (const [costElementTypeId, costAmount] of Object.entries(toolConfig.cost || {})) {
+      if (costAmount < 0) {
+        // Player loses this item/stat
+        const available = updatedInventory[costElementTypeId] || 0;
+        if (available < Math.abs(costAmount)) {
+          const costElementType = elementTypes[costElementTypeId];
+          alert(`You need ${Math.abs(costAmount)} ${costElementType?.data?.title || 'items'} but only have ${available}!`);
+          canUseTool = false;
+          break;
+        }
+      }
+    }
+
+    if (!canUseTool) return;
+
+    // Apply costs
+    for (const [costElementTypeId, costAmount] of Object.entries(toolConfig.cost || {})) {
+      if (costAmount !== 0) {
+        updatedInventory[costElementTypeId] = (updatedInventory[costElementTypeId] || 0) + costAmount;
+        if (updatedInventory[costElementTypeId] <= 0) {
+          delete updatedInventory[costElementTypeId];
+        }
+      }
+    }
+
+    // Transform the element if specified
+    let updatedElements = { ...currentGame.map.elements };
+    if (toolConfig.newElementTypeId) {
+      updatedElements[elementId] = [toolConfig.newElementTypeId, x, y];
+    } else {
+      // If no transformation specified, remove the element
+      delete updatedElements[elementId];
+    }
+
+    // Update game state
+    const updatedPlayers = {
+      ...currentGame.players,
+      [session.user.id]: {
+        ...playerData,
+        inventory: updatedInventory,
+        money: updatedMoney
+      }
+    };
+
+    const updatedMap = {
+      elements: updatedElements,
+      boundaryPolygon: currentGame.map.boundaryPolygon || null
+    };
+
+    await updateGame({
+      ...currentGame,
+      players: updatedPlayers,
+      map: updatedMap
+    });
+
+    const newElementType = elementTypes[toolConfig.newElementTypeId];
+    const transformMessage = toolConfig.newElementTypeId ?
+      ` and transformed into ${newElementType?.data?.title || 'something'}` :
+      ' and was removed';
+
+    alert(`Used ${toolElementType?.data?.title || 'tool'} on ${elementType.data.title}${transformMessage}!`);
   };
 
   // Modal action handlers
@@ -653,6 +778,7 @@ export default function GamePage({session}) {
           elementTypes={elementTypes}
           setElementTypes={setElementTypes}
           session={session}
+          userProfile={userProfile}
           drawingMode={drawingMode}
           setDrawingMode={setDrawingMode}
           selectedMaterialId={selectedMaterialId}
@@ -668,6 +794,7 @@ export default function GamePage({session}) {
           onCraft={handleCraft}
           onSell={handleSell}
           onBuy={handleBuy}
+          onUseTool={handleUseTool}
         />
         <Map
           game={game}

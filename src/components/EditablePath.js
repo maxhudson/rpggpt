@@ -19,6 +19,7 @@ export default function EditablePath({
   const isDraggingPolygon = useRef(false);
   const dragStartPos = useRef(null);
   const originalPoints = useRef(null);
+  const pathRef = useRef(null);
 
   // Track shift key state for conditional grid snapping
   useEffect(() => {
@@ -49,50 +50,63 @@ export default function EditablePath({
     return Math.round(value / gridSize) * gridSize;
   };
 
-  // Handle polygon drag start
-  const handlePolygonDragStart = (e) => {
+  // Handle mouse down on polygon (start drag)
+  const handleMouseDown = (e) => {
     if (!isEditing) return;
 
+    e.cancelBubble = true;
     isDraggingPolygon.current = true;
     // Store the initial mouse position in screen coordinates
     dragStartPos.current = { x: e.evt.clientX, y: e.evt.clientY };
     originalPoints.current = [...polygon.points];
   };
 
-  // Handle polygon drag move
-  const handlePolygonDragMove = (e) => {
-    if (!isDraggingPolygon.current || !dragStartPos.current || !originalPoints.current) return;
+  // Handle mouse move (during drag)
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDraggingPolygon.current || !dragStartPos.current || !originalPoints.current) return;
 
-    // Calculate delta in screen coordinates
-    const currentScreenPos = { x: e.evt.clientX, y: e.evt.clientY };
-    const screenDeltaX = currentScreenPos.x - dragStartPos.current.x;
-    const screenDeltaY = currentScreenPos.y - dragStartPos.current.y;
+      // Calculate delta in screen coordinates
+      const screenDeltaX = e.clientX - dragStartPos.current.x;
+      const screenDeltaY = e.clientY - dragStartPos.current.y;
 
-    // Convert screen delta to world delta (no camera offset needed since it's just a delta)
-    const worldDeltaX = screenDeltaX;
-    const worldDeltaY = screenDeltaY;
+      // Convert screen delta to world delta (no camera offset needed since it's just a delta)
+      const worldDeltaX = screenDeltaX;
+      const worldDeltaY = screenDeltaY;
 
-    // Apply grid snapping if shift is pressed
-    const finalDeltaX = isShiftPressed.current ? snapToGrid(worldDeltaX) : worldDeltaX;
-    const finalDeltaY = isShiftPressed.current ? snapToGrid(worldDeltaY) : worldDeltaY;
+      // Apply grid snapping if shift is pressed
+      const finalDeltaX = isShiftPressed.current ? snapToGrid(worldDeltaX) : worldDeltaX;
+      const finalDeltaY = isShiftPressed.current ? snapToGrid(worldDeltaY) : worldDeltaY;
 
-    // Calculate new points by adding delta to original points
-    const newPoints = originalPoints.current.map(([x, y]) => [
-      x + finalDeltaX,
-      y + finalDeltaY
-    ]);
+      // Calculate new points by adding delta to original points
+      const newPoints = originalPoints.current.map(([x, y]) => [
+        x + finalDeltaX,
+        y + finalDeltaY
+      ]);
 
-    if (onPolygonDrag) {
-      onPolygonDrag(polygonId, newPoints);
+      if (onPolygonDrag) {
+        onPolygonDrag(polygonId, newPoints);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingPolygon.current) {
+        isDraggingPolygon.current = false;
+        dragStartPos.current = null;
+        originalPoints.current = null;
+      }
+    };
+
+    if (isDraggingPolygon.current) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
-  };
 
-  // Handle polygon drag end
-  const handlePolygonDragEnd = () => {
-    isDraggingPolygon.current = false;
-    dragStartPos.current = null;
-    originalPoints.current = null;
-  };
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingPolygon.current, onPolygonDrag, polygonId]);
 
   if (!polygon || polygon.type !== 'path' || !polygon.points || polygon.points.length < 3) {
     return null;
@@ -117,21 +131,19 @@ export default function EditablePath({
     <>
       {/* Render the polygon path */}
       <Path
+        ref={pathRef}
         key={`background-${polygonId}`}
         data={pathData}
         fill={polygon.fill || 'gray'}
         stroke={isSelected ? '#FFD700' : 'transparent'}
         strokeWidth={isSelected ? 3 : 0}
         listening={isEditing}
-        draggable={isEditing}
         onClick={() => {
           if (isEditing && onPolygonSelect) {
             onPolygonSelect(polygonId);
           }
         }}
-        onDragStart={handlePolygonDragStart}
-        onDragMove={handlePolygonDragMove}
-        onDragEnd={handlePolygonDragEnd}
+        onMouseDown={handleMouseDown}
         onMouseEnter={(e) => {
           if (isEditing) {
             e.target.getStage().container().style.cursor = isDraggingPolygon.current ? 'grabbing' : 'grab';

@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        // fetchUserProfile(session.user.id);
+        fetchUserProfile(session.user.id);
       } else if (!isAuthRoute(router.pathname)) {
         router.push('/login');
       }
@@ -25,7 +25,7 @@ export default function App({ Component, pageProps }) {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       if (session) {
-        // fetchUserProfile(session.user.id);
+        fetchUserProfile(session.user.id);
       } else if (!isAuthRoute(router.pathname)) {
         router.push('/login');
       }
@@ -53,22 +53,8 @@ export default function App({ Component, pageProps }) {
 
     if (data) {
       setUserProfile(data);
-    } else if (error && error.code === 'PGRST116') {
-      // Profile doesn't exist, create it
-      const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            email: session?.user?.email
-          }
-        ])
-        .select()
-        .single();
-
-      if (newProfile) {
-        setUserProfile(newProfile);
-      }
+    } else if (error) {
+      console.error('Error fetching user profile:', error);
     }
   };
 

@@ -184,14 +184,14 @@ export default function Map({
         let finalY = currentPlayerPos.y;
 
         // Check X movement
-        if (deltaX !== 0 && !checkCollision(newX, currentPlayerPos.y, currentPlayerPos) && !checkBoundaryCollision(newX, currentPlayerPos.y)) {
+        // if (deltaX !== 0 && !checkCollision(newX, currentPlayerPos.y, currentPlayerPos) && !checkBoundaryCollision(newX, currentPlayerPos.y)) {
           finalX = newX;
-        }
+        // }
 
         // Check Y movement
-        if (deltaY !== 0 && !checkCollision(finalX, newY, currentPlayerPos) && !checkBoundaryCollision(finalX, newY)) {
+        // if (deltaY !== 0 && !checkCollision(finalX, newY, currentPlayerPos) && !checkBoundaryCollision(finalX, newY)) {
           finalY = newY;
-        }
+        // }
 
         // Update player position in game state
         if (finalX !== currentPlayerPos.x || finalY !== currentPlayerPos.y) {
@@ -371,14 +371,27 @@ export default function Map({
       const [elementTypeId, x, y] = mapElement;
       const elementType = stateRef.current.elementTypes[elementTypeId];
 
-      if (!elementType || !elementType.data.actions) return;
+      if (!elementType) return;
 
       // Check if any actions are enabled
-      const hasActions = elementType.data.actions.craft === 1 ||
-                        elementType.data.actions.sell === 1 ||
-                        elementType.data.actions.buy === 1;
+      const hasActions = elementType.data.actions?.craft === 1 ||
+                        elementType.data.actions?.sell === 1 ||
+                        elementType.data.actions?.buy === 1;
 
-      if (!hasActions) return;
+      // Check if element has tool data and player has compatible tools
+      const hasToolData = elementType.data.toolData && Object.keys(elementType.data.toolData).length > 0;
+      let hasCompatibleTool = false;
+
+      if (hasToolData && stateRef.current.player?.inventory) {
+        // Check if player has any tools that can be used on this element
+        Object.keys(elementType.data.toolData).forEach(toolElementTypeId => {
+          if (stateRef.current.player.inventory[toolElementTypeId] > 0) {
+            hasCompatibleTool = true;
+          }
+        });
+      }
+
+      if (!hasActions && !hasCompatibleTool) return;
 
       // Calculate distance from player
       const distance = Math.sqrt(
@@ -392,7 +405,8 @@ export default function Map({
           elementTypeId,
           distance,
           x,
-          y
+          y,
+          hasToolData: hasCompatibleTool
         });
       }
     });

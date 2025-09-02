@@ -7,7 +7,7 @@ const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.La
 import MapObject from './MapObject';
 import K from '../k';
 
-export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart, elementTypes, updateGame, stateRef }) {
+export default function ElementTypeEditor({ isOpen, onClose, elementType, updateElementType, tentativeImages, onSetTentativeImages, onAcceptTentativeImage, onRejectTentativeImage, onDelete, onGeneratingStart, elementTypes, updateGame, stateRef, userProfile, session }) {
   const [activeGenerations, setActiveGenerations] = useState(0);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [jsonData, setJsonData] = useState('');
@@ -34,7 +34,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         body: JSON.stringify({
           description: imageDescription,
           type: elementType.data.type,
-          count: 1 // Generate only 1 option per click
+          count: 1, // Generate only 1 option per click
+          userId: session?.user?.id
         }),
       });
 
@@ -195,6 +196,14 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
           <button onClick={handleGenerate} disabled={!(elementType.data.imageDescription || '').trim()}>
             {activeGenerations > 0 ? `Generating... (${activeGenerations})` : 'Generate 1 Option'}
           </button>
+          <span style={{ fontSize: '12px', color: '#666' }}>
+            (-{K.spriteGenerationCost} credits)
+          </span>
+          {userProfile && (
+            <span style={{ fontSize: '12px', color: '#333', fontWeight: 'bold' }}>
+              {userProfile.credits} credits available
+            </span>
+          )}
           {tentativeImages && tentativeImages.length > 0 && (
             <span style={{ fontSize: '12px', color: '#666' }}>
               {tentativeImages.length} option{tentativeImages.length !== 1 ? 's' : ''} generated
@@ -370,7 +379,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
             </div>
           )}
 
-          {elementType.data?.type === 'item' && (
+          {(elementType.data?.type === 'item' || elementType.data?.type === 'tool' || elementType.data?.type === 'stat') && (
             <div style={{ marginTop: '10px', paddingLeft: '20px' }}>
               <label>Initial Inventory Quantity:</label>
               <input
@@ -421,6 +430,11 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
               >
                 Override All Players
               </button>
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                {elementType.data?.type === 'tool' ? 'Starting tools for new players' :
+                 elementType.data?.type === 'stat' ? 'Starting stat values for new players' :
+                 'Starting items for new players'}
+              </div>
             </div>
           )}
         </div>
@@ -525,6 +539,242 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                   style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
                 >
                   Add Requirement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(elementType.data?.type === 'object' || elementType.data?.type === 'plant' || elementType.data?.type === 'building') && (
+          <div>
+            <label>Tools:</label>
+            <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '5px' }}>
+              {Object.entries(elementType.data?.toolData || {}).map(([toolElementTypeId, toolConfig]) => {
+                const toolElementType = elementTypes?.[toolElementTypeId];
+                const toolName = toolElementType?.data?.title || `Unknown Tool (ID: ${toolElementTypeId})`;
+                const newElementType = elementTypes?.[toolConfig.newElementTypeId];
+                const newElementName = newElementType?.data?.title || `Unknown Element (ID: ${toolConfig.newElementTypeId})`;
+
+                return (
+                  <div key={toolElementTypeId} style={{ border: '1px solid #ddd', padding: '10px', marginBottom: '10px' }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                      Tool: {toolName}
+                    </div>
+
+                    <div style={{ marginBottom: '5px' }}>
+                      <label>Transforms into:</label>
+                      <select
+                        value={toolConfig.newElementTypeId || ''}
+                        onChange={(e) => {
+                          const newToolData = { ...elementType.data.toolData };
+                          newToolData[toolElementTypeId] = {
+                            ...newToolData[toolElementTypeId],
+                            newElementTypeId: e.target.value
+                          };
+                          updateElementType({
+                            ...elementType,
+                            data: {
+                              ...elementType.data,
+                              toolData: newToolData
+                            }
+                          });
+                        }}
+                        style={{ width: '200px', marginLeft: '10px' }}
+                      >
+                        <option value="">Select element...</option>
+                        {elementTypes && Object.entries(elementTypes)
+                          .filter(([id, et]) => id !== elementType.id.toString())
+                          .map(([id, et]) => (
+                            <option key={id} value={id}>
+                              {et.data?.title || `Element ${id}`} ({et.data?.type || 'object'})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div style={{ marginBottom: '5px' }}>
+                      <label>Cost:</label>
+                      <div style={{ marginLeft: '20px', marginTop: '5px' }}>
+                        {Object.entries(toolConfig.cost || {}).map(([costElementTypeId, costAmount]) => {
+                          const costElementType = elementTypes?.[costElementTypeId];
+                          const costElementName = costElementType?.data?.title || `Unknown Element (ID: ${costElementTypeId})`;
+                          return (
+                            <div key={costElementTypeId} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '5px' }}>
+                              <span style={{ fontSize: '12px', minWidth: '120px' }}>
+                                {costElementName}
+                              </span>
+                              <input
+                                type="number"
+                                value={costAmount}
+                                onChange={(e) => {
+                                  const newToolData = { ...elementType.data.toolData };
+                                  const newCost = { ...newToolData[toolElementTypeId].cost };
+                                  if (parseInt(e.target.value) !== 0) {
+                                    newCost[costElementTypeId] = parseInt(e.target.value);
+                                  } else {
+                                    delete newCost[costElementTypeId];
+                                  }
+                                  newToolData[toolElementTypeId] = {
+                                    ...newToolData[toolElementTypeId],
+                                    cost: newCost
+                                  };
+                                  updateElementType({
+                                    ...elementType,
+                                    data: {
+                                      ...elementType.data,
+                                      toolData: newToolData
+                                    }
+                                  });
+                                }}
+                                style={{ width: '60px' }}
+                                placeholder="0"
+                              />
+                              <span style={{ fontSize: '12px', color: '#666' }}>
+                                (negative = lose, positive = gain)
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const newToolData = { ...elementType.data.toolData };
+                                  const newCost = { ...newToolData[toolElementTypeId].cost };
+                                  delete newCost[costElementTypeId];
+                                  newToolData[toolElementTypeId] = {
+                                    ...newToolData[toolElementTypeId],
+                                    cost: newCost
+                                  };
+                                  updateElementType({
+                                    ...elementType,
+                                    data: {
+                                      ...elementType.data,
+                                      toolData: newToolData
+                                    }
+                                  });
+                                }}
+                                style={{ backgroundColor: 'red', color: 'white', padding: '2px 6px', fontSize: '12px' }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          );
+                        })}
+
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                          <select
+                            id={`tool-cost-select-${elementType.id}-${toolElementTypeId}`}
+                            style={{ width: '150px' }}
+                            defaultValue=""
+                          >
+                            <option value="">Add cost element...</option>
+                            {elementTypes && Object.entries(elementTypes)
+                              .filter(([id, et]) => et.data?.type === 'item' || et.data?.type === 'stat')
+                              .map(([id, et]) => (
+                                <option key={id} value={id}>
+                                  {et.data?.title || `Element ${id}`} ({et.data?.type})
+                                </option>
+                              ))}
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            id={`tool-cost-amount-${elementType.id}-${toolElementTypeId}`}
+                            style={{ width: '80px' }}
+                          />
+                          <button
+                            onClick={() => {
+                              const selectInput = document.getElementById(`tool-cost-select-${elementType.id}-${toolElementTypeId}`);
+                              const amountInput = document.getElementById(`tool-cost-amount-${elementType.id}-${toolElementTypeId}`);
+                              const costElementTypeId = selectInput.value;
+                              const amount = parseInt(amountInput.value);
+
+                              if (costElementTypeId && amount !== 0) {
+                                const newToolData = { ...elementType.data.toolData };
+                                const newCost = {
+                                  ...newToolData[toolElementTypeId].cost,
+                                  [costElementTypeId]: amount
+                                };
+                                newToolData[toolElementTypeId] = {
+                                  ...newToolData[toolElementTypeId],
+                                  cost: newCost
+                                };
+                                updateElementType({
+                                  ...elementType,
+                                  data: {
+                                    ...elementType.data,
+                                    toolData: newToolData
+                                  }
+                                });
+                                selectInput.value = '';
+                                amountInput.value = '';
+                              }
+                            }}
+                            style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                          >
+                            Add Cost
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const newToolData = { ...elementType.data.toolData };
+                        delete newToolData[toolElementTypeId];
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            toolData: newToolData
+                          }
+                        });
+                      }}
+                      style={{ backgroundColor: 'red', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                    >
+                      Remove Tool
+                    </button>
+                  </div>
+                );
+              })}
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                <select
+                  id={`tool-select-${elementType.id}`}
+                  style={{ width: '200px' }}
+                  defaultValue=""
+                >
+                  <option value="">Add tool...</option>
+                  {elementTypes && Object.entries(elementTypes)
+                    .filter(([id, et]) => et.data?.type === 'tool')
+                    .map(([id, et]) => (
+                      <option key={id} value={id}>
+                        {et.data?.title || `Tool ${id}`}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const selectInput = document.getElementById(`tool-select-${elementType.id}`);
+                    const toolElementTypeId = selectInput.value;
+
+                    if (toolElementTypeId) {
+                      const newToolData = {
+                        ...elementType.data.toolData,
+                        [toolElementTypeId]: {
+                          cost: {},
+                          newElementTypeId: ''
+                        }
+                      };
+                      updateElementType({
+                        ...elementType,
+                        data: {
+                          ...elementType.data,
+                          toolData: newToolData
+                        }
+                      });
+                      selectInput.value = '';
+                    }
+                  }}
+                  style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Add Tool
                 </button>
               </div>
             </div>

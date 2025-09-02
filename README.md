@@ -91,10 +91,45 @@ elementTypes = {
 
 ### TODO
 
-- Credit/subscription system for ChatGPT API usage
-- Simulation system
-- Minigame - pokemon style
-- Pluralize titles
+AI should only work on [READY] TODOs
+
+
+queue: []
+quests: []
+- simulation rules
+minigame: {} //accuracy, timing, tracking straight line, balancing
+
+
+- Establish fun
+  - Simulation system/passage of time/weather
+  - Quests
+  - Minigames - pokemon style
+- Game splash screen
+- Migration - elementTypes into games w/ generations table? If we don't, do element types need versioning?
+- Polygon editing
+  - Add points to polygon
+  - Fix transforming
+  - Reuse existing colors easily
+- Mobile styles
+- Ability to buy from HUD at any time (game.settings.allowBuyFromHUD) - same with craft & sell
+- HUD (has to be done manually by me, not AI)
+  - Element type icons: plant, building, object, item, stat, tool
+  - Nearby elements
+  - Money & time
+  - Edit & game settings/properties
+- Finish credit system - ability to buy credit
+- Pluralize titles (with inflection js)
+- Security
+  - Use user token rather than id for credit operations
+- Bugs
+  - Collision
+  - Drag and drop from HUD when editing/placing building etc
+  - Ground-level items
+  - Multiple generations not working simultaneously
+- Terms & Privacy
+- Performance
+  - Avoid updating player position
+  - Thumbnails for element types
 
 
 ### Examples
@@ -131,3 +166,39 @@ DAY CYCLE
 ACTIVITIES
 - Make lemonade (crafting - combine items to produce other items)
 - Sell/market: Pick a phrase
+
+QUESTS
+- SUGAR (buy sugar from the grocery store)
+- LEMONADE - Craft your first lemonade
+- SHOPPING - Buy lemons and ice
+- RENT - Rent a sunnier spot
+- MENU - Offer a secret ingredient (have user come up with ingredients - if they do well, then price can increase, but if poorly, business might drop)
+
+
+#### City Builder
+
+PLANTS
+- Tree (cut down to build log)
+- Berry Bush (harvest for food)
+
+OBJECTS
+- Stone Deposit ()
+
+BUILDINGS
+- Storage (storage capacity stat)
+- House (beds)
+- Smokehouse (preserve food)
+- Market (Buy/Sell)
+- Workshop (Craft)
+
+Daily:
+Describe priorities
+At end of day, update stats/objects like plants
+
+QUESTS
+- Set up shelter (makeshift tent - gather 10 branch items on the ground)
+- Fire
+- Gather food
+(weather)
+
+

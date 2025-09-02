@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import ElementTypeEditor from './ElementTypeEditor';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, player, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, selectedPolygonId, nearbyInteractiveElements, onCraft, onSell, onBuy }) {
+export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, player, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, selectedPolygonId, nearbyInteractiveElements, onCraft, onSell, onBuy, onUseTool, userProfile }) {
   const [activeElementTypeId, setActiveElementTypeId] = useState(null);
   const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by elementType id
   const tentativeImagesRef = useRef({}); // Ref for avoiding race conditions with async API responses
@@ -467,7 +467,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                 {elementType.data.title || 'Interactive Element'}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 {elementType.data.actions?.craft === 1 && (
                   <button
                     onClick={() => onCraft(elementType)}
@@ -476,14 +476,21 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '8px 12px',
-                      fontSize: '12px',
+                      padding: '8px',
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
-                    Craft
+                    <img
+                      src="/images/action-craft.png"
+                      alt="Craft"
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Craft
+                    </span>
                   </button>
                 )}
 
@@ -495,14 +502,21 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '8px 12px',
-                      fontSize: '12px',
+                      padding: '8px',
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
-                    Sell
+                    <img
+                      src="/images/action-sell.png"
+                      alt="Sell"
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Sell
+                    </span>
                   </button>
                 )}
 
@@ -514,16 +528,58 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                       color: 'white',
                       border: 'none',
                       borderRadius: '4px',
-                      padding: '8px 12px',
-                      fontSize: '12px',
+                      padding: '8px',
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
-                    Buy
+                    <img
+                      src="/images/action-buy.png"
+                      alt="Buy"
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Buy
+                    </span>
                   </button>
                 )}
+
+                {/* Tool Usage Buttons */}
+                {elementType.data.toolData && player?.inventory && Object.entries(elementType.data.toolData).map(([toolElementTypeId, toolConfig]) => {
+                  const toolElementType = elementTypes[toolElementTypeId];
+                  const playerHasTool = player.inventory[toolElementTypeId] > 0;
+
+                  if (!playerHasTool || !toolElementType) return null;
+
+                  return (
+                    <button
+                      key={toolElementTypeId}
+                      onClick={() => onUseTool(elementId, toolElementTypeId)}
+                      style={{
+                        backgroundColor: '#9C27B0',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <img
+                        src="/images/hammer.png"
+                        alt="Tool"
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Use {toolElementType.data.title}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -584,6 +640,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           elementTypes={elementTypes}
           updateGame={updateGame}
           stateRef={stateRef}
+          userProfile={userProfile}
+          session={session}
         />
       )}
     </>

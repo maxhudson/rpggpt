@@ -1,9 +1,14 @@
 import OpenAI from 'openai';
+import { createClient } from '@supabase/supabase-js';
+import K from '../../k';
 var sharp = require('sharp');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY;
 
 // Game styles
 const gameStyles = {
@@ -13,7 +18,7 @@ const gameStyles = {
 };
 
 // Common prompt components
-const baseStyle = "muted colors\n\nbirds-eye top-down perspective like Pokemon/stardew valley";
+const baseStyle = "muted colors\n\nbirds-eye top-down perspective like Pokemon/stardew valley -- **no shadows**";
 const objectLighting = "afternoon sunlight coming from the top-left of the image\nmature elegant positive professional";
 const transparentCanvas = "IMPORTANT: Use a completely transparent background (no black, no white, just transparent).\nCenter the object taking up most of the canvas space. 1024x1024 image.\nNo platform/ground/tile object at the base (we'll be placing what is generated on a texture of our own so it needs to just be the object with lighting coming from top-left)";
 
@@ -23,7 +28,44 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { description, type = 'object', count = 3 } = req.body;
+    const { description, type = 'object', count = 3, userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Initialize Supabase admin client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Check user credits before proceeding
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('credits')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+
+    // Define credit cost using constant
+    const creditCost = K.spriteGenerationCost;
+
+    if (profile.credits < creditCost) {
+      return res.status(400).json({ error: 'Insufficient credits' });
+    }
+
+    // Deduct credits before generating
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ credits: profile.credits - creditCost })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error deducting credits:', updateError);
+      return res.status(500).json({ error: 'Failed to deduct credits' });
+    }
 
     // Different prompts for different object types using "low poly cartoon" style
     let imagePrompt;
@@ -73,7 +115,18 @@ ${transparentCanvas}`;
       })
     );
 
-    const results = await Promise.all(promises);
+    let results;
+    try {
+      results = await Promise.all(promises);
+    } catch (generationError) {
+      // Revert credit deduction if generation fails
+      await supabase
+        .from('profiles')
+        .update({ credits: profile.credits })
+        .eq('id', userId);
+
+      throw generationError;
+    }
 
     // Process all generated images
     const options = [];
