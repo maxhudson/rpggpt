@@ -308,12 +308,53 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
     await updateGame({ ...game, background: updatedBackground });
   };
 
+  var nearbyInteractiveElement = nearbyInteractiveElements && nearbyInteractiveElements[0];
+
+  var actionButtons = [];
+
+  if (nearbyInteractiveElement) {
+    if (nearbyInteractiveElement.data.actions?.craft === 1) actionButtons.push({onAction: () => onCraft(nearbyInteractiveElement), type: 'craft'});
+    if (nearbyInteractiveElement.data.actions?.sell === 1) actionButtons.push({onAction: () => onSell(nearbyInteractiveElement), type: 'sell'});
+    if (nearbyInteractiveElement.data.actions?.buy === 1) actionButtons.push({onAction: () => onBuy(nearbyInteractiveElement), type: 'buy'});
+
+    if (nearbyInteractiveElement.data.type === 'item') {
+      actionButtons.push({onAction: () => {
+        const updatedInventory = {
+          ...player.inventory,
+
+          [nearbyInteractiveElement.id]: (player.inventory[nearbyInteractiveElement.id] || 0) + 1
+        };
+        const updatedMapElements = { ...game.map.elements };
+        delete updatedMapElements[nearbyInteractiveElement.id]; // Remove from map
+        updateGame({
+          ...game,
+          map: {
+            ...game.map,
+            elements: updatedMapElements
+          },
+          players: {
+            ...game.players,
+            [session.user.id]: {
+              ...player,
+              inventory: updatedInventory
+            }
+
+          }
+        });
+      }, type: 'pick-up'});
+    }
+  }
+
+  actionButtons.push({type: 'build', onAction: () => {
+    setIsBuilding(true)
+  }})
+
   return (
     <>
       {/* Edit button - top right */}
       <div
         onClick={() => setIsEditing(!isEditing)}
-        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, backgroundColor: '#E6E2D2', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}
+        style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 100, backgroundColor: '#E6E2D2', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}
       >
         {isEditing ? '✓' : <span style={{textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em'}}>edit</span>}
       </div>
@@ -330,7 +371,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                   elementType,
                   quantity: quantities[elementTypeId] || 0
                 }))
-                .filter(item => (item.elementType.data.type || 'object') === type);
+                .filter(item => (item.elementType.data.type || 'object') === type)
+                .filter(item => isEditing || item.quantity > 0);
 
               return itemsWithQuantity.map(({ elementTypeId, elementType, quantity }) => {
                 const isGenerating = generatingImages[elementTypeId];
@@ -423,29 +465,31 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
       {player && !isEditing && (
         <div style={{
           position: 'absolute',
-          bottom: '20px',
-          left: '20px',
+          top: '20px',
+          right: '10px',
           zIndex: 100,
           display: 'flex',
           flexDirection: 'column',
+          alignItems: 'flex-end',
           gap: '4px'
         }}>
-          <div style={{
+          {/* <div style={{
             padding: '8px 12px',
             fontSize: '17px',
             fontWeight: 'bold',
             color: '#4A4A4A'
           }}>
             ${player.money || 0}
-          </div>
+          </div> */}
           {game.time && (
             <div style={{
               padding: '0px 12px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#4A4A4A',
+              fontSize: '20px',
+              color: '#000',
               opacity: 0.8,
+              fontWeight: 600,
               textTransform: 'uppercase',
+              letterSpacing: '0.1em',
             }}>
               Day {game.time.day}
             </div>
@@ -453,216 +497,97 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           {game.time && (
             <div style={{
               padding: '0px 12px',
-              fontSize: '14px',
-              fontWeight: 'bold',
+              fontSize: '12px',
               color: '#4A4A4A',
+              opacity: 0.8,
+              fontWeight: 600,
               textTransform: 'uppercase',
-              opacity: 0.8
+              letterSpacing: '0.1em',
+              marginRight: 2
             }}>
-              {String(game.time.hour).padStart(1, '0')}:{String(game.time.minute).padStart(2, '0') + (game.time.hour >= 12 ? ' pm' : ' am')}
+              {String(game.time.hour % 12).padStart(1, '0')}:{String(game.time.minute).padStart(2, '0') + (game.time.hour >= 12 ? ' pm' : ' am')}
             </div>
           )}
         </div>
       )}
 
       {/* Action Buttons - bottom center when near interactive elements and not editing */}
-      {!isEditing && nearbyInteractiveElements && nearbyInteractiveElements.length > 0 && (
+      {!isEditing && (
         <div style={{
           position: 'absolute',
           bottom: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: '20px',
           zIndex: 100,
           display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
+          gap: '1px',
           alignItems: 'center'
         }}>
-          {nearbyInteractiveElements.slice(0, 1).map(({ elementType, elementId }) => (
-            <div key={elementId} style={{
-              backgroundColor: 'rgba(230, 226, 210, 0.95)',
-              border: '2px solid #8B7355',
-              borderRadius: '8px',
-              padding: '15px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              alignItems: 'center',
-              minWidth: '200px'
-            }}>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: '#4A4A4A',
-                textAlign: 'center'
-              }}>
-                {elementType.data.title || 'Interactive Element'}
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {elementType.data.actions?.craft === 1 && (
-                  <button
-                    onClick={() => onCraft(elementType)}
-                    style={{
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <img
-                      src="/images/action-craft.png"
-                      alt="Craft"
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Craft
-                    </span>
-                  </button>
-                )}
-
-                {elementType.data.actions?.sell === 1 && (
-                  <button
-                    onClick={() => onSell(elementType)}
-                    style={{
-                      backgroundColor: '#FF9800',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <img
-                      src="/images/action-sell.png"
-                      alt="Sell"
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Sell
-                    </span>
-                  </button>
-                )}
-
-                {elementType.data.actions?.buy === 1 && (
-                  <button
-                    onClick={() => onBuy(elementType)}
-                    style={{
-                      backgroundColor: '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <img
-                      src="/images/action-buy.png"
-                      alt="Buy"
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Buy
-                    </span>
-                  </button>
-                )}
-
-                {/* Pick up item button */}
-                {elementType.data.type === 'item' && (
-                  <button
-                    onClick={() => {
-                      const updatedInventory = {
-                        ...player.inventory,
-                        [elementType.id]: (player.inventory[elementType.id] || 0) + 1
-                      };
-
-                      const updatedMapElements = { ...game.map.elements };
-                      delete updatedMapElements[elementId]; // Remove from map
-
-                      updateGame({
-                        ...game,
-                        map: {
-                          ...game.map,
-                          elements: updatedMapElements
-                        },
-                        players: {
-                          ...game.players,
-                          [session.user.id]: {
-                            ...player,
-                            inventory: updatedInventory
-                          }
-                        }
-                      });
-                    }}
-                    style={{
-                      backgroundColor: '#9C27B0',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <img
-                      src="/images/pickup.png"
-                      alt="Pick Up"
-                      style={{ width: '16px', height: '16px' }}
-                    />
-                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Pick Up
-                    </span>
-                  </button>
-                )}
-
-                {/* Tool Usage Buttons */}
-                {elementType.data.toolData && player?.inventory && Object.entries(elementType.data.toolData).map(([toolElementTypeId, toolConfig]) => {
-                  const toolElementType = elementTypes[toolElementTypeId];
-                  const playerHasTool = player.inventory[toolElementTypeId] > 0;
-
-                  if (!playerHasTool || !toolElementType) return null;
-
-                  return (
-                    <button
-                      key={toolElementTypeId}
-                      onClick={() => onUseTool(elementId, toolElementTypeId)}
-                      style={{
-                        backgroundColor: '#9C27B0',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <img
-                        src="/images/hammer.png"
-                        alt="Tool"
-                        style={{ width: '16px', height: '16px' }}
-                      />
-                      <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Use {toolElementType.data.title}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+          {nearbyInteractiveElement && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '1px',
+                fontSize: '12px',
+                backgroundColor: '#E6E2D2',
+                padding: '8px',
+                position: 'relative',
+                width: 40,
+                height: 40,
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <img
+                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${nearbyInteractiveElement.id}/image.png${nearbyInteractiveElement.data.imageTimestamp ? `?t=${nearbyInteractiveElement.data.imageTimestamp}` : ''}`}
+                alt={nearbyInteractiveElement.title || 'Item'}
+                draggable={false}
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  objectFit: 'contain',
+                  pointerEvents: 'none'
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'inline';
+                }}
+              />
+            </div>
+          )}
+          {_.map(actionButtons, ({type, onAction}, index) => (
+            <div
+              key={type}
+              onMouseDown={onAction}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '1px',
+                fontSize: '12px',
+                backgroundColor: '#E6E2D2',
+                padding: '8px',
+                position: 'relative',
+                width: 40,
+                height: 40,
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <img
+                src={`/actions/${type}-icon.png`}
+                // alt={elementType.title || 'Item'}
+                draggable={false}
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  objectFit: 'contain',
+                  pointerEvents: 'none'
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'inline';
+                }}
+              />
             </div>
           ))}
         </div>

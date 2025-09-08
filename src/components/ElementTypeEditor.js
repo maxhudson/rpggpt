@@ -563,6 +563,218 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
           </div>
         )}
 
+        {elementType.data?.type === 'tool' && (
+          <div>
+            <label>Crafting Requirements (what's needed to craft this tool):</label>
+            <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '5px' }}>
+              {Object.entries(elementType.data?.craftingRequirements || {}).map(([reqElementTypeId, quantity]) => {
+                const reqElementType = elementTypes?.[reqElementTypeId];
+                const reqElementName = reqElementType?.data?.title || `Unknown Item (ID: ${reqElementTypeId})`;
+                return (
+                  <div key={reqElementTypeId} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '5px' }}>
+                    <span style={{ fontSize: '12px', minWidth: '150px' }}>
+                      {reqElementName}
+                    </span>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const newRequirements = { ...elementType.data.craftingRequirements };
+                        if (parseInt(e.target.value) > 0) {
+                          newRequirements[reqElementTypeId] = parseInt(e.target.value);
+                        } else {
+                          delete newRequirements[reqElementTypeId];
+                        }
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            craftingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ width: '60px' }}
+                      min="0"
+                    />
+                    <button
+                      onClick={() => {
+                        const newRequirements = { ...elementType.data.craftingRequirements };
+                        delete newRequirements[reqElementTypeId];
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            craftingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ backgroundColor: 'red', color: 'white', padding: '2px 6px', fontSize: '12px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                <select
+                  id={`tool-craft-req-select-${elementType.id}`}
+                  style={{ width: '150px' }}
+                  defaultValue=""
+                >
+                  <option value="">Select item...</option>
+                  {elementTypes && Object.entries(elementTypes)
+                    .filter(([id, et]) => et.data?.type === 'item' && id !== elementType.id.toString())
+                    .map(([id, et]) => (
+                      <option key={id} value={id}>
+                        {et.data?.title || `Item ${id}`}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  id={`tool-craft-req-qty-${elementType.id}`}
+                  style={{ width: '80px' }}
+                  min="1"
+                />
+                <button
+                  onClick={() => {
+                    const selectInput = document.getElementById(`tool-craft-req-select-${elementType.id}`);
+                    const qtyInput = document.getElementById(`tool-craft-req-qty-${elementType.id}`);
+                    const elementTypeId = selectInput.value;
+                    const quantity = parseInt(qtyInput.value);
+
+                    if (elementTypeId && quantity > 0) {
+                      const newRequirements = {
+                        ...elementType.data.craftingRequirements,
+                        [elementTypeId]: quantity
+                      };
+                      updateElementType({
+                        ...elementType,
+                        data: {
+                          ...elementType.data,
+                          craftingRequirements: newRequirements
+                        }
+                      });
+                      selectInput.value = '';
+                      qtyInput.value = '';
+                    }
+                  }}
+                  style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Add Requirement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {elementType.data?.type === 'building' && (
+          <div>
+            <label>Building Requirements (what's needed to build this):</label>
+            <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '5px' }}>
+              {Object.entries(elementType.data?.buildingRequirements || {}).map(([reqElementTypeId, quantity]) => {
+                const reqElementType = elementTypes?.[reqElementTypeId];
+                const reqElementName = reqElementType?.data?.title || `Unknown Item (ID: ${reqElementTypeId})`;
+                return (
+                  <div key={reqElementTypeId} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '5px' }}>
+                    <span style={{ fontSize: '12px', minWidth: '150px' }}>
+                      {reqElementName}
+                    </span>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const newRequirements = { ...elementType.data.buildingRequirements };
+                        if (parseInt(e.target.value) > 0) {
+                          newRequirements[reqElementTypeId] = parseInt(e.target.value);
+                        } else {
+                          delete newRequirements[reqElementTypeId];
+                        }
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            buildingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ width: '60px' }}
+                      min="0"
+                    />
+                    <button
+                      onClick={() => {
+                        const newRequirements = { ...elementType.data.buildingRequirements };
+                        delete newRequirements[reqElementTypeId];
+                        updateElementType({
+                          ...elementType,
+                          data: {
+                            ...elementType.data,
+                            buildingRequirements: newRequirements
+                          }
+                        });
+                      }}
+                      style={{ backgroundColor: 'red', color: 'white', padding: '2px 6px', fontSize: '12px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                <select
+                  id={`building-req-select-${elementType.id}`}
+                  style={{ width: '150px' }}
+                  defaultValue=""
+                >
+                  <option value="">Select item...</option>
+                  {elementTypes && Object.entries(elementTypes)
+                    .filter(([id, et]) => et.data?.type === 'item' && id !== elementType.id.toString())
+                    .map(([id, et]) => (
+                      <option key={id} value={id}>
+                        {et.data?.title || `Item ${id}`}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  id={`building-req-qty-${elementType.id}`}
+                  style={{ width: '80px' }}
+                  min="1"
+                />
+                <button
+                  onClick={() => {
+                    const selectInput = document.getElementById(`building-req-select-${elementType.id}`);
+                    const qtyInput = document.getElementById(`building-req-qty-${elementType.id}`);
+                    const elementTypeId = selectInput.value;
+                    const quantity = parseInt(qtyInput.value);
+
+                    if (elementTypeId && quantity > 0) {
+                      const newRequirements = {
+                        ...elementType.data.buildingRequirements,
+                        [elementTypeId]: quantity
+                      };
+                      updateElementType({
+                        ...elementType,
+                        data: {
+                          ...elementType.data,
+                          buildingRequirements: newRequirements
+                        }
+                      });
+                      selectInput.value = '';
+                      qtyInput.value = '';
+                    }
+                  }}
+                  style={{ backgroundColor: 'green', color: 'white', padding: '5px 10px', fontSize: '12px' }}
+                >
+                  Add Requirement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {(elementType.data?.type === 'object' || elementType.data?.type === 'plant' || elementType.data?.type === 'building') && (
           <div>
             <label>Tools:</label>
@@ -867,6 +1079,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                   <Stage
                     width={K.gridSize * (elementType.data.width || 1)}
                     height={K.gridSize * (elementType.data.width || 1) * ((elementType.data.originalHeight || 32) / (elementType.data.originalWidth || 32))}
+                    offset={{ x: -(K.gridSize * (elementType.data.width || 1)) / 2, y: -(K.gridSize * (elementType.data.width || 1) * ((elementType.data.originalHeight || 32) / (elementType.data.originalWidth || 32))) / 2 }}
                   >
                     <Layer>
                       <MapObject
@@ -880,6 +1093,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                           width: K.gridSize * (elementType.data.width || 1),
                           height: K.gridSize * (elementType.data.width || 1) * ((elementType.data.originalHeight || 32) / (elementType.data.originalWidth || 32))
                         }}
+                        isEditing={false}
+                        isSelected={false}
                       />
                     </Layer>
                   </Stage>
@@ -893,6 +1108,7 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                   <Stage
                     width={K.gridSize * (elementType.data.width || 1)}
                     height={K.gridSize * (elementType.data.width || 1) * (option.originalHeight / option.originalWidth)}
+                    offset={{ x: -(K.gridSize * (elementType.data.width || 1)) / 2, y: -(K.gridSize * (elementType.data.width || 1) * (option.originalHeight / option.originalWidth)) / 2 }}
                   >
                     <Layer>
                       <MapObject
@@ -914,6 +1130,8 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
                           width: K.gridSize * (elementType.data.width || 1),
                           height: K.gridSize * (elementType.data.width || 1) * (option.originalHeight / option.originalWidth)
                         }}
+                        isEditing={false}
+                        isSelected={false}
                       />
                     </Layer>
                   </Stage>

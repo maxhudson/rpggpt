@@ -20,6 +20,9 @@ const geistMono = Geist_Mono({
 });
 
 export default function GamePage({session, userProfile}) {
+  // Define max game size
+  const maxGameSize = { width: 800, height: 600 };
+
   var [game, setGame] = useState(null);
   var [isEditing, setIsEditing] = useState(false);
   var [elementTypes, _setElementTypes] = useState({});
@@ -313,7 +316,7 @@ export default function GamePage({session, userProfile}) {
       return;
     }
 
-    const interactionDistance = 60; // Distance in pixels for interaction
+    const interactionDistance = 10; // Distance in pixels for interaction
     const mapElements = stateRef.current.game.map?.elements || {};
     const nearby = [];
 
@@ -326,7 +329,8 @@ export default function GamePage({session, userProfile}) {
       // Check if any actions are enabled
       const hasActions = elementType.data.actions?.craft === 1 ||
                         elementType.data.actions?.sell === 1 ||
-                        elementType.data.actions?.buy === 1;
+                        elementType.data.actions?.buy === 1
+                        || elementType.data.type === 'item';
 
       // Check if element has tool data and player has compatible tools
       const hasToolData = elementType.data.toolData && Object.keys(elementType.data.toolData).length > 0;
@@ -828,7 +832,7 @@ export default function GamePage({session, userProfile}) {
   // Compute nearby interactive elements from IDs and current elementTypes
   const nearbyInteractiveElements = nearbyInteractiveElementIds.map(({ elementId, elementTypeId, distance, x, y }) => {
     const elementType = elementTypes[elementTypeId];
-    return elementType ? { elementId, elementTypeId, elementType, distance, x, y } : null;
+    return elementType ? elementType : null;
   }).filter(Boolean);
   console.log(nearbyInteractiveElementIds, nearbyInteractiveElements);
   return game && player && (
@@ -851,12 +855,12 @@ export default function GamePage({session, userProfile}) {
           justifyContent: 'center'
         }}
       >
-        {/* Game Container - 800x600 max with centered positioning */}
+        {/* Game Container - maxGameSize with centered positioning */}
         <div style={{
           position: 'relative',
           width: stageSize.width,
           height: stageSize.height,
-          backgroundColor: '#cdceac'
+          backgroundColor: '#cdceac',
         }}>
           <HUD
             isEditing={isEditing}
@@ -906,6 +910,7 @@ export default function GamePage({session, userProfile}) {
             session={session}
             setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
             advanceTime={advanceTime}
+            maxGameSize={maxGameSize}
           />
         </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo } from 'react';
 import dynamic from 'next/dynamic';
 import useImage from 'use-image';
 import K from '@/k';
@@ -10,7 +10,7 @@ const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rec
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
 const Konva = dynamic(() => import('konva'), { ssr: false });
 
-export default function MapObject({ elementId, elementTypeId, x, y, elementType, playerPosition, stageSize, isEditing, isSelected, onUpdatePosition, onSelect, onDragStart, onDragMove, onDragEnd }) {
+function MapObject({ elementId, elementTypeId, x, y, elementType, playerPosition, stageSize, isEditing, isSelected, onUpdatePosition, onSelect, onDragStart, onDragMove, onDragEnd }) {
   // Generate dynamic image URL from Supabase storage
   const imageUrl = elementTypeId && elementTypeId !== 'preview-current' && !elementTypeId.startsWith('preview-option-')
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${elementTypeId}/image.png${elementType.data.imageTimestamp ? `?t=${elementType.data.imageTimestamp}` : ''}`
@@ -85,15 +85,9 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     displayWidth * (originalHeight / originalWidth) : displayWidth;
   const displayHeight = baseDisplayHeight * yScale;
 
-  // Calculate position relative to player and center on screen
-  const screenCenterX = stageSize.width / 2;
-  const screenCenterY = stageSize.height / 2;
-
-  const relativeX = x - playerPosition.x;
-  const relativeY = y - playerPosition.y;
-
-  const screenX = screenCenterX + relativeX;
-  const screenY = screenCenterY + relativeY; // Center vertically
+  // Use world coordinates directly since we're using stage offset
+  const worldX = x;
+  const worldY = y;
 
   // Calculate shadow dimensions
   const shadowWidth = displayWidth * shadowRadius * 2;
@@ -105,9 +99,7 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragStart) {
       const node = e.target;
-      const worldX = node.x() - screenCenterX + playerPosition.x;
-      const worldY = node.y() - screenCenterY + playerPosition.y;
-      onDragStart(elementId, { x: worldX, y: worldY });
+      onDragStart(elementId, { x: node.x(), y: node.y() });
     }
   };
 
@@ -117,9 +109,9 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     if (!isEditing) return;
 
     const node = e.target;
-    // Convert from screen coordinates to world coordinates
-    const worldX = node.x() - screenCenterX + playerPosition.x;
-    const worldY = node.y() - screenCenterY + playerPosition.y;
+    // Use world coordinates directly
+    const worldX = node.x();
+    const worldY = node.y();
 
     // Use shared drag handlers if available, otherwise fall back to local handling
     if (onDragEnd) {
@@ -145,8 +137,8 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     <>
       <Group
         ref={groupRef}
-        x={screenX}
-        y={screenY}
+        x={worldX}
+        y={worldY}
         draggable={isEditing}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -155,19 +147,18 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
         dragBoundFunc={(pos) => {
           if (!isEditing) return pos;
 
-          // Convert screen position to world coordinates
-          const worldX = pos.x - screenCenterX + playerPosition.x;
-          const worldY = pos.y - screenCenterY + playerPosition.y;
+          // Use world coordinates directly
+          const worldX = pos.x;
+          const worldY = pos.y;
 
           // Only snap to grid when shift is pressed
           if (isShiftPressed.current) {
             const snappedWorldX = snapToGrid(worldX);
             const snappedWorldY = snapToGrid(worldY);
 
-            // Convert back to screen coordinates
             return {
-              x: screenCenterX + (snappedWorldX - playerPosition.x),
-              y: screenCenterY + (snappedWorldY - playerPosition.y)
+              x: snappedWorldX,
+              y: snappedWorldY
             };
           }
 
@@ -230,9 +221,9 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
           onTransformEnd={(e) => {
             const node = transformerRef.current.nodes()[0];
             if (node && onUpdatePosition) {
-              // Convert screen position to world coordinates
-              const worldX = node.x() - screenCenterX + playerPosition.x;
-              const worldY = node.y() - screenCenterY + playerPosition.y;
+              // Use world coordinates directly
+              const worldX = node.x();
+              const worldY = node.y();
 
               // Only snap to grid when shift is pressed
               const newX = isShiftPressed.current ? snapToGrid(worldX) : worldX;
@@ -247,3 +238,38 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     </>
   );
 }
+
+// Custom comparison function for React.memo
+const areEqual = (prevProps, nextProps) => {
+  const changedProps = [];
+
+  // Check each prop for changes
+  if (prevProps.elementId !== nextProps.elementId) changedProps.push('elementId');
+  if (prevProps.elementTypeId !== nextProps.elementTypeId) changedProps.push('elementTypeId');
+  if (prevProps.x !== nextProps.x) changedProps.push('x');
+  if (prevProps.y !== nextProps.y) changedProps.push('y');
+  if (prevProps.isEditing !== nextProps.isEditing) changedProps.push('isEditing');
+  if (prevProps.isSelected !== nextProps.isSelected) changedProps.push('isSelected');
+
+  // Deep compare elementType
+  if (JSON.stringify(prevProps.elementType) !== JSON.stringify(nextProps.elementType)) {
+    changedProps.push('elementType');
+  }
+
+  // Compare playerPosition
+  // if (prevProps.playerPosition?.x !== nextProps.playerPosition?.x ||
+  //     prevProps.playerPosition?.y !== nextProps.playerPosition?.y) {
+  //   changedProps.push('playerPosition');
+  // }
+
+
+  // Log what changed
+  if (changedProps.length > 0) {
+    console.log(`MapObject ${prevProps.elementId} rerendering due to changed props:`, changedProps);
+  }
+
+  // Return true if props are equal (no rerender needed)
+  return changedProps.length === 0;
+};
+
+export default memo(MapObject, areEqual);

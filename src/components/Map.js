@@ -30,22 +30,21 @@ export default function Map({
   onDeselectAll,
   session,
   setNearbyInteractiveElementIds,
-  advanceTime
+  advanceTime,
+  maxGameSize
 }) {
   const keysPressed = useRef({});
   const [selectedElementId, setSelectedElementId] = useState(null);
+  const stageRef = useRef(null);
 
   // Time system state
   const movementDistanceRef = useRef(0);
 
   useEffect(() => {
     const updateSize = () => {
-      const maxWidth = 800;
-      const maxHeight = 600;
-
       setStageSize({
-        width: Math.min(window.innerWidth, maxWidth),
-        height: Math.min(window.innerHeight, maxHeight)
+        width: Math.min(window.innerWidth, maxGameSize.width),
+        height: Math.min(window.innerHeight, maxGameSize.height)
       });
     };
 
@@ -400,7 +399,7 @@ export default function Map({
       return;
     }
 
-    const interactionDistance = 60; // Distance in pixels for interaction
+    const interactionDistance = 10; // Distance in pixels for interaction
     const mapElements = stateRef.current.game.map?.elements || {};
     const nearby = [];
 
@@ -413,7 +412,8 @@ export default function Map({
       // Check if any actions are enabled
       const hasActions = elementType.data.actions?.craft === 1 ||
                         elementType.data.actions?.sell === 1 ||
-                        elementType.data.actions?.buy === 1;
+                        elementType.data.actions?.buy === 1 ||
+                        elementType.data.type === 'item';
 
       // Check if element has tool data and player has compatible tools
       const hasToolData = elementType.data.toolData && Object.keys(elementType.data.toolData).length > 0;
@@ -466,10 +466,18 @@ export default function Map({
     }
   };
 
+  // Calculate stage offset based on player position in real-time
+  const stageOffset = {
+    x: stageSize.width / 2 - player.position.x,
+    y: stageSize.height / 2 - player.position.y
+  };
+
   return (
     <Stage
+      ref={stageRef}
       width={stageSize.width}
       height={stageSize.height}
+      offset={{ x: -stageOffset.x, y: -stageOffset.y }}
       onClick={(e) => {
         // Only deselect if clicking on the stage itself (empty space)
         if (e.target === e.target.getStage()) {
@@ -518,18 +526,15 @@ export default function Map({
           })()} */}
 
           {/* Render red dot at world coordinates (0,0) when in edit mode */}
-          {isEditing && (() => {
-            const originScreenPos = worldToScreen(0, 0);
-            return (
-              <Circle
-                x={originScreenPos.x}
-                y={originScreenPos.y}
-                radius={1}
-                fill="red"
-                listening={false}
-              />
-            );
-          })()}
+          {isEditing && (
+            <Circle
+              x={0}
+              y={0}
+              radius={1}
+              fill="red"
+              listening={false}
+            />
+          )}
 
           {/* Render background polygons using EditablePath component */}
           {game?.background && Object.entries(game.background).map(([polygonId, polygon]) => (
@@ -549,8 +554,8 @@ export default function Map({
 
           {/* Render Player Shadow - below all other elements */}
           <Ellipse
-            x={stageSize.width / 2}
-            y={stageSize.height / 2 + 1}
+            x={player.position.x}
+            y={player.position.y + 1}
             radiusX={8}
             radiusY={4}
             fill="rgba(0, 0, 0, 0.2)"
@@ -592,8 +597,8 @@ export default function Map({
                 return (
                   <Player
                     key="player"
-                    centerX={stageSize.width / 2}
-                    centerY={stageSize.height / 2}
+                    centerX={player.position.x}
+                    centerY={player.position.y}
                     playerPosition={player.position}
                     fill="#ff0000"
                   />
@@ -627,8 +632,7 @@ export default function Map({
               {/* Boundary polygon outline */}
               <Line
                 points={game.map.boundaryPolygon.flatMap(([worldX, worldY]) => {
-                  const screenPos = worldToScreen(worldX, worldY);
-                  return [screenPos.x, screenPos.y];
+                  return [worldX, worldY];
                 })}
                 closed={true}
                 stroke="#ff6b6b"
@@ -639,20 +643,18 @@ export default function Map({
 
               {/* Draggable boundary points */}
               {game.map.boundaryPolygon.map(([worldX, worldY], pointIndex) => {
-                const screenPos = worldToScreen(worldX, worldY);
                 return (
                   <Circle
                     key={`boundary-point-${pointIndex}`}
-                    x={screenPos.x}
-                    y={screenPos.y}
+                    x={worldX}
+                    y={worldY}
                     radius={8}
                     fill="#ff6b6b"
                     stroke="#ffffff"
                     strokeWidth={2}
                     draggable={true}
                     onDragMove={(e) => {
-                      const worldPos = screenToWorld(e.target.x(), e.target.y());
-                      handleBoundaryPointDrag(pointIndex, worldPos);
+                      handleBoundaryPointDrag(pointIndex, { x: e.target.x(), y: e.target.y() });
                     }}
                     onMouseEnter={(e) => {
                       e.target.getStage().container().style.cursor = 'pointer';
