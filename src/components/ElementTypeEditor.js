@@ -267,6 +267,28 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
         </div>
 
         <div>
+          <label>Saturation (0-1):</label>
+          <input
+            type="text"
+            defaultValue={(elementType.data?.saturation || 1).toString()}
+            onBlur={(e) => updateElementType({ ...elementType, data: { ...elementType.data, saturation: parseFloat(e.target.value) || 1 } })}
+            placeholder="1"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div>
+          <label>Y Scale (height multiplier):</label>
+          <input
+            type="text"
+            defaultValue={(elementType.data?.yScale || 1).toString()}
+            onBlur={(e) => updateElementType({ ...elementType, data: { ...elementType.data, yScale: parseFloat(e.target.value) || 1 } })}
+            placeholder="1"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div>
           <label>Price (for buying/selling):</label>
           <input
             type="text"
@@ -399,10 +421,6 @@ export default function ElementTypeEditor({ isOpen, onClose, elementType, update
               <button
                 onClick={async () => {
                   const quantity = elementType.data?.initialInventoryQuantity || 0;
-                  if (quantity === 0) {
-                    alert('Set an initial inventory quantity first.');
-                    return;
-                  }
 
                   if (!confirm(`This will set all existing players' inventory of "${elementType.data?.title}" to ${quantity}. Are you sure?`)) {
                     return;

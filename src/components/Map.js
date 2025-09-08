@@ -29,16 +29,23 @@ export default function Map({
   setSelectedPolygonId,
   onDeselectAll,
   session,
-  setNearbyInteractiveElementIds
+  setNearbyInteractiveElementIds,
+  advanceTime
 }) {
   const keysPressed = useRef({});
   const [selectedElementId, setSelectedElementId] = useState(null);
 
+  // Time system state
+  const movementDistanceRef = useRef(0);
+
   useEffect(() => {
     const updateSize = () => {
+      const maxWidth = 800;
+      const maxHeight = 600;
+
       setStageSize({
-        width: window.innerWidth,
-        height: window.innerHeight
+        width: Math.min(window.innerWidth, maxWidth),
+        height: Math.min(window.innerHeight, maxHeight)
       });
     };
 
@@ -121,7 +128,7 @@ export default function Map({
   };
 
   useEffect(() => {
-    const moveSpeed = 1;
+    const moveSpeed = 2;
 
     const handleKeyDown = (e) => {
       keysPressed.current[e.key.toLowerCase()] = true;
@@ -175,6 +182,11 @@ export default function Map({
 
       if (deltaX !== 0 || deltaY !== 0) {
         const currentPlayer = stateRef.current.player;
+        if (!currentPlayer || !currentPlayer.position) {
+          console.log('No player data available for movement', currentPlayer);
+          return;
+        }
+
         const currentPlayerPos = currentPlayer.position;
         const newX = currentPlayerPos.x + deltaX;
         const newY = currentPlayerPos.y + deltaY;
@@ -195,7 +207,32 @@ export default function Map({
 
         // Update player position in game state
         if (finalX !== currentPlayerPos.x || finalY !== currentPlayerPos.y) {
-          const currentGame = stateRef.current.game;
+          var currentGame = stateRef.current.game;
+          if (!currentGame || !session?.user?.id) {
+            console.log('Missing game or session data', { currentGame: !!currentGame, sessionUserId: session?.user?.id });
+            return;
+          }
+
+          // Calculate movement distance for time progression
+          const movementDistance = Math.sqrt(
+            Math.pow(finalX - currentPlayerPos.x, 2) +
+            Math.pow(finalY - currentPlayerPos.y, 2)
+          );
+
+          // Accumulate movement distance
+          movementDistanceRef.current += movementDistance;
+
+          // Check if we've moved enough to advance time (100px = 5 minutes)
+          const distanceThreshold = 100;
+          const minutesPerThreshold = 5;
+          console.log(movementDistanceRef.current)
+          if (movementDistanceRef.current >= distanceThreshold) {
+            movementDistanceRef.current = movementDistanceRef.current - distanceThreshold; // Keep remainder
+
+            advanceTime(minutesPerThreshold);
+          }
+          var currentGame = stateRef.current.game;
+
           const updatedPlayers = {
             ...currentGame.players,
             [session.user.id]: {
@@ -222,8 +259,8 @@ export default function Map({
       window.removeEventListener('keyup', handleKeyUp);
       clearInterval(intervalId);
     };
-  }, [selectedElementId, isEditing]);
-
+  }, [selectedElementId, isEditing, updateGame, session.user.id]);
+  console.log(session.user.id, 'session user ID in Map component');
   const mapElements = game.map.elements;
 
   const handleDeleteElement = async (elementId) => {
@@ -430,19 +467,18 @@ export default function Map({
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#cdceac' }}>
-      <Stage
-        width={stageSize.width}
-        height={stageSize.height}
-        onClick={(e) => {
-          // Only deselect if clicking on the stage itself (empty space)
-          if (e.target === e.target.getStage()) {
-            if (onDeselectAll) {
-              onDeselectAll();
-            }
+    <Stage
+      width={stageSize.width}
+      height={stageSize.height}
+      onClick={(e) => {
+        // Only deselect if clicking on the stage itself (empty space)
+        if (e.target === e.target.getStage()) {
+          if (onDeselectAll) {
+            onDeselectAll();
           }
-        }}
-      >
+        }
+      }}
+    >
         <Layer>
           {/* Render checkerboard grid when in edit mode */}
           {/* {isEditing && (() => {
@@ -515,9 +551,9 @@ export default function Map({
           <Ellipse
             x={stageSize.width / 2}
             y={stageSize.height / 2 + 1}
-            radiusX={6}
-            radiusY={3}
-            fill="rgba(0, 0, 0, 0.3)"
+            radiusX={8}
+            radiusY={4}
+            fill="rgba(0, 0, 0, 0.2)"
             opacity={0.6}
             listening={false}
           />
@@ -630,7 +666,6 @@ export default function Map({
             </>
           )}
         </Layer>
-      </Stage>
-    </div>
+    </Stage>
   );
 }

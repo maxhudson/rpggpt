@@ -106,7 +106,7 @@ ${objectLighting} technical
 just see the front and the top of objects
 ${transparentCanvas}`;
     }
-
+    console.log('Generating sprite with prompt:', imagePrompt);
     // Generate the requested number of images in parallel
     const promises = Array(count).fill().map(() =>
       openai.images.generate({

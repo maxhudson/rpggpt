@@ -193,10 +193,12 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
     const quantities = {};
 
     // Count elements in map
-    Object.values(game.map.elements).forEach(mapElement => {
-      const elementTypeId = mapElement[0]; // [elementTypeId, x, y]
-      quantities[elementTypeId] = (quantities[elementTypeId] || 0) + 1;
-    });
+    if (isEditing) {
+      Object.values(game.map.elements).forEach(mapElement => {
+        const elementTypeId = mapElement[0]; // [elementTypeId, x, y]
+        quantities[elementTypeId] = (quantities[elementTypeId] || 0) + 1;
+      });
+    }
 
     // Count elements in player inventory
     if (player && player.inventory) {
@@ -311,13 +313,13 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
       {/* Edit button - top right */}
       <div
         onClick={() => setIsEditing(!isEditing)}
-        style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 100, backgroundColor: '#E6E2D2', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}
+        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100, backgroundColor: '#E6E2D2', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}
       >
         {isEditing ? '✓' : <span style={{textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em'}}>edit</span>}
       </div>
 
       {/* Inventory Display - top left */}
-      <div style={{ position: 'fixed', top: '20px', left: '20px', zIndex: 100, display: 'flex', gap: '1px'}}>
+      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 100, display: 'flex', gap: '1px'}}>
         {_.map(isEditing ? ['object', 'plant', 'building', 'tool', 'item', 'stat'] : ['tool', 'item', 'stat'], (type) => (
           <div key={type}>
             {(() => {
@@ -417,26 +419,56 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
         ))}
       </div>
 
-      {/* Money Display - bottom left - only show when not editing */}
+      {/* Money and Time Display - bottom left - only show when not editing */}
       {player && !isEditing && (
         <div style={{
-          position: 'fixed',
+          position: 'absolute',
           bottom: '20px',
           left: '20px',
           zIndex: 100,
-          padding: '8px 12px',
-          fontSize: '17px',
-          fontWeight: 'bold',
-          color: '#4A4A4A'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
         }}>
-          ${player.money || 0}
+          <div style={{
+            padding: '8px 12px',
+            fontSize: '17px',
+            fontWeight: 'bold',
+            color: '#4A4A4A'
+          }}>
+            ${player.money || 0}
+          </div>
+          {game.time && (
+            <div style={{
+              padding: '0px 12px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#4A4A4A',
+              opacity: 0.8,
+              textTransform: 'uppercase',
+            }}>
+              Day {game.time.day}
+            </div>
+          )}
+          {game.time && (
+            <div style={{
+              padding: '0px 12px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#4A4A4A',
+              textTransform: 'uppercase',
+              opacity: 0.8
+            }}>
+              {String(game.time.hour).padStart(1, '0')}:{String(game.time.minute).padStart(2, '0') + (game.time.hour >= 12 ? ' pm' : ' am')}
+            </div>
+          )}
         </div>
       )}
 
       {/* Action Buttons - bottom center when near interactive elements and not editing */}
       {!isEditing && nearbyInteractiveElements && nearbyInteractiveElements.length > 0 && (
         <div style={{
-          position: 'fixed',
+          position: 'absolute',
           bottom: '20px',
           left: '50%',
           transform: 'translateX(-50%)',
@@ -546,6 +578,56 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                   </button>
                 )}
 
+                {/* Pick up item button */}
+                {elementType.data.type === 'item' && (
+                  <button
+                    onClick={() => {
+                      const updatedInventory = {
+                        ...player.inventory,
+                        [elementType.id]: (player.inventory[elementType.id] || 0) + 1
+                      };
+
+                      const updatedMapElements = { ...game.map.elements };
+                      delete updatedMapElements[elementId]; // Remove from map
+
+                      updateGame({
+                        ...game,
+                        map: {
+                          ...game.map,
+                          elements: updatedMapElements
+                        },
+                        players: {
+                          ...game.players,
+                          [session.user.id]: {
+                            ...player,
+                            inventory: updatedInventory
+                          }
+                        }
+                      });
+                    }}
+                    style={{
+                      backgroundColor: '#9C27B0',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <img
+                      src="/images/pickup.png"
+                      alt="Pick Up"
+                      style={{ width: '16px', height: '16px' }}
+                    />
+                    <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Pick Up
+                    </span>
+                  </button>
+                )}
+
                 {/* Tool Usage Buttons */}
                 {elementType.data.toolData && player?.inventory && Object.entries(elementType.data.toolData).map(([toolElementTypeId, toolConfig]) => {
                   const toolElementType = elementTypes[toolElementTypeId];
@@ -588,7 +670,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
 
       {/* Polygon Drawing Controls - bottom right when editing */}
       {isEditing && (
-        <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end' }}>
+        <div style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-end' }}>
           <input
             type="color"
             value={selectedPolygonId && game?.background?.[selectedPolygonId] ?

@@ -7,6 +7,7 @@ import _ from 'lodash';
 import HUD from '@/components/HUD';
 import Map from '@/components/Map';
 import ActionModal from '@/components/ActionModal';
+import FilmNoise from '@/components/FilmNoise';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,17 +60,39 @@ export default function GamePage({session, userProfile}) {
   const router = useRouter();
   const { gameId } = router.query;
 
+  // Handle polygon deletion
+  const handleDeletePolygon = async (polygonId) => {
+    // Remove the polygon from game.background
+    const updatedBackground = {...stateRef.current.game.background};
+
+    delete updatedBackground[polygonId];
+
+    const updatedGame = {
+      ...stateRef.current.game,
+      background: updatedBackground
+    };
+
+    // Update the game state and database
+    await updateGame(updatedGame);
+
+    // Clear the selection
+    setSelectedPolygonId(null);
+  };
+
   // Handle escape key and deselection
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setSelectedPolygonId(null);
+      } else if ((e.key === 'Backspace' || e.key === 'Delete') && selectedPolygonId && isEditing) {
+        // Delete the selected polygon
+        handleDeletePolygon(selectedPolygonId);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedPolygonId, isEditing]);
 
   // Handle deselection when clicking empty space
   const handleDeselectAll = () => {
@@ -356,6 +379,18 @@ export default function GamePage({session, userProfile}) {
   const ensurePlayerData = async () => {
     const currentGame = stateRef.current.game;
     let playerData = currentGame.players?.[session.user.id];
+    let gameNeedsUpdate = false;
+    let updatedGame = { ...currentGame };
+
+    // Initialize game time if it doesn't exist
+    if (!currentGame.time) {
+      updatedGame.time = {
+        day: 1,
+        hour: 6,
+        minute: 0
+      };
+      gameNeedsUpdate = true;
+    }
 
     if (!playerData) {
       // Create initial inventory from element types with initialInventoryQuantity
@@ -379,20 +414,57 @@ export default function GamePage({session, userProfile}) {
       };
 
       const updatedPlayers = {
-        ...currentGame.players,
+        ...updatedGame.players,
         [session.user.id]: playerData
       };
 
-      const updatedGame = {
-        ...currentGame,
+      updatedGame = {
+        ...updatedGame,
         players: updatedPlayers
       };
+      gameNeedsUpdate = true;
+    }
 
+    if (gameNeedsUpdate) {
       await updateGame(updatedGame);
-      return playerData;
     }
 
     return playerData;
+  };
+
+  // Time advancement function
+  const advanceTime = async (minutes) => {
+    const currentGame = stateRef.current.game;
+    if (!currentGame?.time) return;
+
+    let { day, hour, minute } = currentGame.time;
+    minute += minutes;
+
+    // Handle minute overflow
+    while (minute >= 60) {
+      minute -= 60;
+      hour += 1;
+    }
+
+    // Handle hour overflow (day ends at 21:00, new day starts at 6:00)
+    while (hour >= 21) {
+      hour = 6; // Reset to 6 AM
+      day += 1;
+
+      // TODO: Add end-of-day processing here
+      // - AI generation for weather, events, challenges
+      // - Screen blackout transition
+      // - Game state analysis and bonus rewards
+      console.log(`End of day ${day - 1}! Starting day ${day}`);
+    }
+
+    const updatedTime = { day, hour, minute };
+    const updatedGame = {
+      ...currentGame,
+      time: updatedTime
+    };
+
+    await updateGame(updatedGame, { updateSupabase: true, updateState: true });
   };
 
   // Action handlers
@@ -769,55 +841,73 @@ export default function GamePage({session, userProfile}) {
       </Head>
       <div
         className={`${geistSans.variable} ${geistMono.variable}`}
+        style={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden',
+          backgroundColor: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
       >
-        <HUD
-          isEditing={isEditing}
-          setIsEditing={setIsEditing}
-          game={game}
-          updateGame={updateGame}
-          elementTypes={elementTypes}
-          setElementTypes={setElementTypes}
-          session={session}
-          userProfile={userProfile}
-          drawingMode={drawingMode}
-          setDrawingMode={setDrawingMode}
-          selectedMaterialId={selectedMaterialId}
-          setSelectedMaterialId={setSelectedMaterialId}
-          stateRef={stateRef}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          createMapElement={createMapElement}
-          player={player}
-          selectedPolygonId={selectedPolygonId}
-          nearbyInteractiveElements={nearbyInteractiveElements}
-          onCraft={handleCraft}
-          onSell={handleSell}
-          onBuy={handleBuy}
-          onUseTool={handleUseTool}
-        />
-        <Map
-          game={game}
-          elementTypes={elementTypes}
-          isEditing={isEditing}
-          updateGame={updateGame}
-          debouncedUpdateGame={updateGameForDrawing}
-          drawingMode={drawingMode}
-          selectedMaterialId={selectedMaterialId}
-          stateRef={stateRef}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          stageSize={stageSize}
-          setStageSize={setStageSize}
-          player={player}
-          selectedPolygonId={selectedPolygonId}
-          setSelectedPolygonId={setSelectedPolygonId}
-          onDeselectAll={handleDeselectAll}
-          session={session}
-          setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
-        />
-
+        {/* Game Container - 800x600 max with centered positioning */}
+        <div style={{
+          position: 'relative',
+          width: stageSize.width,
+          height: stageSize.height,
+          backgroundColor: '#cdceac'
+        }}>
+          <HUD
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            game={game}
+            updateGame={updateGame}
+            elementTypes={elementTypes}
+            setElementTypes={setElementTypes}
+            session={session}
+            userProfile={userProfile}
+            drawingMode={drawingMode}
+            setDrawingMode={setDrawingMode}
+            selectedMaterialId={selectedMaterialId}
+            setSelectedMaterialId={setSelectedMaterialId}
+            stateRef={stateRef}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            createMapElement={createMapElement}
+            player={player}
+            selectedPolygonId={selectedPolygonId}
+            nearbyInteractiveElements={nearbyInteractiveElements}
+            onCraft={handleCraft}
+            onSell={handleSell}
+            onBuy={handleBuy}
+            onUseTool={handleUseTool}
+            stageSize={stageSize}
+          />
+          <Map
+            game={game}
+            elementTypes={elementTypes}
+            isEditing={isEditing}
+            updateGame={updateGame}
+            debouncedUpdateGame={updateGameForDrawing}
+            drawingMode={drawingMode}
+            selectedMaterialId={selectedMaterialId}
+            stateRef={stateRef}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            stageSize={stageSize}
+            setStageSize={setStageSize}
+            player={player}
+            selectedPolygonId={selectedPolygonId}
+            setSelectedPolygonId={setSelectedPolygonId}
+            onDeselectAll={handleDeselectAll}
+            session={session}
+            setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
+            advanceTime={advanceTime}
+          />
+        </div>
 
         {/* Action Modal */}
         <ActionModal
@@ -827,6 +917,9 @@ export default function GamePage({session, userProfile}) {
           elementTypes={elementTypes}
           player={player}
         />
+
+        {/* Film Noise Overlay */}
+        <FilmNoise opacity={0.4} intensity={0.2} />
       </div>
     </>
   );

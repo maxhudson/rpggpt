@@ -8,6 +8,7 @@ const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.
 const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Group })), { ssr: false });
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 const Transformer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Transformer })), { ssr: false });
+const Konva = dynamic(() => import('konva'), { ssr: false });
 
 export default function MapObject({ elementId, elementTypeId, x, y, elementType, playerPosition, stageSize, isEditing, isSelected, onUpdatePosition, onSelect, onDragStart, onDragMove, onDragEnd }) {
   // Generate dynamic image URL from Supabase storage
@@ -73,13 +74,16 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
     offsetX = 0,
     offsetY = 0,
     collisionRadius = 0.25,
-    shadowRadius = 0.5
+    shadowRadius = 0.5,
+    saturation = 1, // 0-1, where 1 is full saturation, 0 is grayscale
+    yScale = 1 // 0-infinity, where 1 is default, 0.5 is half height, 2 is double height
   } = elementType.data;
 
   // Calculate display dimensions
   const displayWidth = width * K.gridSize;
-  const displayHeight = (originalHeight && originalWidth) ?
+  const baseDisplayHeight = (originalHeight && originalWidth) ?
     displayWidth * (originalHeight / originalWidth) : displayWidth;
+  const displayHeight = baseDisplayHeight * yScale;
 
   // Calculate position relative to player and center on screen
   const screenCenterX = stageSize.width / 2;
@@ -191,6 +195,8 @@ export default function MapObject({ elementId, elementTypeId, x, y, elementType,
             y={-displayHeight + K.gridSize / 2 + (displayHeight * offsetY)}
             width={displayWidth}
             height={displayHeight}
+            // filters={saturation !== 1 ? [Konva.filters.HSV] : []}
+            // saturation={saturation}
           />
         )}
 

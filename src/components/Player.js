@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Konva components to avoid SSR issues
+const Image = dynamic(() => import('react-konva').then(mod => mod.Image), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => mod.Ellipse), { ssr: false });
 
 const Player = ({
@@ -15,12 +16,29 @@ const Player = ({
 }) => {
   const [animationTime, setAnimationTime] = useState(0);
   const [bounceOffset, setBounceOffset] = useState(0);
+  const [playerImage, setPlayerImage] = useState(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const lastPositionRef = useRef(playerPosition);
   const lastMoveTimeRef = useRef(Date.now());
   const intervalDependenciesRef = useRef({ playerPosition });
 
   // Update ref with current dependencies
   intervalDependenciesRef.current = { playerPosition };
+
+  // Load player image from public folder
+  useEffect(() => {
+    const img = new window.Image();
+    img.onload = () => {
+      setPlayerImage(img);
+      setImageLoaded(true);
+    };
+    img.onerror = () => {
+      console.log('Player image failed to load, using fallback');
+      setImageLoaded(false);
+    };
+    // Load from public folder - you can change this to your image filename
+    img.src = '/player.png';
+  }, []);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -58,14 +76,30 @@ const Player = ({
     };
   }, []);
 
+  // If image is loaded, show the image; otherwise show fallback ellipse
+  if (imageLoaded && playerImage) {
+    return (
+      <Image
+        key="player"
+        image={playerImage}
+        x={centerX - 16.5} // Center the 50px image
+        y={centerY + baseOffset - 9} // Center the 50px image
+        width={33}
+        height={33}
+        listening={false}
+      />
+    );
+  }
+
+  // Fallback to ellipse if image doesn't load
   return (
     <Ellipse
-      key="player"
+      key="player-fallback"
       x={centerX}
       y={centerY + baseOffset + bounceOffset}
       radiusX={playerRadius}
       radiusY={playerRadius}
-      fill={'#000'}
+      fill={'#ff0000'}
       listening={false}
     />
   );
