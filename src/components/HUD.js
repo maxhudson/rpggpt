@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import ElementTypeEditor from './ElementTypeEditor';
+import { Tooltip } from 'react-tooltip';
 import _ from 'lodash';
 
-export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, player, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, selectedPolygonId, nearbyInteractiveElements, onCraft, onSell, onBuy, onUseTool, userProfile }) {
+export default function HUD({ isEditing, setIsEditing, game, updateGame, elementTypes, setElementTypes, session, player, drawingMode, setDrawingMode, selectedMaterialId, setSelectedMaterialId, stateRef, onDragStart, onDragMove, onDragEnd, createMapElement, selectedPolygonId, nearbyInteractiveElements, onCraft, onSell, onBuy, onBuild, onUseTool, onPlayNewInstance, userProfile }) {
   const [activeElementTypeId, setActiveElementTypeId] = useState(null);
   const [tentativeImages, setTentativeImages] = useState({}); // Store tentative images by elementType id
   const tentativeImagesRef = useRef({}); // Ref for avoiding race conditions with async API responses
@@ -313,19 +314,21 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
   var actionButtons = [];
 
   if (nearbyInteractiveElement) {
-    if (nearbyInteractiveElement.data.actions?.craft === 1) actionButtons.push({onAction: () => onCraft(nearbyInteractiveElement), type: 'craft'});
-    if (nearbyInteractiveElement.data.actions?.sell === 1) actionButtons.push({onAction: () => onSell(nearbyInteractiveElement), type: 'sell'});
-    if (nearbyInteractiveElement.data.actions?.buy === 1) actionButtons.push({onAction: () => onBuy(nearbyInteractiveElement), type: 'buy'});
+    if (nearbyInteractiveElement.elementType.data.actions?.craft === 1) actionButtons.push({onAction: () => onCraft(nearbyInteractiveElement.elementType), type: 'craft'});
+    if (nearbyInteractiveElement.elementType.data.actions?.sell === 1) actionButtons.push({onAction: () => onSell(nearbyInteractiveElement.elementType), type: 'sell'});
+    if (nearbyInteractiveElement.elementType.data.actions?.buy === 1) actionButtons.push({onAction: () => onBuy(nearbyInteractiveElement.elementType), type: 'buy'});
 
-    if (nearbyInteractiveElement.data.type === 'item') {
+    if (nearbyInteractiveElement.elementType.data.type === 'item') {
       actionButtons.push({onAction: () => {
         const updatedInventory = {
           ...player.inventory,
 
-          [nearbyInteractiveElement.id]: (player.inventory[nearbyInteractiveElement.id] || 0) + 1
+          [nearbyInteractiveElement.elementType.id]: (player.inventory[nearbyInteractiveElement.elementType.id] || 0) + 1
         };
+
         const updatedMapElements = { ...game.map.elements };
-        delete updatedMapElements[nearbyInteractiveElement.id]; // Remove from map
+        delete updatedMapElements[nearbyInteractiveElement.element.id]; // Remove from map
+
         updateGame({
           ...game,
           map: {
@@ -346,17 +349,31 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
   }
 
   actionButtons.push({type: 'build', onAction: () => {
-    setIsBuilding(true)
+    onBuild()
   }})
 
   return (
     <>
-      {/* Edit button - top right */}
-      <div
-        onClick={() => setIsEditing(!isEditing)}
-        style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 100, backgroundColor: '#E6E2D2', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'}}
-      >
-        {isEditing ? '✓' : <span style={{textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em'}}>edit</span>}
+      {/* Edit button and Play New Instance button - top right */}
+      <div style={{ position: 'absolute', bottom: '20px', right: '160px', zIndex: 100, display: 'flex', gap: '1px', flexDirection: 'column' }}>
+        {/* Play New Instance button - only show when editing (game definition) */}
+        {isEditing && (
+          <div
+            onClick={onPlayNewInstance}
+            style={{
+              backgroundColor: '#E6E2D2',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              marginBottom: '1px'
+            }}
+          >
+            <span style={{textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.05em', textAlign: 'center', lineHeight: '10px'}}>play</span>
+          </div>
+        )}
       </div>
 
       {/* Inventory Display - top left */}
@@ -395,6 +412,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                       justifyContent: 'center',
                       cursor: 'pointer',
                     }}
+                    data-tooltip-id={`inventory-tooltip-${elementTypeId}`}
+                    data-tooltip-content={`${(elementType.data.title || '?').toUpperCase()}`}
                   >
                     {isGenerating ? (
                       <span style={{ fontSize: '16px', fontWeight: 'bold' }}>...</span>
@@ -471,7 +490,10 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
-          gap: '4px'
+          gap: '0px',
+          backgroundColor: '#E6E2D2',
+          paddingTop: 8,
+          paddingBottom: 8,
         }}>
           {/* <div style={{
             padding: '8px 12px',
@@ -489,7 +511,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
               opacity: 0.8,
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.05em',
             }}>
               Day {game.time.day}
             </div>
@@ -502,7 +524,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
               opacity: 0.8,
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.05em',
               marginRight: 2
             }}>
               {String(game.time.hour % 12).padStart(1, '0')}:{String(game.time.minute).padStart(2, '0') + (game.time.hour >= 12 ? ' pm' : ' am')}
@@ -537,10 +559,12 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
+              data-tooltip-id={`nearby-item`}
+              data-tooltip-content={(nearbyInteractiveElement.elementType.data.title || '?').toUpperCase()}
             >
               <img
-                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${nearbyInteractiveElement.id}/image.png${nearbyInteractiveElement.data.imageTimestamp ? `?t=${nearbyInteractiveElement.data.imageTimestamp}` : ''}`}
-                alt={nearbyInteractiveElement.title || 'Item'}
+                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/element_types/${nearbyInteractiveElement.elementType.id}/image.png${nearbyInteractiveElement.elementType.data.imageTimestamp ? `?t=${nearbyInteractiveElement.elementType.data.imageTimestamp}` : ''}`}
+                alt={nearbyInteractiveElement.elementType.data.title || '?'}
                 draggable={false}
                 style={{
                   width: '24px',
@@ -572,10 +596,12 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
+              data-tooltip-id={`action-tooltip-${type}`}
+              data-tooltip-content={_.startCase(type)}
             >
               <img
                 src={`/actions/${type}-icon.png`}
-                // alt={elementType.title || 'Item'}
+                alt={type}
                 draggable={false}
                 style={{
                   width: '24px',
@@ -651,6 +677,46 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           session={session}
         />
       )}
+
+      {/* Tooltips */}
+      {Object.entries(elementTypes).map(([elementTypeId, elementType]) => (
+        <Tooltip
+          key={`inventory-tooltip-${elementTypeId}`}
+          id={`inventory-tooltip-${elementTypeId}`}
+          place="right"
+          style={{
+            borderRadius: '0px',
+            textTransform: 'uppercase',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            zIndex: 1000
+          }}
+        />
+      ))}
+      <Tooltip
+        id="nearby-item"
+        style={{
+          borderRadius: '0px',
+          textTransform: 'uppercase',
+          fontSize: '12px',
+          fontWeight: 'bold',
+            zIndex: 1000
+        }}
+      />
+      {['craft', 'sell', 'buy', 'pick-up', 'build'].map(type => (
+        <Tooltip
+          key={`action-tooltip-${type}`}
+          id={`action-tooltip-${type}`}
+          place="top-right"
+          style={{
+            borderRadius: '0px',
+            textTransform: 'uppercase',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            zIndex: 1000
+          }}
+        />
+      ))}
     </>
   );
 }

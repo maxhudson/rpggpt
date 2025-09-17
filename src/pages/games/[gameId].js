@@ -20,8 +20,6 @@ const geistMono = Geist_Mono({
 });
 
 export default function GamePage({session, userProfile}) {
-  // Define max game size
-  const maxGameSize = { width: 800, height: 600 };
 
   var [game, setGame] = useState(null);
   var [isEditing, setIsEditing] = useState(false);
@@ -42,7 +40,8 @@ export default function GamePage({session, userProfile}) {
 
   // Action system state
   const [nearbyInteractiveElementIds, _setNearbyInteractiveElementIds] = useState([]);
-  const [activeAction, setActiveAction] = useState(null); // { type: 'craft'|'sell'|'buy', elementType: {...} }
+  const [activeAction, setActiveAction] = useState(null); // { type: 'craft'|'sell'|'buy'|'build', elementType: {...} }
+  const [tentativeMapObject, setTentativeMapObject] = useState(null); // { elementTypeId, x, y }
 
   const setNearbyInteractiveElementIds = (newIds) => {
     _setNearbyInteractiveElementIds(newIds);
@@ -85,10 +84,23 @@ export default function GamePage({session, userProfile}) {
   // Handle escape key and deselection
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Check if user is typing in an input field or if a modal is open
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.contentEditable === 'true'
+      );
+
+      // Check if any modal dialogs are open (ElementTypeEditor has z-index 1000)
+      const hasModalOpen = document.querySelector('[style*="z-index: 1000"]') !== null;
+
       if (e.key === 'Escape') {
         setSelectedPolygonId(null);
-      } else if ((e.key === 'Backspace' || e.key === 'Delete') && selectedPolygonId && isEditing) {
-        // Delete the selected polygon
+        setTentativeMapObject(null); // Clear tentative building on escape
+      } else if ((e.key === 'Backspace' || e.key === 'Delete') && selectedPolygonId && isEditing && !isInputFocused && !hasModalOpen) {
+        // Delete the selected polygon only if no inputs focused and no modals open
+        e.preventDefault();
         handleDeletePolygon(selectedPolygonId);
       }
     };
@@ -96,6 +108,70 @@ export default function GamePage({session, userProfile}) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedPolygonId, isEditing]);
+
+  // Handle mouse movement for tentative building placement
+  useEffect(() => {
+    if (!tentativeMapObject) return;
+
+    const handleMouseMove = (e) => {
+      const worldPos = pageToWorldCoordinates(e.clientX, e.clientY);
+      setTentativeMapObject(prev => ({
+        ...prev,
+        x: worldPos.x,
+        y: worldPos.y
+      }));
+    };
+
+    const handleClick = async (e) => {
+      if (!tentativeMapObject) return;
+
+      const playerData = await ensurePlayerData();
+      const currentGame = stateRef.current.game;
+      const buildingElementType = elementTypes[tentativeMapObject.elementTypeId];
+
+      if (!buildingElementType) return;
+
+      const buildingRequirements = buildingElementType.data.buildingRequirements || {};
+      let updatedInventory = { ...playerData.inventory };
+
+      // Consume required items
+      for (const [reqElementTypeId, requiredQuantity] of Object.entries(buildingRequirements)) {
+        updatedInventory[reqElementTypeId] -= requiredQuantity;
+        if (updatedInventory[reqElementTypeId] <= 0) {
+          delete updatedInventory[reqElementTypeId];
+        }
+      }
+
+      // Create the building at tentative position
+      const { elementId, updatedMap } = createMapElement(tentativeMapObject.elementTypeId, tentativeMapObject.x, tentativeMapObject.y);
+
+      // Update game data
+      const updatedPlayers = {
+        ...currentGame.players,
+        [session.user.id]: {
+          ...playerData,
+          inventory: updatedInventory
+        }
+      };
+
+      await updateGame({
+        ...currentGame,
+        players: updatedPlayers,
+        map: updatedMap
+      });
+
+      alert(`Built ${buildingElementType.data.title}!`);
+      setTentativeMapObject(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('click', handleClick);
+    };
+  }, [tentativeMapObject, elementTypes, player]);
 
   // Handle deselection when clicking empty space
   const handleDeselectAll = () => {
@@ -127,7 +203,16 @@ export default function GamePage({session, userProfile}) {
         const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
         setNextElementId(maxId + 1);
 
-        // Fetch element types for this game using element_type_ids
+        // Determine if this is a game definition or instance
+        const isGameDefinition = !gameData.source_game_id;
+        const isGameInstance = !!gameData.source_game_id;
+
+        // Set editing mode based on game type
+        setIsEditing(isGameDefinition);
+
+        // Fetch element types - from this game if definition, from source game if instance
+        const elementTypeGameId = isGameInstance ? gameData.source_game_id : gameId;
+
         if (gameData.element_type_ids && gameData.element_type_ids.length > 0) {
           const { data: elementTypesData, error: elementTypesError } = await supabase
             .from('element_types')
@@ -145,6 +230,26 @@ export default function GamePage({session, userProfile}) {
           setElementTypes(elementTypesObj);
 
           stateRef.current.elementTypes = elementTypesObj;
+        } else if (isGameInstance && gameData.source_game_id) {
+          // For game instances, fetch element types from the source game
+          const { data: sourceGameData, error: sourceGameError } = await supabase
+            .from('games')
+            .select('element_type_ids')
+            .eq('id', gameData.source_game_id)
+            .single();
+
+          if (!sourceGameError && sourceGameData?.element_type_ids?.length > 0) {
+            const { data: elementTypesData, error: elementTypesError } = await supabase
+              .from('element_types')
+              .select('*')
+              .in('id', sourceGameData.element_type_ids);
+
+            if (!elementTypesError) {
+              const elementTypesObj = _.keyBy(elementTypesData, 'id');
+              setElementTypes(elementTypesObj);
+              stateRef.current.elementTypes = elementTypesObj;
+            }
+          }
         }
 
         // Ensure player data exists on mount
@@ -484,6 +589,50 @@ export default function GamePage({session, userProfile}) {
     setActiveAction({ type: 'buy', elementType });
   };
 
+  const handleBuild = async () => {
+    setActiveAction({ type: 'build', elementType: null });
+  };
+
+  const handlePlayNewInstance = async () => {
+    try {
+      // Create a new game instance based on the current game definition
+      const newGameData = {
+        user_id: session.user.id,
+        source_game_id: gameId, // Reference to the source game definition
+        element_type_ids: game.element_type_ids, // Copy element type IDs
+        map: {
+          elements: { ...game.map.elements }, // Copy map elements from the definition
+          boundaryPolygon: game.map.boundaryPolygon || null // Copy boundary if exists
+        },
+        background: game.background || {}, // Copy background
+        players: {}, // Empty players object - will be populated when player joins
+        time: {
+          day: 1,
+          hour: 6,
+          minute: 0
+        }
+      };
+
+      const { data: newGame, error } = await supabase
+        .from('games')
+        .insert(newGameData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating game instance:', error);
+        alert('Failed to create game instance. Please try again.');
+        return;
+      }
+
+      // Navigate to the new game instance
+      router.push(`/games/${newGame.id}`);
+    } catch (error) {
+      console.error('Error creating game instance:', error);
+      alert('Failed to create game instance. Please try again.');
+    }
+  };
+
   const handleUseTool = async (elementId, toolElementTypeId) => {
     const playerData = await ensurePlayerData();
     const currentGame = stateRef.current.game;
@@ -579,6 +728,39 @@ export default function GamePage({session, userProfile}) {
 
     const playerData = await ensurePlayerData();
     const currentGame = stateRef.current.game;
+
+    // Handle building selection
+    if (actionData.buildingId && actionData.type === 'build') {
+      const buildingElementType = elementTypes[actionData.buildingId];
+      if (!buildingElementType) return;
+
+      const buildingRequirements = buildingElementType.data.buildingRequirements || {};
+      let canBuild = true;
+
+      // Check if player has all required items
+      for (const [reqElementTypeId, requiredQuantity] of Object.entries(buildingRequirements)) {
+        const playerQuantity = playerData.inventory[reqElementTypeId] || 0;
+        if (playerQuantity < requiredQuantity) {
+          const requiredElementType = elementTypes[reqElementTypeId];
+          const itemName = requiredElementType?.data?.title || `Item ${reqElementTypeId}`;
+          alert(`You need ${requiredQuantity} ${itemName} but only have ${playerQuantity}`);
+          canBuild = false;
+          break;
+        }
+      }
+
+      if (!canBuild) return;
+
+      // Set tentative map object for building placement
+      setTentativeMapObject({
+        elementTypeId: actionData.buildingId,
+        x: player.position.x,
+        y: player.position.y
+      });
+
+      setActiveAction(null);
+      return;
+    }
 
     // Handle new batch operations format
     if (actionData.quantities && actionData.type) {
@@ -832,7 +1014,7 @@ export default function GamePage({session, userProfile}) {
   // Compute nearby interactive elements from IDs and current elementTypes
   const nearbyInteractiveElements = nearbyInteractiveElementIds.map(({ elementId, elementTypeId, distance, x, y }) => {
     const elementType = elementTypes[elementTypeId];
-    return elementType ? elementType : null;
+    return elementType ? {element: {id: elementId}, elementType} : null;
   }).filter(Boolean);
   console.log(nearbyInteractiveElementIds, nearbyInteractiveElements);
   return game && player && (
@@ -860,7 +1042,8 @@ export default function GamePage({session, userProfile}) {
           position: 'relative',
           width: stageSize.width,
           height: stageSize.height,
-          backgroundColor: '#cdceac',
+          // backgroundColor: '#cdceac',
+          backgroundColor: '#eee',
         }}>
           <HUD
             isEditing={isEditing}
@@ -886,7 +1069,9 @@ export default function GamePage({session, userProfile}) {
             onCraft={handleCraft}
             onSell={handleSell}
             onBuy={handleBuy}
+            onBuild={handleBuild}
             onUseTool={handleUseTool}
+            onPlayNewInstance={handlePlayNewInstance}
             stageSize={stageSize}
           />
           <Map
@@ -910,7 +1095,7 @@ export default function GamePage({session, userProfile}) {
             session={session}
             setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
             advanceTime={advanceTime}
-            maxGameSize={maxGameSize}
+            tentativeMapObject={tentativeMapObject}
           />
         </div>
 

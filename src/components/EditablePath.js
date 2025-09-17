@@ -9,8 +9,6 @@ export default function EditablePath({
   polygon,
   isEditing,
   isSelected,
-  worldToScreen,
-  screenToWorld,
   onPointDrag,
   onPolygonSelect,
   onPolygonDrag
@@ -112,18 +110,12 @@ export default function EditablePath({
     return null;
   }
 
-  // Convert world coordinates to screen coordinates and create SVG path
-  const screenPoints = polygon.points.map(([worldX, worldY]) => {
-    const screenPos = worldToScreen(worldX, worldY);
-    return [screenPos.x, screenPos.y];
-  });
-
-  // Create SVG path string
-  const pathData = screenPoints.reduce((path, [x, y], index) => {
+  // Create SVG path string directly from world coordinates (stage handles offset)
+  const pathData = polygon.points.reduce((path, [worldX, worldY], index) => {
     if (index === 0) {
-      return `M ${x} ${y}`;
+      return `M ${worldX} ${worldY}`;
     } else {
-      return `${path} L ${x} ${y}`;
+      return `${path} L ${worldX} ${worldY}`;
     }
   }, '') + ' Z'; // Close the path
 
@@ -158,19 +150,19 @@ export default function EditablePath({
 
       {/* Render draggable points when in editing mode and selected */}
       {isEditing && isSelected && polygon.points.map(([worldX, worldY], pointIndex) => {
-        const screenPos = worldToScreen(worldX, worldY);
         return (
           <Circle
             key={`background-${polygonId}-point-${pointIndex}`}
-            x={screenPos.x}
-            y={screenPos.y}
+            x={worldX}
+            y={worldY}
             radius={6}
             fill="#4CAF50"
             stroke="#ffffff"
             strokeWidth={2}
             draggable={true}
             onDragMove={(e) => {
-              const worldPos = screenToWorld(e.target.x(), e.target.y());
+              // e.target.x() and e.target.y() are already in world coordinates since stage handles offset
+              const worldPos = { x: e.target.x(), y: e.target.y() };
               onPointDrag(polygonId, pointIndex, worldPos, isShiftPressed.current);
             }}
             onMouseEnter={(e) => {

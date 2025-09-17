@@ -17,6 +17,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-konva": "^19.0.7",
+    "react-tooltip": "^5.29.1",
     "sharp": "^0.34.3",
     "use-image": "^1.1.4"
   },

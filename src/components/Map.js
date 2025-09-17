@@ -31,7 +31,8 @@ export default function Map({
   session,
   setNearbyInteractiveElementIds,
   advanceTime,
-  maxGameSize
+  maxGameSize,
+  tentativeMapObject
 }) {
   const keysPressed = useRef({});
   const [selectedElementId, setSelectedElementId] = useState(null);
@@ -43,8 +44,8 @@ export default function Map({
   useEffect(() => {
     const updateSize = () => {
       setStageSize({
-        width: Math.min(window.innerWidth, maxGameSize.width),
-        height: Math.min(window.innerHeight, maxGameSize.height)
+        width: window.innerWidth,
+        height: window.innerHeight
       });
     };
 
@@ -471,7 +472,7 @@ export default function Map({
     x: stageSize.width / 2 - player.position.x,
     y: stageSize.height / 2 - player.position.y
   };
-
+  console.log(game.background, 'game background in Map component');
   return (
     <Stage
       ref={stageRef}
@@ -544,8 +545,6 @@ export default function Map({
               polygon={polygon}
               isEditing={isEditing}
               isSelected={selectedPolygonId === polygonId}
-              worldToScreen={worldToScreen}
-              screenToWorld={screenToWorld}
               onPointDrag={handleBackgroundPolygonPointDrag}
               onPolygonSelect={handlePolygonSelect}
               onPolygonDrag={handleBackgroundPolygonDrag}
@@ -589,7 +588,18 @@ export default function Map({
                   x,
                   elementType: elementTypes[elementTypeId]
                 };
-              })
+              }),
+            // Add tentative building if it exists
+            ...(tentativeMapObject ? [{
+              id: 'tentative-building',
+              y: tentativeMapObject.y,
+              isPlayer: false,
+              isTentative: true,
+              elementId: 'tentative-building',
+              elementTypeId: tentativeMapObject.elementTypeId,
+              x: tentativeMapObject.x,
+              elementType: elementTypes[tentativeMapObject.elementTypeId]
+            }] : [])
           ]
             .sort((a, b) => a.y - b.y) // Sort by Y position (lower Y renders first/behind)
             .map(item => {
@@ -621,6 +631,7 @@ export default function Map({
                     onDragStart={onDragStart}
                     onDragMove={onDragMove}
                     onDragEnd={onDragEnd}
+                    isTentative={item.isTentative}
                   />
                 );
               }

@@ -49,6 +49,19 @@ export default function ActionModal({
           isAffordable: player.money >= (et.data.price || 0)
         }));
     }
+    else if (type === 'build') {
+      console.log('build', elementTypes);
+      // Show buildings that can be built (have building requirements)
+      return Object.entries(elementTypes)
+        .filter(([id, et]) => et.data?.type === 'building' && et.data?.buildingRequirements)
+        .map(([id, et]) => {
+          const requirements = et.data.buildingRequirements || {};
+          const canAfford = Object.entries(requirements).every(([reqId, reqQty]) => {
+            return (player.inventory[reqId] || 0) >= reqQty;
+          });
+          return { id, elementType: et, isAffordable: canAfford };
+        });
+    }
     return [];
   };
 
@@ -59,6 +72,7 @@ export default function ActionModal({
       case 'craft': return `Craft at ${elementType.data.title}`;
       case 'sell': return `Sell at ${elementType.data.title}`;
       case 'buy': return `Buy from ${elementType.data.title}`;
+      case 'build': return 'Build Structure';
       default: return 'Action';
     }
   };
@@ -68,6 +82,7 @@ export default function ActionModal({
       case 'craft': return 'No items can be crafted here';
       case 'sell': return 'You have no items to sell';
       case 'buy': return 'No items available for purchase';
+      case 'build': return 'No buildings available to build';
       default: return 'No items available';
     }
   };
@@ -130,8 +145,58 @@ export default function ActionModal({
           <p style={{ textAlign: 'center', color: '#666' }}>
             {getEmptyMessage()}
           </p>
+        ) : type === 'build' ? (
+          // Special layout for building - click to select, no quantities
+          <div>
+            <div style={{ marginBottom: '20px' }}>
+              {availableItems.map(({ id, elementType: itemType, isAffordable }) => (
+                <div
+                  key={id}
+                  onClick={() => onAction({ buildingId: id, type })}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    marginBottom: '10px',
+                    cursor: isAffordable ? 'pointer' : 'not-allowed',
+                    opacity: isAffordable ? 1 : 0.5,
+                    backgroundColor: isAffordable ? '#f9f9f9' : '#f5f5f5'
+                  }}
+                >
+                  <ElementTypeIcon
+                    elementType={itemType}
+                    size="small"
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold' }}>
+                      {itemType.data.title || 'Unnamed Building'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      Click to select for building
+                    </div>
+                    {itemType.data.buildingRequirements && (
+                      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                        Requires: {Object.entries(itemType.data.buildingRequirements).map(([reqId, reqQty]) => {
+                          const reqType = elementTypes[reqId];
+                          const hasEnough = (player.inventory[reqId] || 0) >= reqQty;
+                          return (
+                            <span key={reqId} style={{ color: hasEnough ? '#4CAF50' : '#f44336', marginRight: '8px' }}>
+                              {reqQty}x {reqType?.data?.title || `Item ${reqId}`}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
-          // Unified layout for all action types with quantity inputs
+          // Unified layout for all other action types with quantity inputs
           <div>
             <div style={{ marginBottom: '20px' }}>
               {availableItems.map(({ id, elementType: itemType, quantity: availableQty }) => {

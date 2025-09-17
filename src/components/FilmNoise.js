@@ -12,7 +12,7 @@ export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
 
     // Set canvas size to match viewport with retina scaling
     const resizeCanvas = () => {
-      const pixelRatio = window.devicePixelRatio || 1;
+      const pixelRatio = 1; //window.devicePixelRatio || 1;
       const width = window.innerWidth;
       const height = window.innerHeight;
 
@@ -53,7 +53,7 @@ export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
     // Animation loop at 20fps (50ms intervals)
     const animate = () => {
       generateNoise();
-      // animationRef.current = setTimeout(animate, 100); // 20fps = 1000ms/20 = 50ms
+      animationRef.current = setTimeout(animate, 100); // 20fps = 1000ms/20 = 50ms
     };
 
     animate();
