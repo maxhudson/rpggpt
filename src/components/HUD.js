@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ElementTypeEditor from './ElementTypeEditor';
 import { Tooltip } from 'react-tooltip';
@@ -12,8 +12,20 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
   const [isDragging, setIsDragging] = useState(false);
   const [dragElementTypeId, setDragElementTypeId] = useState(null);
   const [selectedPolygonColor, setSelectedPolygonColor] = useState('#808080');
+  const [isMobile, setIsMobile] = useState(false);
+  const [arrowKeysPressed, setArrowKeysPressed] = useState({ up: false, down: false, left: false, right: false });
 
   tentativeImagesRef.current = tentativeImages; // Keep ref in sync with state
+
+  // Detect mobile devices
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Derive the active element type object from the ID and elementTypes
   const activeElementType = activeElementTypeId ? elementTypes[activeElementTypeId] : null;
@@ -492,8 +504,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           alignItems: 'flex-end',
           gap: '0px',
           backgroundColor: '#E6E2D2',
-          paddingTop: 8,
-          paddingBottom: 8,
+          height: 40,
         }}>
           {/* <div style={{
             padding: '8px 12px',
@@ -505,7 +516,8 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           </div> */}
           {game.time && (
             <div style={{
-              padding: '0px 12px',
+              padding: '0px 2px',
+              paddingLeft: 14,
               fontSize: '20px',
               color: '#000',
               opacity: 0.8,
@@ -518,14 +530,13 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           )}
           {game.time && (
             <div style={{
-              padding: '0px 12px',
-              fontSize: '12px',
+              padding: '0px 2px',
+              fontSize: '10px',
               color: '#4A4A4A',
               opacity: 0.8,
               fontWeight: 600,
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginRight: 2
+              letterSpacing: '0.05em'
             }}>
               {String(game.time.hour % 12).padStart(1, '0')}:{String(game.time.minute).padStart(2, '0') + (game.time.hour >= 12 ? ' pm' : ' am')}
             </div>
@@ -533,7 +544,7 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
         </div>
       )}
 
-      {/* Action Buttons - bottom center when near interactive elements and not editing */}
+      {/* Action Buttons - bottom left when near interactive elements and not editing */}
       {!isEditing && (
         <div style={{
           position: 'absolute',
@@ -655,6 +666,130 @@ export default function HUD({ isEditing, setIsEditing, game, updateGame, element
           >
             Add Polygon
           </button>
+        </div>
+      )}
+
+      {/* Mobile Arrow Controls - bottom right when on mobile and not editing */}
+      {isMobile && !isEditing && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 100,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 40px)',
+          gridTemplateRows: 'repeat(2, 40px)',
+          gap: '1px'
+        }}>
+          {/* Empty top-left */}
+          <div />
+
+          {/* Up arrow */}
+          <div
+            onTouchStart={() => {
+              setArrowKeysPressed(prev => ({ ...prev, up: true }));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }));
+            }}
+            onTouchEnd={() => {
+              setArrowKeysPressed(prev => ({ ...prev, up: false }));
+              window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }));
+            }}
+            style={{
+              backgroundColor: arrowKeysPressed.up ? '#D6D2C2' : '#E6E2D2',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: '20px'
+            }}
+          >
+            ▲
+          </div>
+
+          {/* Empty top-right */}
+          <div />
+
+          {/* Left arrow */}
+          <div
+            onTouchStart={() => {
+              setArrowKeysPressed(prev => ({ ...prev, left: true }));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+            }}
+            onTouchEnd={() => {
+              setArrowKeysPressed(prev => ({ ...prev, left: false }));
+              window.dispatchEvent(new KeyboardEvent('keyup', { key: 'a' }));
+            }}
+            style={{
+              backgroundColor: arrowKeysPressed.left ? '#D6D2C2' : '#E6E2D2',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: '20px',
+              userSelect: 'none'
+            }}
+          >
+            ◀
+          </div>
+
+
+
+          {/* Down arrow */}
+          <div
+            onTouchStart={() => {
+              setArrowKeysPressed(prev => ({ ...prev, down: true }));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 's' }));
+            }}
+            onTouchEnd={() => {
+              setArrowKeysPressed(prev => ({ ...prev, down: false }));
+              window.dispatchEvent(new KeyboardEvent('keyup', { key: 's' }));
+            }}
+            style={{
+              backgroundColor: arrowKeysPressed.down ? '#D6D2C2' : '#E6E2D2',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: '20px'
+            }}
+          >
+            ▼
+          </div>
+          {/* Right arrow */}
+          <div
+            onTouchStart={() => {
+              setArrowKeysPressed(prev => ({ ...prev, right: true }));
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }));
+            }}
+            onTouchEnd={() => {
+              setArrowKeysPressed(prev => ({ ...prev, right: false }));
+              window.dispatchEvent(new KeyboardEvent('keyup', { key: 'd' }));
+            }}
+            style={{
+              backgroundColor: arrowKeysPressed.right ? '#D6D2C2' : '#E6E2D2',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: '20px'
+            }}
+          >
+            <span style={{pointerEvents: 'none'}}>▶</span>
+          </div>
+
+
         </div>
       )}
 

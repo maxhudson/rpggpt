@@ -610,7 +610,7 @@ export default function Map({
                     centerX={player.position.x}
                     centerY={player.position.y}
                     playerPosition={player.position}
-                    fill="#ff0000"
+                    fill="#000000"
                   />
                 );
               } else {

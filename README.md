@@ -175,7 +175,25 @@ QUESTS
 - MENU - Offer a secret ingredient (have user come up with ingredients - if they do well, then price can increase, but if poorly, business might drop)
 
 
-#### City Builder
+
+
+//new schema
+//emphasis on quests/story
+//copy hud
+
+walk
+buy
+sell
+craft
+move
+plant
+harvest
+
+
+needs to be difficult to progress/be impressive to have gotten to point X
+needs to be story-driven where its not too repetitive and you feel like you're writing your own version of a story to try to achieve a difficult goal or create an interesting story
+
+#### Village Builder
 
 PLANTS
 - Tree (cut down to build log)
@@ -200,5 +218,59 @@ QUESTS
 - Fire
 - Gather food
 (weather)
+
+{
+  stats: {
+    population,
+    day
+  },
+  resources: {
+
+  },
+  buildings: {},
+  skills: {
+    'Building': {},
+    'Crafting': {},
+    'Farming': {},
+    'Combat': {},
+  },
+  jobs: {},
+  characters: {
+    'John': {job: 'Builder'},
+    'Sarah': {job: 'Militia'},
+  }
+}
+
+#### Pokemon
+
+{
+  stats: {
+
+  },
+  resources: {
+
+  },
+  buildingTypes: {},
+  skillTypes: {
+
+  },
+  jobs: {},
+  characters: {
+    'John': {job: 'Builder'},
+    'Sarah': {job: 'Militia'},
+  }
+}
+
+
+
+
+#### Duck Farmer
+
+{
+  title: "Duck Farmer",
+
+}
+
+
 
 
