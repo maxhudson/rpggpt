@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
+export default function FilmNoise({ opacity = 0.1, intensity = 0.5, containerRef = null }) {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
 
@@ -10,11 +10,20 @@ export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
 
     const ctx = canvas.getContext('2d');
 
-    // Set canvas size to match viewport with retina scaling
+    // Set canvas size to match viewport or container with retina scaling
     const resizeCanvas = () => {
       const pixelRatio = 1; //window.devicePixelRatio || 1;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+
+      // Use container dimensions if containerRef is provided, otherwise use viewport
+      let width, height;
+      if (containerRef && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+      } else {
+        width = window.innerWidth;
+        height = window.innerHeight;
+      }
 
       // Set the actual canvas size in memory (scaled for retina)
       canvas.width = width * pixelRatio;
@@ -29,7 +38,11 @@ export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
     };
 
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+
+    // Only add resize listener if using viewport (fullscreen mode)
+    if (!containerRef) {
+      window.addEventListener('resize', resizeCanvas);
+    }
 
     // Generate noise pattern
     const generateNoise = () => {
@@ -59,25 +72,39 @@ export default function FilmNoise({ opacity = 0.1, intensity = 0.5 }) {
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      if (!containerRef) {
+        window.removeEventListener('resize', resizeCanvas);
+      }
       if (animationRef.current) {
         clearTimeout(animationRef.current);
       }
     };
-  }, [opacity, intensity]);
+  }, [opacity, intensity, containerRef]);
+
+  // Use absolute positioning if container is provided, otherwise fixed
+  const positionStyle = containerRef ? {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 1000,
+  } : {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
+    zIndex: 1001,
+  };
 
   return (
     <canvas
       ref={canvasRef}
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
+        ...positionStyle,
         pointerEvents: 'none',
-        zIndex: 1001,
-        mixBlendMode: 'overlay',
+        // mixBlendMode: 'overlay',
         opacity: opacity
       }}
     />

@@ -1,11 +1,11 @@
 // Example game definitions using the new Game format
 
 export const lemonadeStand = {
-  title: "Lemonade",
-  description: "Your friend is tired of selling lemonade and wants to focus more on hot dogs so he's giving you his lemonade cart. You need to pay off your student loan debt and no one is hiring so you decide to try it out.",
-  story: "The morning sun filters through your apartment window as you stare at the mountain of paperwork on your coffee table. Student loan statements, job rejection letters, and now—a rusty lemonade cart key your friend Mike dropped off last night.\n\n\"I'm done with it, man,\" he'd said, tossing you the key. \"Hot dogs are where the money's at. The cart's yours if you want it.\"\n\nYou turn the key over in your palm. -$45,000 in debt. No callbacks from any of the hundreds of applications you've sent. The cart sits outside your apartment building, a faded yellow beacon of... possibility? Desperation? Maybe both.\n\nYou check your supplies: lemons, ice, water, and cups. But no sugar—Mike must have used the last of it. At least you have $45,000 in debt to motivate you. Wait, that's not how motivation works.\n\nThe clock reads 7:00 AM on Day 1. The city is waking up, and you need to decide your first move.",
+  title: "Lemonade Stand",
+  description: "Your friend is tired of selling lemonade and wants to get into the hot dog business, so he's giving you his lemonade cart. You need to pay off your student loan debt and no one is hiring so you decide to try it out.",
+  story: "The morning sun filters through your apartment window as you stare at the mountain of paperwork on your coffee table. Student loan statements, job rejection letters, and now—a rusty lemonade cart key your friend Mike dropped off last night.\n\n\"I'm done with it, man,\" he'd said, tossing you the key. \"Hot dogs are where the money's at. The cart's yours if you want it.\"\n\nYou turn the key over in your palm. $5,000 in debt. No callbacks from any of the hundreds of applications you've sent. The cart sits outside your apartment building, a faded yellow beacon of... possibility? Desperation? Maybe both.\n\nYou check your supplies: lemons, ice, water, and cups. But no sugar—Mike must have used the last of it. At least you have $45,000 in debt to motivate you. Wait, that's not how motivation works.\n\nThe clock reads 7:00 AM on Day 1. The city is waking up, and you need to decide your first move.",
 
-  money: -45000,
+  money: -5000,
   currentLocation: "Home",
   weather: { condition: "sunny", high: 75, low: 55 },
   clock: { day: 1, time: [7, 0, "am"] },
@@ -53,11 +53,11 @@ export const lemonadeStand = {
   },
 
   actions: {
-    "Buy": { notes: "Buy ingredients - can only be done from the grocery store" },
+    "Buy": { notes: "Buy ingredients - can only be done from the grocery store. Don't let player buy more than they have money for." },
     "Sell": { notes: "Sell inventory to customers - can't be displayed as an availableAction - sales happen organically over time." },
-    "Craft": { notes: "Craft ingredients into recipes - should take timeInMinutes * quantity time. Can't craft until renting." },
+    "Craft": { notes: "Craft ingredients into recipes - should take timeInMinutes * quantity time. Can't craft until renting. Don't let player craft more than they have inventory for." },
     "Travel": { notes: "Change locations" },
-    "Pass Time": { notes: "Pass a specified amount of time, typically to allow sales to happen." },
+    "Pass Time": { notes: "Pass a specified amount of time, typically to allow sales to happen. Offer option to work the rest of the day once it becomes 10am." },
     "Rent": { notes: "Rent a location for the day. Can't sell or craft at a location until you've paid the daily fee." },
     "Hire": { notes: "Converts role into employee and has hourly cost." }
   },
@@ -92,63 +92,116 @@ export const lemonadeStand = {
 };
 
 export const farmToTable = {
-  title: "FarmBnB",
+  title: "Farmbnb",
+  description: "Turn an empty property into an operating farm, restaurant, and hotel.",
   plot: [
-    "Grow and sell food.",
+
   ],
   clock: { day: 1, time: [6, 0, "am"] },
   currentLocation: "Farm",
-  money: 1000,
-  story: "",
+  money: 100000,
+  story: "Your boots pick up dew off the grass as you step out of your car by the side of the road.\n\nThere's nothing here yet—not even a driveway—nothing but potential.\n\nWhere to start first—planting or building?",
 
   locations: {
-    "Farm": {},
+    "Farm": {
+      plants: {
+        1: { type: "Oak Tree", position: { x: 0, y: 0 } },
+      }
+    },
     "Store": {}
   },
 
   actions: {
     "Travel": {},
     "Build": {},
-    "Plant": {},
+    "Plant": {notes: "Don't let player plant more than they have inventory for"},
     "Harvest": {},
-    "Craft": {},
+    "Craft": {notes: "Don't let player craft more than they have inventory for"},
     "Hire": {},
     "Buy": {}
   },
 
   items: {
-    "Acre of Land": { "inventory": 1, notes: "A piece of land you can plant crops on." },
+    "Wildflower Seeds": {"inventory": 100, "notes": "Plant these to attract bees and other pollinators."},
+    "Corn Seeds": {},
+    "Comfrey Seeds": { cost: { unit: "Bag", quantity: 32, money: 5 }},
 
     "Head of Corn": {},
     "Head of Lettuce": {},
     "Tomato": {},
     "Carrot": {},
     "Onion": {},
-    "Tortilla": { notes: "Crafted from corn" }
+    "Tortilla": { notes: "Crafted from corn" },
+    "Breakfast Burrito": {},
+    "Chile Relleno": {},
+    "Eggs, Sausage, Potatoes": {},
+    "Pancakes": {},
+    "Waffles": {},
+  },
+
+  tools: {
+
+  },
+
+  buildings: {
+    "Small Shed": {"notes": "Can be built anytime - "},
+    "Yurt": {"notes": "Can be built anytime"},
+    "Outhouse": {"notes": ""},
+    "House": {},
+    "Workshop": {},
+    "Greenhouse": {},
+    "Restaurant": {},
+    "Fenced Garden": {},
+    "Farm Stand": {},
+    "Chicken Coop": {},
+    "Barn": {},
+    "Grain Mill": {},
+    "Sawmill": {},
   },
 
   animals: {
-    "Chicken": {}
+    "Chicken": {},
+    "Cow": {},
+    "Pig": {},
+    "Sheep": {},
+    "Goat": {},
+    "Horse": {},
+    "Alpaca": {},
+    "Duck": {},
+    "Bee": {},
+
   },
 
   plants: {
-    "Oak Tree": {},
+    "Oak Tree": { },
     "Fir Tree": {},
     "Comfrey": { notes: "Nitrogen fixer" },
     "Corn": {}
-  }
+  },
+
+  availableActions: [
+    {type: "Build", options: [
+      {label: "Small Shed", costs: {money: 5000}, timeInMinutes: 60},
+      {label: "Yurt", costs: {money: 10000}, timeInMinutes: 120},
+    ]},
+    {type: "Plant", options: [
+      {label: "Wildflower Seeds"},
+    ]},
+    {type: "Travel", label: "Go to the Store"}
+  ]
 };
 
 export const fantasy = {
   title: "The Mountain Hums",
+  description: "Paths intertwine to save the kingdom",
   plot: [
     "A stolen sword and a poisoned wing. Three siblings, one turned dark.",
     "Kira activates her sword for the first time - she considers looking for her trainer to tell him but he's nowhere to be found if she decides to look.",
-    "After Kira wakes up the next day her sword is missing.",
+    "After Kira wakes up the next day her sword is missing. If player tries not to go to sleep, at some point only the sleep option should be shown.",
 
     "Kira and Casseus grew up without knowledge of each other but their paths are brought together when their mysteries coincide.",
     "Their brother Damen wants to challenge them for the throne of the kingdom, which technically Casseus is first in line for.",
-    "Their fight comes half way through the story.",
+    "Their fight comes half way through the story. The fight cannot be talked out of. The dragon is also difficult to heal and requires a side quest in order to do that (need to find someone in the village who can produce a potion).",
     "The three have to team up in the end when the warlord returns to the kingdom.",
   ],
   story: "Chapter 1: The Sword of Embers\n\nKira stood in the castle courtyard, the sunset casting long red shadows across gray cobblestones. She held her mother's sword in her hands. It was a relic of power, but it had never responded to her touch. Today, however, something felt different. As she began to hum a tune her mother used to sing, the sword vibrated softly, sending a shiver through her bones.\n\n\"What is this?\" she whispered, eyes wide with wonder. The sword had never done this before.",
@@ -233,14 +286,24 @@ export const theGuardian = {
 };
 
 export const cityBuilder = {
-  title: "City Builder",
+  title: "Village Builder",
+  description: "You and a band of travellers don't think you can make it to California so you decide to settle in the middle of nowhere.",
   clock: { day: 1, time: [8, 0, "am"] },
-  currentLocation: "Town Center"
+  currentLocation: "",
+  money: 100000000,
+  locations: {
+    "": { notes: "" },
+  },
+  buildings: {
+
+  },
 };
 
 export const artisticAnime = {
 
 };
+
+// gta
 
 
 // Export all games as a collection
@@ -248,6 +311,6 @@ export const allGames = {
   lemonadeStand,
   farmToTable,
   fantasy,
-  theGuardian,
-  cityBuilder
+  // theGuardian,
+  // cityBuilder
 };

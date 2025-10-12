@@ -182,7 +182,7 @@ export default function Home() {
 
         {/* Continue Your Games Section */}
         {gameInstances.length > 0 && (
-          <section style={{ marginBottom: '60px', marginTop: '60px' }}>
+          <section style={{ marginBottom: '60px', maxWidth: '900px', margin: '0 auto', marginTop: '60px', }}>
             <h2 style={{
               fontSize: '32px',
               marginBottom: '24px',

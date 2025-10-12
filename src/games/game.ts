@@ -76,7 +76,8 @@ export interface Clock {
 
 export interface Game {
   title: string;
-  plot?: string;
+  description?: string;
+  plot?: string[];
   story?: string;
 
   locations?: Record<string, Location>;
@@ -87,6 +88,7 @@ export interface Game {
   roles?: Record<string, Role>;
 
   items?: Record<string, Element>;
+  tools?: Record<string, Element>;
   animals?: Record<string, Element>;
   plants?: Record<string, Element>;
   buildings?: Record<string, Element>;
