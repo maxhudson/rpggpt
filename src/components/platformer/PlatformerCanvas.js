@@ -47,34 +47,10 @@ export default function PlatformerCanvas({ width = 300, height = 300 }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  const treeWidth = 100 * scale;
-  const treeHeight = 100 * scale;
+  const treeWidth = 128 * scale;
+  const treeHeight = 128 * scale;
   const treeX = width / 2 - treeWidth / 2 + xOffset;
-  const treeY = height - treeHeight - 50;
-
-  var [clouds, setClouds] = useState([]);
-  var [cloudOffset, setCloudOffset] = useState(0);
-
-  useEffect(() => {
-    var interval = setInterval(() => {
-      setCloudOffset(prev => prev + 1);
-
-      setClouds(prev => {
-        const newClouds = [...prev];
-        if (newClouds.length < 5) {
-          newClouds.push({
-            x: Math.random() * width,
-            y: Math.random() * height / 2,
-            speed: Math.random() * 0.5 + 0.1
-          });
-        }
-        return newClouds;
-      });
-
-    }, 30);
-
-    return () => clearInterval(interval);
-  }, [width, height]);
+  const treeY = height - treeHeight - 80;
 
   return (
     <div
@@ -111,7 +87,7 @@ export default function PlatformerCanvas({ width = 300, height = 300 }) {
         }}
       />
 
-      <img
+      {/* <img
         src="/elements/Yurt.png"
         alt="Yurt"
         style={{
@@ -123,7 +99,7 @@ export default function PlatformerCanvas({ width = 300, height = 300 }) {
           height: treeHeight / 2,
           imageRendering: 'pixelated'
         }}
-      />
+      /> */}
 
 
       {keysPressed.current['a'] || keysPressed.current['d'] ? (

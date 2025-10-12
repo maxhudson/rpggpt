@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { EB_Garamond } from 'next/font/google';
+import { Pixelify_Sans } from 'next/font/google';
 import _ from 'lodash';
 import dynamic from 'next/dynamic';
 import { Button } from './Button';
@@ -12,7 +12,7 @@ import { formatTime } from './helpers';
 
 const PlatformerCanvas = dynamic(() => import('../components/platformer/PlatformerCanvas'), { ssr: false });
 
-const ebGaramond = EB_Garamond({
+const pixelifySans = Pixelify_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
@@ -220,7 +220,7 @@ export default function GamePage() {
   if (!game) return null;
 
   return (
-    <div className={ebGaramond.className} style={{
+    <div className={pixelifySans.className} style={{
       minHeight: '100vh',
       backgroundColor: '#EFECE3',
       color: '#171717',
