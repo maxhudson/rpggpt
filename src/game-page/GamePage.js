@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { Pixelify_Sans } from 'next/font/google';
 import _ from 'lodash';
 import dynamic from 'next/dynamic';
 import { Button } from './Button';
@@ -9,13 +8,10 @@ import { ActionSelector } from './ActionSelector';
 import { HistoryItem } from './HistoryItem';
 import { getPrompt } from './getPrompt';
 import { formatTime } from './helpers';
+import { primaryFont } from '../styles/fonts';
+import styles from './GamePage.module.css';
 
 const PlatformerCanvas = dynamic(() => import('../components/platformer/PlatformerCanvas'), { ssr: false });
-
-const pixelifySans = Pixelify_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export default function GamePage() {
   const router = useRouter();
@@ -220,20 +216,20 @@ export default function GamePage() {
   if (!game) return null;
 
   return (
-    <div className={pixelifySans.className} style={{
+    <div className={primaryFont.className} style={{
       minHeight: '100vh',
       backgroundColor: '#EFECE3',
       color: '#171717',
     }}>
-      <div style={{}}>
-        <div style={{padding: '40px 40px', paddingRight: 580}}>
-          <h1 style={{ fontSize: '36px', fontWeight: 600, marginBottom: 40 }}>{game.title}</h1>
+      <div>
+        <div className={styles.storyWrapper}>
+          <h1 className={styles.title} style={{ fontSize: '36px', fontWeight: 600, marginBottom: 40 }}>{game.title}</h1>
 
           {/* Story History */}
           <div style={{ marginBottom: '20px', borderRadius: '5px' }}>
-            {game.story && (
+            {/* {game.story && (
               <p style={{ whiteSpace: 'pre-line' }}>{game.story}</p>
-            )}
+            )} */}
             {history.map((historyItem, index) => (
               <div key={index} style={{ marginTop: '10px' }}>
                 <HistoryItem
@@ -354,8 +350,12 @@ export default function GamePage() {
             </div>
           )}
         </div>
-        <div style={{width: 500, position: 'absolute', top: 40, right: 40}}>
-          <PlatformerCanvas width={500} height={500} />
+        <div className={styles.canvasWrapper}>
+          <PlatformerCanvas
+            activeLocation={game.currentLocation ? game.locations[game.currentLocation] : null}
+            game={game}
+            width={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth : 500}
+            height={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth * 1 : 500} />
 {/* <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <Button
               onClick={resetGame}
@@ -367,20 +367,21 @@ export default function GamePage() {
           </div> */}
 
           {/* Game State */}
-          <div style={{ margin: '20px', borderRadius: '5px', fontSize: '1em' }}>
+          <div style={{padding: 16, fontSize: '1em'}}>
             <div>
               {game.clock && (
                 <span>Day {game.clock.day}, {formatTime(game.clock.time)}</span>
               )}
               <span> at the {game.currentLocation}</span>
+              {game.money !== undefined && (
+                <div style={{marginTop: 3}}><b><Currency amount={game.money} /></b></div>
+              )}
             </div>
-            {game.money !== undefined && (
-              <p style={{marginTop: 10}}><b><Currency amount={game.money} /></b></p>
-            )}
+
             {game.weather && (
               <p>{game.weather.condition} {game.weather.high && `(${game.weather.low}°F - ${game.weather.high}°F)`}</p>
             )}
-            <div style={{marginTop: 10}}>
+            {/* <div style={{marginTop: 10}}>
               {game.items && Object.entries(game.items)
                 .filter(([_, item]) => item.inventory && item.inventory > 0)
                 .map(([itemName, item]) => (
@@ -388,7 +389,7 @@ export default function GamePage() {
                     <b>{item.inventory}</b> {itemName}
                   </div>
                 ))}
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

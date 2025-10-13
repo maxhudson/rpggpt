@@ -58,9 +58,9 @@ export function HistoryItem({ historyItem, game, onLoadCheckpoint }) {
         )}
 
         {/* Story text */}
-        {content.additionalStoryText && (
+        {/* {content.additionalStoryText && (
           <p style={{ whiteSpace: 'pre-wrap' }}>{content.additionalStoryText}</p>
-        )}
+        )} */}
 
         {/* Items sold */}
         {content.itemsSold && Object.keys(content.itemsSold).length > 0 && (

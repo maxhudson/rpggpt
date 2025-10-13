@@ -274,3 +274,9 @@ QUESTS
 
 
 
+# TODO
+
+- Mobile layout
+- Autoscroll to bottom
+- Pick & flesh out a specific story
+- Indicate whether story has visual or not

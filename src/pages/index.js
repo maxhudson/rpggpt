@@ -1,14 +1,9 @@
 import Head from "next/head";
-import { Pixelify_Sans } from "next/font/google";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { allGames } from '../games/exampleGames';
 import { v4 as uuidv4 } from 'uuid';
-
-const pixelifySans = Pixelify_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
+import { primaryFont } from '../styles/fonts';
 
 export default function Home() {
   const [gameInstances, setGameInstances] = useState([]);
@@ -104,7 +99,7 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <div className={pixelifySans.className} style={{
+      <div className={primaryFont.className} style={{
         minHeight: '100vh',
         backgroundColor: '#EFECE3',
         color: '#171717',

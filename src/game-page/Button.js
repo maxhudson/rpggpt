@@ -1,6 +1,6 @@
 export function Button({ children, onClick, variant = 'filled', disabled = false, style = {} }) {
   const baseStyle = {
-    height: '30px',
+    height: '40px',
     padding: '0 16px',
     backgroundColor: variant === 'outline' ? 'transparent' : (disabled ? '#E0DDD4' : '#111'),
     color: disabled ? '#999' : '#ffffff',

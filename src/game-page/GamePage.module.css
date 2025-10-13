@@ -1,0 +1,34 @@
+.canvasWrapper {
+  position: fixed;
+  user-select: none !important;
+}
+
+@media screen and (min-width: 769px) {
+  .canvasWrapper {
+    width: 500;
+    top: 40;
+    right: 40;
+  }
+
+  .storyWrapper {
+    padding: 40px 40px;
+    padding-right: 580px;
+  }
+}
+
+/* vertical */
+@media screen and (max-width: 768px) {
+  .title {
+    display: none;
+  }
+  .canvasWrapper {
+    top: 0;
+    width: 100%;
+    height: 100vw;
+  }
+
+  .storyWrapper {
+    padding: 16px;
+    padding-top: calc(100vw + 94px);
+  }
+}

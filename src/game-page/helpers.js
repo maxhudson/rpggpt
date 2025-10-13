@@ -8,5 +8,5 @@ export const formatCurrency = (amount) => {
 export const formatTime = (time) => {
   if (!time) return '';
   const [hour, minute, period] = time;
-  return `${hour}:${minute.toString().padStart(2, '0')} ${period}`;
+  return `${hour}:${minute.toString().padStart(2, '0')}${period}`;
 };
