@@ -354,8 +354,9 @@ export default function GamePage() {
           <PlatformerCanvas
             activeLocation={game.currentLocation ? game.locations[game.currentLocation] : null}
             game={game}
-            width={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth : 500}
-            height={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth * 1 : 500} />
+            scale={typeof(window) !== 'undefined' && window.innerWidth <= 1580 ? 1 : 2}
+            width={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth : (typeof(window) !== 'undefined' && window.innerWidth <= 1580 ? 400 : 400)}
+            height={typeof(window) !== 'undefined' && window.innerWidth <= 768 ? window.innerWidth * 1 : (typeof(window) !== 'undefined' && window.innerWidth <= 1580 ? 400 : 400)} />
 {/* <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <Button
               onClick={resetGame}

@@ -7,17 +7,20 @@ import _ from 'lodash';
 var assets = {
   elements: {
     "Oak Tree": {size: 256, bottomOffset: -3},
-    "Cabin": {size: 128}
+    "Cabin": {size: 128},
+    "Yurt": {size: 128},
+    "Sunflower": {size: 32, bottomOffset: 0},
+    "Onion": {size: 15, bottomOffset: 0},
   }
 };
 
-export default function PlatformerCanvas({ activeLocation, game, width = 300, height = 300 }) {
+export default function PlatformerCanvas({ activeLocation, game, width = 300, height = 300, ...props }) {
   const containerRef = useRef(null);
   const keysPressed = useRef({});
   const [xOffset, setXOffset] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const [_forceUpdate, setForceUpdate] = useState(0);
 
-  const scale = 4;
+  const scale = 4 * (props.scale || 1);
 
   // Handle keyboard input
   useEffect(() => {
@@ -27,7 +30,7 @@ export default function PlatformerCanvas({ activeLocation, game, width = 300, he
 
     const handleKeyUp = (e) => {
       keysPressed.current[e.key.toLowerCase()] = false;
-      setForceUpdate(xOffset => xOffset + 1);
+      setForceUpdate(xOffset => xOffset + scale / 2);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -65,10 +68,15 @@ export default function PlatformerCanvas({ activeLocation, game, width = 300, he
     _.times(300, () => {
       initialTexturePositions.current.push({
         x: Math.random() * width,
-        y: height * 0.8 + Math.random() * height * 0.2
+        y: height - (39 * scale / 2) + Math.random() * 39 * scale / 2
       });
     });
   }
+
+  function mod(n, m) {
+    return ((n % m) + m) % m;
+  }
+  console.log()
 
   return (
     <div
@@ -90,7 +98,7 @@ export default function PlatformerCanvas({ activeLocation, game, width = 300, he
           <div style={{position: 'absolute', backgroundColor: color, opacity: opacity || 1, left: 0, bottom: bottom * scale / 2,
             width, height: height * scale / 2}} />
           {addNoise && _.map(initialTexturePositions.current, (pos, index) => (
-            <div style={{position: 'absolute', left: (pos.x + xOffset) % width, top: pos.y, width: 2, height: 2, backgroundColor: 'rgba(0, 0, 0, 0.1)'}}/>
+            <div style={{position: 'absolute', left: mod(pos.x + xOffset, width), top: pos.y, width: 0.5 * scale, height: 0.5 * scale, backgroundColor: 'rgba(0, 0, 0, 0.1)'}}/>
           ))}
         </>))}
 
@@ -100,7 +108,7 @@ export default function PlatformerCanvas({ activeLocation, game, width = 300, he
             src={'/elements/' + element.type + '.png'}
             style={{
               position: 'absolute',
-              left: element.x + xOffset,
+              left: element.x * scale / 4 + xOffset,
               bottom: (activeLocation.elementBottomOffset + (assets.elements[element.type].bottomOffset || 0)) * scale / 2,
               width: assets.elements[element.type].size * scale / 2,
               height: assets.elements[element.type].size * scale / 2,

@@ -305,38 +305,108 @@
 
 // gta
 
-export const theArtistsGarden = {
-  title: "The Artist's Garden",
+
+//inspirations - skyrim, spirits, - no memory? - paint, spirit farer - looking for someone - without the memories, a test
+//helping people pass through the canyon
+
+export const safePassage = {
+  plot: [
+    'Player wakes up in an empty field',
+    'Find first ingredient '
+  ],
+  locations: {
+    "The Field": {},
+    // "The Canyon": {},
+    // "The Gate": {},
+    // "The Tower": {},
+    // "The Bridge": {}
+  },
+  spells: {
+    // "Clarity": {notes: ""},
+    // "Equinimity": {notes: ""},
+    // "Spaciousness": {},
+
+
+    //unlock your specialty first
+    //water
+
+    //fire
+    //plant
+  },
+  actions: {
+    "Sit": {notes: "Can be used to pass time"},
+    "Pick Flowers": {notes: ""},
+    // "Travel": {},
+    // "Cast": {notes: ""} //multiple specialties available
+    //magic Paint brush
+  },
+  items: {
+    // "White Robe": {oneOfAKind: true}, //white, gray, and black
+
+    "The Brush": {oneOfAKind: true, notes: ""},
+
+    //spells require items to learn
+  },
+  characters: {
+    //different places around the world - Paris, Tehran, Tokyo, New York
+  },
+  story: `Nameless eyes open slowly.
+
+A field stretching beyond the horizon comes into focus.
+
+Gentle winds push clouds across the sky calmly. Birds fly quietly overhead.
+
+Time passes slowly, hardly at all.
+
+Your vision is clear, but not your memory.
+
+Nowhere to go-not in time or in place.`,
+  availableActions: [
+    {type: 'Sit'},
+    {type: 'Pick Flowers'}
+  ]
+};
+
+
+export const perma = {
+  title: "The Culturist", //permaculture, syntropy, symbiosis, regenerative ag
   description: "",
-  currentLocation: "The Artist's Property",
+  currentLocation: "The Farm",
   clock: { day: 1, time: [8, 0, "am"] },
   money: 100000,
-  story: "You wake up in your yurt on the artist's property. The sun is shining and the birds are chirping. You have a lot of work to do today.",
+  story: "",
   locations: {
-    "The Artist's Property": {
+    "The Farm": {
       walkingBottomOffset: 15,
       elementBottomOffset: 30,
       backgroundLayers: [
-        {color: '#8b9567', height: 40, bottom: 0, addNoise: true},
-        {color: '#6f7653ff', height: 1, bottom: 40 },
-        {color: "#b9ae7fff", height: 14, bottom: 12, opacity: 0.8 },
-        {color: '#cdc899ff', height: 1, bottom: 26},
-        {color: '#777f5bff', height: 1, bottom: 12 },
+        {color: '#8b9567', height: 39, bottom: 0, addNoise: true},
+        {color: '#6f7653ff', height: 1, bottom: 39 },
+        {color: "#b9ae7fff", height: 8, bottom: 14, opacity: 0.6 },
+        {color: '#cdc899ff', height: 1, bottom: 22},
+        {color: '#777f5bff', height: 1, bottom: 14 },
       ],
       elements: [
         {type: "Oak Tree", x: 0},
         {type: "Cabin", x: 350}
       ]
     }
-  }
+  },
+  plants: {
+
+  },
+  buildings: {
+
+  },
+  characters: {
+
+  },
 };
 
 // Export all games as a collection
 export const allGames = {
-  theMountainHums: {
-    title: "The Mountain Hums",
-  },
-  theArtistsGarden: theArtistsGarden
+  safePassage,
+  perma
   // lemonadeStand,
   // farmToTable,
   // fantasy,
