@@ -11,7 +11,7 @@ import { formatTime } from './helpers';
 import { primaryFont } from '../styles/fonts';
 import styles from './GamePage.module.css';
 
-const PlatformerCanvas = dynamic(() => import('../components/platformer/PlatformerCanvas'), { ssr: false });
+const Map = dynamic(() => import('../components/Map'), { ssr: false });
 
 export default function GamePage() {
   const router = useRouter();

@@ -10,25 +10,45 @@ Previous history: ${JSON.stringify(history, null, 2)}
 Generate a JSON response with the following structure:
 {
   "additionalStoryText": "Describe what happened next in the story very concisely.",
-  "updatedClock": {
-    "day": 1,
-    "time": [7, 30, "am"]
-  },
-  "inventoryUpdates": { //differentials to apply to current inventory (e.g., -2 means decrease by 2, +5 means increase by 5)
-    "Lemons": -2,
-    "Serving of Ice": -1
+  "gameUpdates": {
+    "updates": [
+      ["clock.day": 1],
+      ["clock.time": [7, 30, "am"]],
+
+      //i.e. "Travel Home"
+      ["location": "Home"]
+
+      //i.e. "Build House"
+      ["locations.Home.elements.House", ]
+      ["]
+
+
+      //i.e. "Craft Stew"
+      ["items.Stew.inventory": 1], //new inventory value after action
+
+
+    },
+    "deletions": [
+      //i.e. Deconstruct House
+      ["locations.", "House1"]
+    ],
+
+  "items": {
+    "Lemons": {"inventory": 2},
+    "Serving of Ice": {"inventory": 1},
   },
   "itemsSold": { //sales happen naturally over time based on specified market behavior by location - they should reduce inventory and increase money correspondingly, in addition to any other side-effect costs/incomes from the selected action
     "Lemonade": {"quantity": 3, "revenue": 15}
   },
   "moneySpent": 10, //money spent on purchases, fees, etc. (optional)
-  "grossMoneyMade": 15, //total money earned (optional)
-  "netMoneyChange": 5 //(gross income - expenses), can be positive, negative, or zero
-  "updatedMoney": <new money amount if changed (optional)>,
+  "grossMoneyMade": 15, //revenue before expenses (optional)
+  "updatedMoney": {
+    <new money amount if changed (optional)>,
+  ",
   "gameOverMessage": null, //or a string explaining why the game is over if any gameOverConditions are met
   "nextAvailableActions": [
     {
-      "type": "Go",
+      "type": "Travel",
       "options": [
         {"label": "Grocery Store", "costs": {"minutes": 10}},
         {"label": "Park", "costs": {"minutes": 15}}
