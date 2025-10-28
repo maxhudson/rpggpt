@@ -226,152 +226,171 @@ export const surviville = {
           57: {x: 0, y: 4, collection: "Objects", element: "Rock"},
           58: {x: -1, y: 3, collection: "Objects", element: "Rock"},
 
-          // Northern Forest - 50 trees with branches scattered throughout
+          // Northern Forest - 50 trees in natural clusters
           // Path through forest: clear lane at x=0 going north
 
-          // West side of path (x: -8 to -1)
+          // West side - Dense cluster near (-7, -6)
           100: {x: -8, y: -5, collection: "Plants", element: "Tree"},
           101: {x: -7, y: -5, collection: "Plants", element: "Tree"},
-          102: {x: -5, y: -5, collection: "Plants", element: "Tree"},
-          103: {x: -3, y: -5, collection: "Plants", element: "Tree"},
-          104: {x: -2, y: -5, collection: "Plants", element: "Tree"},
+          102: {x: -6, y: -5, collection: "Plants", element: "Tree"},
+          103: {x: -7, y: -6, collection: "Plants", element: "Tree"},
+          104: {x: -6, y: -6, collection: "Plants", element: "Tree"},
+          105: {x: -8, y: -6, collection: "Plants", element: "Tree"},
+          106: {x: -7, y: -7, collection: "Plants", element: "Tree"},
+          107: {x: -6, y: -7, collection: "Plants", element: "Tree"},
 
-          105: {x: -8, y: -7, collection: "Plants", element: "Tree"},
-          106: {x: -6, y: -7, collection: "Plants", element: "Tree"},
-          107: {x: -4, y: -7, collection: "Plants", element: "Tree"},
-          108: {x: -2, y: -7, collection: "Plants", element: "Tree"},
-          109: {x: -1, y: -7, collection: "Plants", element: "Tree"},
+          // West side - Medium cluster near (-4, -8)
+          108: {x: -5, y: -7, collection: "Plants", element: "Tree"},
+          109: {x: -4, y: -7, collection: "Plants", element: "Tree"},
+          110: {x: -3, y: -7, collection: "Plants", element: "Tree"},
+          111: {x: -5, y: -8, collection: "Plants", element: "Tree"},
+          112: {x: -4, y: -8, collection: "Plants", element: "Tree"},
+          113: {x: -3, y: -8, collection: "Plants", element: "Tree"},
+          114: {x: -4, y: -9, collection: "Plants", element: "Tree"},
 
-          110: {x: -8, y: -9, collection: "Plants", element: "Tree"},
-          111: {x: -7, y: -9, collection: "Plants", element: "Tree"},
-          112: {x: -5, y: -9, collection: "Plants", element: "Tree"},
-          113: {x: -3, y: -9, collection: "Plants", element: "Tree"},
-          114: {x: -1, y: -9, collection: "Plants", element: "Tree"},
+          // West side - Sparse trees near path
+          115: {x: -2, y: -6, collection: "Plants", element: "Tree"},
+          116: {x: -1, y: -8, collection: "Plants", element: "Tree"},
+          117: {x: -2, y: -10, collection: "Plants", element: "Tree"},
 
-          115: {x: -8, y: -11, collection: "Plants", element: "Tree"},
-          116: {x: -6, y: -11, collection: "Plants", element: "Tree"},
-          117: {x: -4, y: -11, collection: "Plants", element: "Tree"},
-          118: {x: -3, y: -11, collection: "Plants", element: "Tree"},
-          119: {x: -1, y: -11, collection: "Plants", element: "Tree"},
+          // West side - Small cluster north (-6, -10)
+          118: {x: -7, y: -10, collection: "Plants", element: "Tree"},
+          119: {x: -6, y: -10, collection: "Plants", element: "Tree"},
+          120: {x: -5, y: -10, collection: "Plants", element: "Tree"},
+          121: {x: -6, y: -11, collection: "Plants", element: "Tree"},
+          122: {x: -7, y: -11, collection: "Plants", element: "Tree"},
 
-          120: {x: -7, y: -13, collection: "Plants", element: "Tree"},
-          121: {x: -5, y: -13, collection: "Plants", element: "Tree"},
-          122: {x: -3, y: -13, collection: "Plants", element: "Tree"},
-          123: {x: -2, y: -13, collection: "Plants", element: "Tree"},
+          // West side - Far north cluster
+          123: {x: -4, y: -12, collection: "Plants", element: "Tree"},
+          124: {x: -3, y: -12, collection: "Plants", element: "Tree"},
+          125: {x: -4, y: -13, collection: "Plants", element: "Tree"},
+          126: {x: -5, y: -13, collection: "Plants", element: "Tree"},
 
-          // East side of path (x: 1 to 8)
-          124: {x: 2, y: -5, collection: "Plants", element: "Tree"},
-          125: {x: 3, y: -5, collection: "Plants", element: "Tree"},
-          126: {x: 5, y: -5, collection: "Plants", element: "Tree"},
-          127: {x: 7, y: -5, collection: "Plants", element: "Tree"},
-          128: {x: 8, y: -5, collection: "Plants", element: "Tree"},
+          // East side - Dense cluster near (6, -6)
+          127: {x: 5, y: -5, collection: "Plants", element: "Tree"},
+          128: {x: 6, y: -5, collection: "Plants", element: "Tree"},
+          129: {x: 7, y: -5, collection: "Plants", element: "Tree"},
+          130: {x: 5, y: -6, collection: "Plants", element: "Tree"},
+          131: {x: 6, y: -6, collection: "Plants", element: "Tree"},
+          132: {x: 7, y: -6, collection: "Plants", element: "Tree"},
+          133: {x: 6, y: -7, collection: "Plants", element: "Tree"},
+          134: {x: 7, y: -7, collection: "Plants", element: "Tree"},
+          135: {x: 8, y: -6, collection: "Plants", element: "Tree"},
 
-          129: {x: 1, y: -7, collection: "Plants", element: "Tree"},
-          130: {x: 2, y: -7, collection: "Plants", element: "Tree"},
-          131: {x: 4, y: -7, collection: "Plants", element: "Tree"},
-          132: {x: 6, y: -7, collection: "Plants", element: "Tree"},
-          133: {x: 8, y: -7, collection: "Plants", element: "Tree"},
+          // East side - Medium cluster near (3, -9)
+          136: {x: 2, y: -8, collection: "Plants", element: "Tree"},
+          137: {x: 3, y: -8, collection: "Plants", element: "Tree"},
+          138: {x: 4, y: -8, collection: "Plants", element: "Tree"},
+          139: {x: 2, y: -9, collection: "Plants", element: "Tree"},
+          140: {x: 3, y: -9, collection: "Plants", element: "Tree"},
+          141: {x: 4, y: -9, collection: "Plants", element: "Tree"},
+          142: {x: 3, y: -10, collection: "Plants", element: "Tree"},
 
-          134: {x: 1, y: -9, collection: "Plants", element: "Tree"},
-          135: {x: 3, y: -9, collection: "Plants", element: "Tree"},
-          136: {x: 5, y: -9, collection: "Plants", element: "Tree"},
-          137: {x: 7, y: -9, collection: "Plants", element: "Tree"},
-          138: {x: 8, y: -9, collection: "Plants", element: "Tree"},
+          // East side - Sparse trees near path
+          143: {x: 1, y: -7, collection: "Plants", element: "Tree"},
+          144: {x: 2, y: -11, collection: "Plants", element: "Tree"},
 
-          139: {x: 1, y: -11, collection: "Plants", element: "Tree"},
-          140: {x: 3, y: -11, collection: "Plants", element: "Tree"},
-          141: {x: 4, y: -11, collection: "Plants", element: "Tree"},
-          142: {x: 6, y: -11, collection: "Plants", element: "Tree"},
-          143: {x: 8, y: -11, collection: "Plants", element: "Tree"},
+          // East side - North cluster (6, -11)
+          145: {x: 5, y: -11, collection: "Plants", element: "Tree"},
+          146: {x: 6, y: -11, collection: "Plants", element: "Tree"},
+          147: {x: 7, y: -11, collection: "Plants", element: "Tree"},
+          148: {x: 6, y: -12, collection: "Plants", element: "Tree"},
+          149: {x: 5, y: -13, collection: "Plants", element: "Tree"},
+          150: {x: 6, y: -13, collection: "Plants", element: "Tree"},
 
-          144: {x: 2, y: -13, collection: "Plants", element: "Tree"},
-          145: {x: 3, y: -13, collection: "Plants", element: "Tree"},
-          146: {x: 5, y: -13, collection: "Plants", element: "Tree"},
-          147: {x: 7, y: -13, collection: "Plants", element: "Tree"},
+          // Branches clustered near tree groups
+          // West clusters
+          200: {x: -8, y: -7, collection: "Objects", element: "Branch"},
+          201: {x: -5, y: -6, collection: "Objects", element: "Branch"},
+          202: {x: -6, y: -8, collection: "Objects", element: "Branch"},
+          203: {x: -3, y: -9, collection: "Objects", element: "Branch"},
+          204: {x: -5, y: -11, collection: "Objects", element: "Branch"},
+          205: {x: -7, y: -12, collection: "Objects", element: "Branch"},
+          206: {x: -2, y: -7, collection: "Objects", element: "Branch"},
 
-          // Additional trees to reach 50
-          148: {x: -6, y: -6, collection: "Plants", element: "Tree"},
-          149: {x: 6, y: -6, collection: "Plants", element: "Tree"},
+          // East clusters
+          210: {x: 8, y: -7, collection: "Objects", element: "Branch"},
+          211: {x: 5, y: -7, collection: "Objects", element: "Branch"},
+          212: {x: 4, y: -10, collection: "Objects", element: "Branch"},
+          213: {x: 2, y: -10, collection: "Objects", element: "Branch"},
+          214: {x: 5, y: -12, collection: "Objects", element: "Branch"},
+          215: {x: 7, y: -13, collection: "Objects", element: "Branch"},
+          216: {x: 1, y: -8, collection: "Objects", element: "Branch"},
 
-          // Branches scattered among trees
-          200: {x: -7, y: -6, collection: "Objects", element: "Branch"},
-          201: {x: -4, y: -6, collection: "Objects", element: "Branch"},
-          202: {x: -2, y: -6, collection: "Objects", element: "Branch"},
-          203: {x: -6, y: -8, collection: "Objects", element: "Branch"},
-          204: {x: -3, y: -8, collection: "Objects", element: "Branch"},
-          205: {x: -1, y: -8, collection: "Objects", element: "Branch"},
-          206: {x: -7, y: -10, collection: "Objects", element: "Branch"},
-          207: {x: -4, y: -10, collection: "Objects", element: "Branch"},
-          208: {x: -2, y: -10, collection: "Objects", element: "Branch"},
-          209: {x: -5, y: -12, collection: "Objects", element: "Branch"},
-          210: {x: 3, y: -6, collection: "Objects", element: "Branch"},
-          211: {x: 5, y: -6, collection: "Objects", element: "Branch"},
-          212: {x: 7, y: -6, collection: "Objects", element: "Branch"},
-          213: {x: 2, y: -8, collection: "Objects", element: "Branch"},
-          214: {x: 5, y: -8, collection: "Objects", element: "Branch"},
-          215: {x: 7, y: -8, collection: "Objects", element: "Branch"},
-          216: {x: 2, y: -10, collection: "Objects", element: "Branch"},
-          217: {x: 4, y: -10, collection: "Objects", element: "Branch"},
-          218: {x: 6, y: -10, collection: "Objects", element: "Branch"},
-          219: {x: 4, y: -12, collection: "Objects", element: "Branch"},
+          // Sparse branches in clearings
+          217: {x: -1, y: -9, collection: "Objects", element: "Branch"},
+          218: {x: 1, y: -10, collection: "Objects", element: "Branch"},
+          219: {x: -2, y: -12, collection: "Objects", element: "Branch"},
 
-          // Southern area - Tall Grass scattered around
-          300: {x: -5, y: 2, collection: "Plants", element: "Tall Grass"},
-          301: {x: -3, y: 3, collection: "Plants", element: "Tall Grass"},
-          302: {x: -1, y: 2, collection: "Plants", element: "Tall Grass"},
-          303: {x: 2, y: 2, collection: "Plants", element: "Tall Grass"},
-          304: {x: 5, y: 2, collection: "Plants", element: "Tall Grass"},
-          305: {x: 7, y: 2, collection: "Plants", element: "Tall Grass"},
+          // Southern area - Tall Grass in bunches
+          // West grass patch
+          300: {x: -7, y: 3, collection: "Plants", element: "Tall Grass"},
+          301: {x: -6, y: 3, collection: "Plants", element: "Tall Grass"},
+          302: {x: -7, y: 4, collection: "Plants", element: "Tall Grass"},
+          303: {x: -6, y: 4, collection: "Plants", element: "Tall Grass"},
+          304: {x: -5, y: 4, collection: "Plants", element: "Tall Grass"},
 
-          306: {x: -6, y: 5, collection: "Plants", element: "Tall Grass"},
-          307: {x: -4, y: 5, collection: "Plants", element: "Tall Grass"},
-          308: {x: -1, y: 5, collection: "Plants", element: "Tall Grass"},
-          309: {x: 2, y: 5, collection: "Plants", element: "Tall Grass"},
-          310: {x: 4, y: 5, collection: "Plants", element: "Tall Grass"},
-          311: {x: 6, y: 5, collection: "Plants", element: "Tall Grass"},
+          // Center-west bunch
+          305: {x: -3, y: 5, collection: "Plants", element: "Tall Grass"},
+          306: {x: -2, y: 5, collection: "Plants", element: "Tall Grass"},
+          307: {x: -3, y: 6, collection: "Plants", element: "Tall Grass"},
+          308: {x: -2, y: 6, collection: "Plants", element: "Tall Grass"},
+          309: {x: -4, y: 6, collection: "Plants", element: "Tall Grass"},
 
-          312: {x: -7, y: 7, collection: "Plants", element: "Tall Grass"},
-          313: {x: -4, y: 7, collection: "Plants", element: "Tall Grass"},
-          314: {x: -2, y: 7, collection: "Plants", element: "Tall Grass"},
-          315: {x: 1, y: 7, collection: "Plants", element: "Tall Grass"},
-          316: {x: 3, y: 7, collection: "Plants", element: "Tall Grass"},
-          317: {x: 5, y: 7, collection: "Plants", element: "Tall Grass"},
-          318: {x: 7, y: 7, collection: "Plants", element: "Tall Grass"},
+          // Center-east bunch
+          310: {x: 2, y: 4, collection: "Plants", element: "Tall Grass"},
+          311: {x: 3, y: 4, collection: "Plants", element: "Tall Grass"},
+          312: {x: 2, y: 5, collection: "Plants", element: "Tall Grass"},
+          313: {x: 3, y: 5, collection: "Plants", element: "Tall Grass"},
+          314: {x: 4, y: 5, collection: "Plants", element: "Tall Grass"},
 
-          319: {x: -6, y: 9, collection: "Plants", element: "Tall Grass"},
-          320: {x: -3, y: 9, collection: "Plants", element: "Tall Grass"},
+          // East grass patch
+          315: {x: 6, y: 7, collection: "Plants", element: "Tall Grass"},
+          316: {x: 7, y: 7, collection: "Plants", element: "Tall Grass"},
+          317: {x: 6, y: 8, collection: "Plants", element: "Tall Grass"},
+          318: {x: 7, y: 8, collection: "Plants", element: "Tall Grass"},
+          319: {x: 5, y: 8, collection: "Plants", element: "Tall Grass"},
+
+          // Far south cluster
+          320: {x: -1, y: 9, collection: "Plants", element: "Tall Grass"},
           321: {x: 0, y: 9, collection: "Plants", element: "Tall Grass"},
-          322: {x: 2, y: 9, collection: "Plants", element: "Tall Grass"},
-          323: {x: 4, y: 9, collection: "Plants", element: "Tall Grass"},
-          324: {x: 6, y: 9, collection: "Plants", element: "Tall Grass"},
+          322: {x: 1, y: 9, collection: "Plants", element: "Tall Grass"},
+          323: {x: 0, y: 10, collection: "Plants", element: "Tall Grass"},
+          324: {x: 1, y: 10, collection: "Plants", element: "Tall Grass"},
 
-          // Southern area - Rocks scattered around
-          400: {x: -7, y: 3, collection: "Objects", element: "Rock"},
-          401: {x: -4, y: 3, collection: "Objects", element: "Rock"},
-          402: {x: 1, y: 3, collection: "Objects", element: "Rock"},
-          403: {x: 3, y: 3, collection: "Objects", element: "Rock"},
-          404: {x: 6, y: 3, collection: "Objects", element: "Rock"},
+          // Southern area - Rocks in clusters
+          // West rock pile
+          400: {x: -8, y: 5, collection: "Objects", element: "Rock"},
+          401: {x: -7, y: 5, collection: "Objects", element: "Rock"},
+          402: {x: -8, y: 6, collection: "Objects", element: "Rock"},
+          403: {x: -7, y: 6, collection: "Objects", element: "Rock"},
+          404: {x: -6, y: 6, collection: "Objects", element: "Rock"},
 
-          405: {x: -8, y: 5, collection: "Objects", element: "Rock"},
-          406: {x: -5, y: 5, collection: "Objects", element: "Rock"},
-          407: {x: -2, y: 5, collection: "Objects", element: "Rock"},
-          408: {x: 1, y: 5, collection: "Objects", element: "Rock"},
-          409: {x: 4, y: 6, collection: "Objects", element: "Rock"},
-          410: {x: 7, y: 6, collection: "Objects", element: "Rock"},
+          // Center-west rocks
+          405: {x: -4, y: 7, collection: "Objects", element: "Rock"},
+          406: {x: -3, y: 7, collection: "Objects", element: "Rock"},
+          407: {x: -4, y: 8, collection: "Objects", element: "Rock"},
+          408: {x: -3, y: 8, collection: "Objects", element: "Rock"},
 
-          411: {x: -6, y: 7, collection: "Objects", element: "Rock"},
-          412: {x: -3, y: 8, collection: "Objects", element: "Rock"},
-          413: {x: 0, y: 8, collection: "Objects", element: "Rock"},
-          414: {x: 3, y: 8, collection: "Objects", element: "Rock"},
-          415: {x: 5, y: 8, collection: "Objects", element: "Rock"},
-          416: {x: 8, y: 8, collection: "Objects", element: "Rock"},
+          // Central cluster
+          409: {x: 0, y: 6, collection: "Objects", element: "Rock"},
+          410: {x: 1, y: 6, collection: "Objects", element: "Rock"},
+          411: {x: 0, y: 7, collection: "Objects", element: "Rock"},
+          412: {x: 1, y: 7, collection: "Objects", element: "Rock"},
+          413: {x: -1, y: 7, collection: "Objects", element: "Rock"},
 
-          417: {x: -7, y: 10, collection: "Objects", element: "Rock"},
-          418: {x: -4, y: 10, collection: "Objects", element: "Rock"},
-          419: {x: -1, y: 10, collection: "Objects", element: "Rock"},
-          420: {x: 2, y: 10, collection: "Objects", element: "Rock"},
-          421: {x: 5, y: 10, collection: "Objects", element: "Rock"},
-          422: {x: 7, y: 10, collection: "Objects", element: "Rock"},
+          // East rock group
+          414: {x: 4, y: 9, collection: "Objects", element: "Rock"},
+          415: {x: 5, y: 9, collection: "Objects", element: "Rock"},
+          416: {x: 4, y: 10, collection: "Objects", element: "Rock"},
+          417: {x: 5, y: 10, collection: "Objects", element: "Rock"},
+          418: {x: 6, y: 10, collection: "Objects", element: "Rock"},
+
+          // Sparse southern rocks
+          419: {x: -5, y: 10, collection: "Objects", element: "Rock"},
+          420: {x: -2, y: 11, collection: "Objects", element: "Rock"},
+          421: {x: 2, y: 11, collection: "Objects", element: "Rock"},
+          422: {x: 7, y: 11, collection: "Objects", element: "Rock"},
 
           // // Resource deposits (far corners)
           // 60: {x: 24, y: -20, collection: "Objects", element: "Boulder"},

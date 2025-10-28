@@ -8,6 +8,8 @@ const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Gr
 const Circle = dynamic(() => import('react-konva').then(mod => ({ default: mod.Circle })), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
 
+var yScale = 0.75; // Scale factor for Y axis to adjust character height
+
 // Konva is only available on client-side
 let Konva;
 if (typeof window !== 'undefined') {
@@ -76,12 +78,13 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
           pixelSize={2}
         />
       ) : (<>
-        <Circle
-          radius={2.5}
+        <Ellipse
+          radiusX={2.5}
+          radiusY={2.5 / yScale}
           fill="#ffffffff"
           strokeWidth={2}
-          offsetX={0}
-          offsetY={0 + 23}
+          x={0}
+          y={0 - 23 / yScale}
           //shadow
           shadowColor="#fff"
           shadowBlur={5}
@@ -91,9 +94,9 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
         />
         <Ellipse
           x={0}
-          y={-9}
+          y={-9 / yScale}
           radiusX={3.5 + bounceOffset / 4}
-          radiusY={10}
+          radiusY={10 / yScale}
           fill="black"
         />
       </>)}
