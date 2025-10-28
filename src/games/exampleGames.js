@@ -1,8 +1,9 @@
 
 export const surviville = {
-  title: "A Ghost Town",
+  title: "Ghost Town",
   description: "Classic town builder",
   quests: [
+    // "Search for clues",
     "Harvest 5 branches to build a workbench",
     "Build a workbench so you can craft an axe",
     "Craft an axe so you can cut down a tree for wood",
@@ -74,7 +75,7 @@ export const surviville = {
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Iron"]}
       }},
-      "Workbench": {color: "#8B4513", maxLevel: 3, actions: {
+      "Workbench": {color: "#8B4513", spriteId: "Workbench", maxLevel: 3, actions: {
         "Build": {timeInHours: 2, cost: {"Wood": 5}},
         "Upgrade": {timeInHours: 2, cost: {"Wood": 3}},
         "Deconstruct": {},
@@ -184,18 +185,18 @@ export const surviville = {
       }},
     },
     "Locations": {
-      "Forest": {},
+      "The Forest": {},
       "The Cave": {}
     }
   },
   instance: {
-    activeLocation: "Forest",
+    activeLocation: "The Forest",
     activeCharacter: "Hannes",
     clock: { day: 1, time: [8, 0, "am"] },
     storyText: "Hannes wakes up in the Forest alone. Hakira is missing.",
     activeQuest: "Harvest 5 branches to build a workbench",
     locations: {
-      "Forest": {
+      "The Forest": {
         characters: {
           "Hannes": {x: 0, y: 0, levels: {
             "Forge": {level: 10, xp: 0},

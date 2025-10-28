@@ -183,7 +183,7 @@ export default function GamePage() {
     setIsProcessing(true);
     addToHistory({content: userInput, type: 'prompt'});
 
-    try {
+    try {game
       // Check if this can be handled client-side
       const extractedActionType = actionType || userInput.split(' ')[0];
 
@@ -222,6 +222,14 @@ export default function GamePage() {
             },
             type: 'response'
           });
+        } else {
+          // Show error message for failed client-side action
+          addToHistory({
+            content: { error: true, message: clientSideData.message },
+            type: 'error'
+          });
+          setIsProcessing(false);
+          return;
         }
 
         // // Still make API call to get quest updates and additional messages
@@ -362,12 +370,15 @@ export default function GamePage() {
     }}>
       <div>
         <div className={styles.storyWrapper}>
+          <h1 style={{ color: '#fff', marginBottom: 5, fontSize: '1.5rem', fontWeight: 'normal'}}>
+            {game.title}
+          </h1>
           <div style={{fontSize: '1em', marginBottom: 20, fontSize: '1.1rem', top: 60, right: 40}}>
-            <div>
+            <div style={{opacity: 0.7}}>
               {game.instance?.clock && (
                 <span>Day {game.instance.clock.day}, {formatTime(game.instance.clock.time)}</span>
               )}
-              <span>, the {game.instance?.activeLocation}</span>
+              <span>, {game.instance?.activeLocation}</span>
               {game.money !== undefined && (
                 <div style={{marginTop: 3}}><b><Currency amount={game.money} /></b></div>
               )}
@@ -380,7 +391,7 @@ export default function GamePage() {
             {/* Active Quest Display */}
             {game.instance?.activeQuest && (
               <div style={{
-                marginTop: 12,
+                marginTop: 3,
                 fontSize: '0.9em',
                 opacity: 1,
                 color: '#ffffff',
@@ -395,7 +406,7 @@ export default function GamePage() {
           {/* Inventory Display */}
           {game.instance?.locations?.[game.instance.activeLocation]?.inventory &&
            Object.keys(game.instance.locations[game.instance.activeLocation].inventory).length > 0 && (
-            <div style={{position: 'fixed', top: 40, right: 40, zIndex: 100, display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: 1}}>
+            <div style={{position: 'fixed', top: 40, right: 40, display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: 1, zIndex: 2000}}>
               {Object.entries(game.instance.locations[game.instance.activeLocation].inventory)
                 .filter(([, qty]) => qty > 0)
                 .map(([itemName, qty]) => {
@@ -682,7 +693,7 @@ export default function GamePage() {
                 gameElements={game.elements}
                 stageSize={{
                   width: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerWidth : window.innerWidth / 2) : 600,
-                  height: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerHeight / 2 : window.innerHeight) : 600
+                  height: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerWidth : window.innerHeight) : 600
                 }}
                 onPositionUpdate={(newPosition, options = {}) => {
                   // Update character position in game state

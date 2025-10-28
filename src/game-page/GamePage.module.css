@@ -27,12 +27,19 @@
   .canvasWrapper {
     top: 0;
     width: 100vw;
-    height: 50vh;
+    height: 100vw;
+    z-index: 0;
   }
 
   .storyWrapper {
     padding: 16px;
-    padding-top: calc(50vh + 16px);
-    min-height: 50vh;
+    padding-top: calc(100vw + 16px);
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgb(62, 56, 52);
+    overflow: auto;
   }
 }

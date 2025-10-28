@@ -24,7 +24,7 @@ export default function MapSimple({
   const [, forceUpdate] = useState(0);
   const [isWalking, setIsWalking] = useState(false);
   const stageRef = useRef(null);
-  const joystickDirection = useRef({ x: 0, y: 0 });
+  const joystickDirection = useRef({ x: 0, y: 0, speed: 0 });
 
   // Initialize player position from character's location
   useEffect(() => {
@@ -62,24 +62,26 @@ export default function MapSimple({
         return;
       }
 
-      // Double speed when shift is pressed
-      const moveSpeed = keysPressed.current['shift'] ? baseMoveSpeed * 2 : baseMoveSpeed;
-
       let deltaX = 0;
       let deltaY = 0;
 
-      // Keyboard input
-      if (keysPressed.current['w'] || keysPressed.current['arrowup']) deltaY -= moveSpeed;
-      if (keysPressed.current['s'] || keysPressed.current['arrowdown']) deltaY += moveSpeed;
-      if (keysPressed.current['a'] || keysPressed.current['arrowleft']) deltaX -= moveSpeed;
-      if (keysPressed.current['d'] || keysPressed.current['arrowright']) deltaX += moveSpeed;
-
-      // Joystick input (overrides keyboard if active)
+      // Joystick input (takes priority if active)
       if (joystickDirection.current.x !== 0 || joystickDirection.current.y !== 0) {
-        deltaX = joystickDirection.current.x * moveSpeed;
-        deltaY = joystickDirection.current.y * moveSpeed;
-      } else if (deltaX !== 0 && deltaY !== 0) {
-        // Normalize diagonal keyboard movement to prevent moving faster
+        // Use joystick speed multiplier (1 or 2)
+        const joystickSpeed = baseMoveSpeed * joystickDirection.current.speed;
+        deltaX = joystickDirection.current.x * joystickSpeed;
+        deltaY = joystickDirection.current.y * joystickSpeed;
+      } else {
+        // Keyboard input (with shift for double speed)
+        const moveSpeed = keysPressed.current['shift'] ? baseMoveSpeed * 2 : baseMoveSpeed;
+        if (keysPressed.current['w'] || keysPressed.current['arrowup']) deltaY -= moveSpeed;
+        if (keysPressed.current['s'] || keysPressed.current['arrowdown']) deltaY += moveSpeed;
+        if (keysPressed.current['a'] || keysPressed.current['arrowleft']) deltaX -= moveSpeed;
+        if (keysPressed.current['d'] || keysPressed.current['arrowright']) deltaX += moveSpeed;
+      }
+
+      // Normalize diagonal movement to prevent moving faster
+      if (deltaX !== 0 && deltaY !== 0) {
         const diagonalFactor = 1 / Math.sqrt(2);
         deltaX *= diagonalFactor;
         deltaY *= diagonalFactor;

@@ -5,6 +5,7 @@ var sprites = {
   "Rock": {width: 1, yOffset: 0.35, imageScale: 0.4, shadowScale: 0.6, shadowOpacity: 0.6},
   "Tall Grass": {width: 1, yOffset: 0.3, height: 1.5, imageScale: 0.4, shadowScale: 0.5, shadowOpacity: 0.7},
   "Basic Shelter": {width: 2, yOffset: 0.65, height: 1.5, imageScale: 0.7, shadowScale: 0.75},
+  "Workbench": {width: 1, yOffset: 0.4, height: 1.5, imageScale: 0.5, shadowScale: 0.7, shadowOpacity: 0.6},
 };
 
 export default sprites;

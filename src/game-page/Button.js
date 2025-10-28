@@ -17,9 +17,9 @@ export function Button({ children, onClick, variant = 'filled', disabled = false
   };
 
   const hoverStyle = !disabled ? {
-    opacity: 0.9,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-    transform: 'translateY(-2px)'
+    // opacity: 0.9,
+    // boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    // transform: 'translateY(-2px)'
   } : {};
 
   return (
