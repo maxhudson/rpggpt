@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import MapSimpleObject from './MapSimpleObject';
 import MapSimpleCharacter from './MapSimpleCharacter';
+import Joystick from './Joystick';
 import { cellSize } from '../k';
 import sprites from '../sprites';
 import { findNearestObject } from '../game-page/helpers';
@@ -23,6 +24,7 @@ export default function MapSimple({
   const [, forceUpdate] = useState(0);
   const [isWalking, setIsWalking] = useState(false);
   const stageRef = useRef(null);
+  const joystickDirection = useRef({ x: 0, y: 0 });
 
   // Initialize player position from character's location
   useEffect(() => {
@@ -66,13 +68,18 @@ export default function MapSimple({
       let deltaX = 0;
       let deltaY = 0;
 
+      // Keyboard input
       if (keysPressed.current['w'] || keysPressed.current['arrowup']) deltaY -= moveSpeed;
       if (keysPressed.current['s'] || keysPressed.current['arrowdown']) deltaY += moveSpeed;
       if (keysPressed.current['a'] || keysPressed.current['arrowleft']) deltaX -= moveSpeed;
       if (keysPressed.current['d'] || keysPressed.current['arrowright']) deltaX += moveSpeed;
 
-      // Normalize diagonal movement to prevent moving faster
-      if (deltaX !== 0 && deltaY !== 0) {
+      // Joystick input (overrides keyboard if active)
+      if (joystickDirection.current.x !== 0 || joystickDirection.current.y !== 0) {
+        deltaX = joystickDirection.current.x * moveSpeed;
+        deltaY = joystickDirection.current.y * moveSpeed;
+      } else if (deltaX !== 0 && deltaY !== 0) {
+        // Normalize diagonal keyboard movement to prevent moving faster
         const diagonalFactor = 1 / Math.sqrt(2);
         deltaX *= diagonalFactor;
         deltaY *= diagonalFactor;
@@ -152,14 +159,15 @@ export default function MapSimple({
   const yScale = 0.75; // 45-degree camera angle
 
   return (
-    <Stage
-      ref={stageRef}
-      width={stageSize.width}
-      height={stageSize.height}
-      style={{
-        background: 'linear-gradient(to top left, #a3b488, #afb98dff)'
-      }}
-    >
+    <>
+      <Stage
+        ref={stageRef}
+        width={stageSize.width}
+        height={stageSize.height}
+        style={{
+          background: 'linear-gradient(to top left, #a3b488, #afb98dff)'
+        }}
+      >
       <Layer
         x={stageSize.width / 2}
         y={stageSize.height / 2}
@@ -279,6 +287,12 @@ export default function MapSimple({
           }
         })}
       </Layer>
-    </Stage>
+      </Stage>
+      <Joystick
+        onMove={(direction) => {
+          joystickDirection.current = direction;
+        }}
+      />
+    </>
   );
 }
