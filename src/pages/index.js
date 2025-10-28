@@ -1,180 +1,259 @@
 import Head from "next/head";
-import { Geist, Geist_Mono } from "next/font/google";
-import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { allGames } from '../games/exampleGames';
+import { v4 as uuidv4 } from 'uuid';
+import { primaryFont } from '../styles/fonts';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export default function Home({session}) {
-  const [games, setGames] = useState([]);
-  const [isCreating, setIsCreating] = useState(false);
+export default function Home() {
+  const [gameInstances, setGameInstances] = useState([]);
   const router = useRouter();
 
   useEffect(() => {
-    if (session?.user?.id) {
-      fetchGames();
-    }
-  }, [session]);
+    loadGameInstances();
+  }, []);
 
-  const fetchGames = async () => {
-    const { data, error } = await supabase
-      .from('games')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
+  const loadGameInstances = () => {
+    if (typeof window === 'undefined') return;
 
-    if (error) {
-      console.error('Error fetching games:', error);
-      return;
-    }
+    const instances = [];
+    const keys = Object.keys(localStorage);
 
-    setGames(data || []);
-  };
-
-  const createNewGame = async () => {
-    if (!session?.user?.id) return;
-
-    setIsCreating(true);
-    try {
-      const newGame = {
-        user_id: session.user.id,
-        map: {
-          elements: {},
-          boundaryPolygon: [
-            [-500, -500], // Top-left
-            [500, -500],  // Top-right
-            [500, 500],   // Bottom-right
-            [-500, 500]   // Bottom-left
-          ]
-        },
-        background: {},
-        element_type_ids: [],
-        players: {
-          [session.user.id]: {
-            inventory: {},
-            money: 100, // Starting money
-            position: { x: 0, y: 0 } // Starting position
-          }
+    for (const key of keys) {
+      if (key.startsWith('game-instance-')) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          instances.push({
+            id: key.replace('game-instance-', ''),
+            ...data
+          });
+        } catch (e) {
+          console.error('Failed to parse game instance:', key, e);
         }
-      };
-
-      const { data, error } = await supabase
-        .from('games')
-        .insert([newGame])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating game:', error);
-        alert('Failed to create game. Please try again.');
-        return;
       }
-
-      // Navigate to the new game
-      router.push(`/games/${data.id}`);
-    } catch (error) {
-      console.error('Error creating game:', error);
-      alert('Failed to create game. Please try again.');
-    } finally {
-      setIsCreating(false);
     }
+
+    // Sort by last played (most recent first)
+    instances.sort((a, b) => {
+      const timeA = new Date(a.lastPlayed || 0).getTime();
+      const timeB = new Date(b.lastPlayed || 0).getTime();
+      return timeB - timeA;
+    });
+
+    setGameInstances(instances);
   };
 
-  if (!session) {
-    return (
-      <>
-        <Head>
-          <title>RPG Game Platform</title>
-          <meta name="description" content="Create top-down RPG games without coding" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <link rel="icon" href="/favicon.ico" />
-        </Head>
-        <div className={`${geistSans.variable} ${geistMono.variable}`}>
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <h1>RPG Game Platform</h1>
-            <p>Please log in to create and manage your RPG games.</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+  const createNewGame = (gameKey) => {
+    const gameId = uuidv4();
+    const game = allGames[gameKey];
+
+    // Copy the full game state to localStorage
+    const gameState = JSON.parse(JSON.stringify(game));
+    localStorage.setItem(`game-state-${gameId}`, JSON.stringify(gameState));
+
+    // Initialize empty history
+    localStorage.setItem(`game-history-${gameId}`, JSON.stringify([]));
+
+    // Initialize game instance metadata
+    const gameInstance = {
+      title: game.title,
+      lastPlayed: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(`game-instance-${gameId}`, JSON.stringify(gameInstance));
+
+    // Navigate to the game
+    router.push(`/game/${gameId}`);
+  };
+
+  const continueGame = (instanceId) => {
+    // Update last played timestamp
+    const key = `game-instance-${instanceId}`;
+    try {
+      const data = JSON.parse(localStorage.getItem(key));
+      data.lastPlayed = new Date().toISOString();
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      console.error('Failed to update last played:', e);
+    }
+
+    router.push(`/game/${instanceId}`);
+  };
+
+  const deleteGameInstance = (instanceId, e) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to delete this game? This cannot be undone.')) {
+      localStorage.removeItem(`game-instance-${instanceId}`);
+      localStorage.removeItem(`game-state-${instanceId}`);
+      localStorage.removeItem(`game-history-${instanceId}`);
+      loadGameInstances();
+    }
+  };
 
   return (
     <>
       <Head>
-        <title>RPG Game Platform</title>
-        <meta name="description" content="Create top-down RPG games without coding" />
+        <title></title>
+        <meta name="description" content="AI-powered text-based RPG games" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <div className={`${geistSans.variable} ${geistMono.variable}`}>
-        <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto' }}>
-          <h1>My RPG Games</h1>
+      <div className={primaryFont.className} style={{
+        minHeight: '100vh',
+        backgroundColor: '#EFECE3',
+        color: '#171717',
+        padding: '40px 20px'
+      }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <h1 style={{
+            fontSize: '48px',
+            marginBottom: '40px',
+            fontWeight: 600,
+            textAlign: 'center'
+          }}>
 
-          <div style={{ marginBottom: '30px' }}>
-            <button
-              onClick={createNewGame}
-              disabled={isCreating}
-              style={{
-                backgroundColor: '#007bff',
-                color: 'white',
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: isCreating ? 'not-allowed' : 'pointer',
-                opacity: isCreating ? 0.6 : 1
-              }}
-            >
-              {isCreating ? 'Creating...' : 'Create New Game'}
-            </button>
-          </div>
+          </h1>
 
-          {games.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-              <p>No games yet. Create your first RPG game!</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '20px' }}>
-              {games.map(game => (
+          {/* Start a New Game Section */}
+          <section>
+            <h2 style={{
+              fontSize: '32px',
+              marginBottom: '24px',
+              paddingLeft: '24px',
+              fontWeight: 500
+            }}>
+              Start a New Game
+            </h2>
+            <div style={{
+              display: 'grid',
+              gap: '16px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))'
+            }}>
+              {Object.entries(allGames).map(([key, game]) => (
                 <div
-                  key={game.id}
+                  key={key}
+                  onClick={() => createNewGame(key)}
                   style={{
-                    border: '1px solid #ddd',
+                    border: '1px solid #C4B9A6',
                     borderRadius: '8px',
-                    padding: '20px',
+                    padding: '24px',
                     cursor: 'pointer',
-                    transition: 'box-shadow 0.2s',
+                    transition: 'all 0.2s',
+                    backgroundColor: '#FFFFFF'
                   }}
-                  onClick={() => router.push(`/games/${game.id}`)}
                   onMouseEnter={(e) => {
-                    e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.boxShadow = 'none';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <h3 style={{ margin: '0 0 10px 0' }}>{game.title}</h3>
-                  <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
-                    Created: {new Date(game.created_at).toLocaleDateString()}
-                  </p>
-                  <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '14px' }}>
-                    Elements: {Object.keys(game.map?.elements || {}).length}
+                  <h3 style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '24px',
+                    fontWeight: 500
+                  }}>
+                    {game.title}
+                  </h3>
+                  {game.description && (
+                    <p style={{
+                      margin: '0',
+                      color: '#666',
+                      fontSize: '16px',
+                      lineHeight: '1.5'
+                    }}>
+                      {game.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+
+        {/* Continue Your Games Section */}
+        {gameInstances.length > 0 && (
+          <section style={{ marginBottom: '60px', maxWidth: '900px', margin: '0 auto', marginTop: '60px', }}>
+            <h2 style={{
+              fontSize: '32px',
+              marginBottom: '24px',
+              paddingLeft: '24px',
+              fontWeight: 500
+            }}>
+              Continue
+            </h2>
+            <div style={{
+              display: 'grid',
+              gap: '16px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))'
+            }}>
+              {gameInstances.map(instance => (
+                <div
+                  key={instance.id}
+                  onClick={() => continueGame(instance.id)}
+                  style={{
+                    border: '1px solid #C4B9A6',
+                    borderRadius: '8px',
+                    padding: '24px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    backgroundColor: '#FAF8F3',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <button
+                    onClick={(e) => deleteGameInstance(instance.id, e)}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '20px',
+                      cursor: 'pointer',
+                      color: '#999',
+                      padding: '4px 8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#c33';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#999';
+                    }}
+                  >
+                    ×
+                  </button>
+                  <h3 style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '24px',
+                    fontWeight: 500
+                  }}>
+                    {instance.title}
+                  </h3>
+                  <p style={{
+                    margin: '0',
+                    color: '#666',
+                    fontSize: '14px'
+                  }}>
+                    Last played: {new Date(instance.lastPlayed).toLocaleDateString()}
                   </p>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </section>
+        )}
       </div>
     </>
   );

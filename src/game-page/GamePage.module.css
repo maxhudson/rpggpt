@@ -1,0 +1,38 @@
+.canvasWrapper {
+  position: fixed;
+  user-select: none !important;
+}
+
+/* Wide screen - 50/50 horizontal split */
+@media screen and (min-width: 769px) {
+  .canvasWrapper {
+    width: 50vw;
+    height: 100vh;
+    top: 0px;
+    left: 0px;
+  }
+
+  .storyWrapper {
+    padding: 40px 40px;
+    padding-left: calc(50vw + 40px);
+    width: 100vw;
+  }
+}
+
+/* Narrow screen - 50/50 vertical split */
+@media screen and (max-width: 768px) {
+  .title {
+    display: none;
+  }
+  .canvasWrapper {
+    top: 0;
+    width: 100vw;
+    height: 50vh;
+  }
+
+  .storyWrapper {
+    padding: 16px;
+    padding-top: calc(50vh + 16px);
+    min-height: 50vh;
+  }
+}

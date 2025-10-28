@@ -7,6 +7,7 @@ import _ from 'lodash';
 import HUD from '@/components/HUD';
 import Map from '@/components/Map';
 import ActionModal from '@/components/ActionModal';
+import FilmNoise from '@/components/FilmNoise';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,6 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export default function GamePage({session, userProfile}) {
+
   var [game, setGame] = useState(null);
   var [isEditing, setIsEditing] = useState(false);
   var [elementTypes, _setElementTypes] = useState({});
@@ -38,7 +40,8 @@ export default function GamePage({session, userProfile}) {
 
   // Action system state
   const [nearbyInteractiveElementIds, _setNearbyInteractiveElementIds] = useState([]);
-  const [activeAction, setActiveAction] = useState(null); // { type: 'craft'|'sell'|'buy', elementType: {...} }
+  const [activeAction, setActiveAction] = useState(null); // { type: 'craft'|'sell'|'buy'|'build', elementType: {...} }
+  const [tentativeMapObject, setTentativeMapObject] = useState(null); // { elementTypeId, x, y }
 
   const setNearbyInteractiveElementIds = (newIds) => {
     _setNearbyInteractiveElementIds(newIds);
@@ -59,17 +62,116 @@ export default function GamePage({session, userProfile}) {
   const router = useRouter();
   const { gameId } = router.query;
 
+  // Handle polygon deletion
+  const handleDeletePolygon = async (polygonId) => {
+    // Remove the polygon from game.background
+    const updatedBackground = {...stateRef.current.game.background};
+
+    delete updatedBackground[polygonId];
+
+    const updatedGame = {
+      ...stateRef.current.game,
+      background: updatedBackground
+    };
+
+    // Update the game state and database
+    await updateGame(updatedGame);
+
+    // Clear the selection
+    setSelectedPolygonId(null);
+  };
+
   // Handle escape key and deselection
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Check if user is typing in an input field or if a modal is open
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.contentEditable === 'true'
+      );
+
+      // Check if any modal dialogs are open (ElementTypeEditor has z-index 1000)
+      const hasModalOpen = document.querySelector('[style*="z-index: 1000"]') !== null;
+
       if (e.key === 'Escape') {
         setSelectedPolygonId(null);
+        setTentativeMapObject(null); // Clear tentative building on escape
+      } else if ((e.key === 'Backspace' || e.key === 'Delete') && selectedPolygonId && isEditing && !isInputFocused && !hasModalOpen) {
+        // Delete the selected polygon only if no inputs focused and no modals open
+        e.preventDefault();
+        handleDeletePolygon(selectedPolygonId);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedPolygonId, isEditing]);
+
+  // Handle mouse movement for tentative building placement
+  useEffect(() => {
+    if (!tentativeMapObject) return;
+
+    const handleMouseMove = (e) => {
+      const worldPos = pageToWorldCoordinates(e.clientX, e.clientY);
+      setTentativeMapObject(prev => ({
+        ...prev,
+        x: worldPos.x,
+        y: worldPos.y
+      }));
+    };
+
+    const handleClick = async (e) => {
+      if (!tentativeMapObject) return;
+
+      const playerData = await ensurePlayerData();
+      const currentGame = stateRef.current.game;
+      const buildingElementType = elementTypes[tentativeMapObject.elementTypeId];
+
+      if (!buildingElementType) return;
+
+      const buildingRequirements = buildingElementType.data.buildingRequirements || {};
+      let updatedInventory = { ...playerData.inventory };
+
+      // Consume required items
+      for (const [reqElementTypeId, requiredQuantity] of Object.entries(buildingRequirements)) {
+        updatedInventory[reqElementTypeId] -= requiredQuantity;
+        if (updatedInventory[reqElementTypeId] <= 0) {
+          delete updatedInventory[reqElementTypeId];
+        }
+      }
+
+      // Create the building at tentative position
+      const { elementId, updatedMap } = createMapElement(tentativeMapObject.elementTypeId, tentativeMapObject.x, tentativeMapObject.y);
+
+      // Update game data
+      const updatedPlayers = {
+        ...currentGame.players,
+        [session.user.id]: {
+          ...playerData,
+          inventory: updatedInventory
+        }
+      };
+
+      await updateGame({
+        ...currentGame,
+        players: updatedPlayers,
+        map: updatedMap
+      });
+
+      alert(`Built ${buildingElementType.data.title}!`);
+      setTentativeMapObject(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('click', handleClick);
+    };
+  }, [tentativeMapObject, elementTypes, player]);
 
   // Handle deselection when clicking empty space
   const handleDeselectAll = () => {
@@ -101,7 +203,16 @@ export default function GamePage({session, userProfile}) {
         const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
         setNextElementId(maxId + 1);
 
-        // Fetch element types for this game using element_type_ids
+        // Determine if this is a game definition or instance
+        const isGameDefinition = !gameData.source_game_id;
+        const isGameInstance = !!gameData.source_game_id;
+
+        // Set editing mode based on game type
+        setIsEditing(isGameDefinition);
+
+        // Fetch element types - from this game if definition, from source game if instance
+        const elementTypeGameId = isGameInstance ? gameData.source_game_id : gameId;
+
         if (gameData.element_type_ids && gameData.element_type_ids.length > 0) {
           const { data: elementTypesData, error: elementTypesError } = await supabase
             .from('element_types')
@@ -119,6 +230,26 @@ export default function GamePage({session, userProfile}) {
           setElementTypes(elementTypesObj);
 
           stateRef.current.elementTypes = elementTypesObj;
+        } else if (isGameInstance && gameData.source_game_id) {
+          // For game instances, fetch element types from the source game
+          const { data: sourceGameData, error: sourceGameError } = await supabase
+            .from('games')
+            .select('element_type_ids')
+            .eq('id', gameData.source_game_id)
+            .single();
+
+          if (!sourceGameError && sourceGameData?.element_type_ids?.length > 0) {
+            const { data: elementTypesData, error: elementTypesError } = await supabase
+              .from('element_types')
+              .select('*')
+              .in('id', sourceGameData.element_type_ids);
+
+            if (!elementTypesError) {
+              const elementTypesObj = _.keyBy(elementTypesData, 'id');
+              setElementTypes(elementTypesObj);
+              stateRef.current.elementTypes = elementTypesObj;
+            }
+          }
         }
 
         // Ensure player data exists on mount
@@ -290,7 +421,7 @@ export default function GamePage({session, userProfile}) {
       return;
     }
 
-    const interactionDistance = 60; // Distance in pixels for interaction
+    const interactionDistance = 10; // Distance in pixels for interaction
     const mapElements = stateRef.current.game.map?.elements || {};
     const nearby = [];
 
@@ -303,7 +434,8 @@ export default function GamePage({session, userProfile}) {
       // Check if any actions are enabled
       const hasActions = elementType.data.actions?.craft === 1 ||
                         elementType.data.actions?.sell === 1 ||
-                        elementType.data.actions?.buy === 1;
+                        elementType.data.actions?.buy === 1
+                        || elementType.data.type === 'item';
 
       // Check if element has tool data and player has compatible tools
       const hasToolData = elementType.data.toolData && Object.keys(elementType.data.toolData).length > 0;
@@ -356,6 +488,18 @@ export default function GamePage({session, userProfile}) {
   const ensurePlayerData = async () => {
     const currentGame = stateRef.current.game;
     let playerData = currentGame.players?.[session.user.id];
+    let gameNeedsUpdate = false;
+    let updatedGame = { ...currentGame };
+
+    // Initialize game time if it doesn't exist
+    if (!currentGame.time) {
+      updatedGame.time = {
+        day: 1,
+        hour: 6,
+        minute: 0
+      };
+      gameNeedsUpdate = true;
+    }
 
     if (!playerData) {
       // Create initial inventory from element types with initialInventoryQuantity
@@ -379,20 +523,57 @@ export default function GamePage({session, userProfile}) {
       };
 
       const updatedPlayers = {
-        ...currentGame.players,
+        ...updatedGame.players,
         [session.user.id]: playerData
       };
 
-      const updatedGame = {
-        ...currentGame,
+      updatedGame = {
+        ...updatedGame,
         players: updatedPlayers
       };
+      gameNeedsUpdate = true;
+    }
 
+    if (gameNeedsUpdate) {
       await updateGame(updatedGame);
-      return playerData;
     }
 
     return playerData;
+  };
+
+  // Time advancement function
+  const advanceTime = async (minutes) => {
+    const currentGame = stateRef.current.game;
+    if (!currentGame?.time) return;
+
+    let { day, hour, minute } = currentGame.time;
+    minute += minutes;
+
+    // Handle minute overflow
+    while (minute >= 60) {
+      minute -= 60;
+      hour += 1;
+    }
+
+    // Handle hour overflow (day ends at 21:00, new day starts at 6:00)
+    while (hour >= 21) {
+      hour = 6; // Reset to 6 AM
+      day += 1;
+
+      // TODO: Add end-of-day processing here
+      // - AI generation for weather, events, challenges
+      // - Screen blackout transition
+      // - Game state analysis and bonus rewards
+      console.log(`End of day ${day - 1}! Starting day ${day}`);
+    }
+
+    const updatedTime = { day, hour, minute };
+    const updatedGame = {
+      ...currentGame,
+      time: updatedTime
+    };
+
+    await updateGame(updatedGame, { updateSupabase: true, updateState: true });
   };
 
   // Action handlers
@@ -406,6 +587,50 @@ export default function GamePage({session, userProfile}) {
 
   const handleBuy = async (elementType) => {
     setActiveAction({ type: 'buy', elementType });
+  };
+
+  const handleBuild = async () => {
+    setActiveAction({ type: 'build', elementType: null });
+  };
+
+  const handlePlayNewInstance = async () => {
+    try {
+      // Create a new game instance based on the current game definition
+      const newGameData = {
+        user_id: session.user.id,
+        source_game_id: gameId, // Reference to the source game definition
+        element_type_ids: game.element_type_ids, // Copy element type IDs
+        map: {
+          elements: { ...game.map.elements }, // Copy map elements from the definition
+          boundaryPolygon: game.map.boundaryPolygon || null // Copy boundary if exists
+        },
+        background: game.background || {}, // Copy background
+        players: {}, // Empty players object - will be populated when player joins
+        time: {
+          day: 1,
+          hour: 6,
+          minute: 0
+        }
+      };
+
+      const { data: newGame, error } = await supabase
+        .from('games')
+        .insert(newGameData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating game instance:', error);
+        alert('Failed to create game instance. Please try again.');
+        return;
+      }
+
+      // Navigate to the new game instance
+      router.push(`/games/${newGame.id}`);
+    } catch (error) {
+      console.error('Error creating game instance:', error);
+      alert('Failed to create game instance. Please try again.');
+    }
   };
 
   const handleUseTool = async (elementId, toolElementTypeId) => {
@@ -503,6 +728,39 @@ export default function GamePage({session, userProfile}) {
 
     const playerData = await ensurePlayerData();
     const currentGame = stateRef.current.game;
+
+    // Handle building selection
+    if (actionData.buildingId && actionData.type === 'build') {
+      const buildingElementType = elementTypes[actionData.buildingId];
+      if (!buildingElementType) return;
+
+      const buildingRequirements = buildingElementType.data.buildingRequirements || {};
+      let canBuild = true;
+
+      // Check if player has all required items
+      for (const [reqElementTypeId, requiredQuantity] of Object.entries(buildingRequirements)) {
+        const playerQuantity = playerData.inventory[reqElementTypeId] || 0;
+        if (playerQuantity < requiredQuantity) {
+          const requiredElementType = elementTypes[reqElementTypeId];
+          const itemName = requiredElementType?.data?.title || `Item ${reqElementTypeId}`;
+          alert(`You need ${requiredQuantity} ${itemName} but only have ${playerQuantity}`);
+          canBuild = false;
+          break;
+        }
+      }
+
+      if (!canBuild) return;
+
+      // Set tentative map object for building placement
+      setTentativeMapObject({
+        elementTypeId: actionData.buildingId,
+        x: player.position.x,
+        y: player.position.y
+      });
+
+      setActiveAction(null);
+      return;
+    }
 
     // Handle new batch operations format
     if (actionData.quantities && actionData.type) {
@@ -756,7 +1014,7 @@ export default function GamePage({session, userProfile}) {
   // Compute nearby interactive elements from IDs and current elementTypes
   const nearbyInteractiveElements = nearbyInteractiveElementIds.map(({ elementId, elementTypeId, distance, x, y }) => {
     const elementType = elementTypes[elementTypeId];
-    return elementType ? { elementId, elementTypeId, elementType, distance, x, y } : null;
+    return elementType ? {element: {id: elementId}, elementType} : null;
   }).filter(Boolean);
   console.log(nearbyInteractiveElementIds, nearbyInteractiveElements);
   return game && player && (
@@ -769,55 +1027,77 @@ export default function GamePage({session, userProfile}) {
       </Head>
       <div
         className={`${geistSans.variable} ${geistMono.variable}`}
+        style={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden',
+          backgroundColor: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
       >
-        <HUD
-          isEditing={isEditing}
-          setIsEditing={setIsEditing}
-          game={game}
-          updateGame={updateGame}
-          elementTypes={elementTypes}
-          setElementTypes={setElementTypes}
-          session={session}
-          userProfile={userProfile}
-          drawingMode={drawingMode}
-          setDrawingMode={setDrawingMode}
-          selectedMaterialId={selectedMaterialId}
-          setSelectedMaterialId={setSelectedMaterialId}
-          stateRef={stateRef}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          createMapElement={createMapElement}
-          player={player}
-          selectedPolygonId={selectedPolygonId}
-          nearbyInteractiveElements={nearbyInteractiveElements}
-          onCraft={handleCraft}
-          onSell={handleSell}
-          onBuy={handleBuy}
-          onUseTool={handleUseTool}
-        />
-        <Map
-          game={game}
-          elementTypes={elementTypes}
-          isEditing={isEditing}
-          updateGame={updateGame}
-          debouncedUpdateGame={updateGameForDrawing}
-          drawingMode={drawingMode}
-          selectedMaterialId={selectedMaterialId}
-          stateRef={stateRef}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          stageSize={stageSize}
-          setStageSize={setStageSize}
-          player={player}
-          selectedPolygonId={selectedPolygonId}
-          setSelectedPolygonId={setSelectedPolygonId}
-          onDeselectAll={handleDeselectAll}
-          session={session}
-          setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
-        />
-
+        {/* Game Container - maxGameSize with centered positioning */}
+        <div style={{
+          position: 'relative',
+          width: stageSize.width,
+          height: stageSize.height,
+          // backgroundColor: '#cdceac',
+          backgroundColor: '#eee',
+        }}>
+          <HUD
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            game={game}
+            updateGame={updateGame}
+            elementTypes={elementTypes}
+            setElementTypes={setElementTypes}
+            session={session}
+            userProfile={userProfile}
+            drawingMode={drawingMode}
+            setDrawingMode={setDrawingMode}
+            selectedMaterialId={selectedMaterialId}
+            setSelectedMaterialId={setSelectedMaterialId}
+            stateRef={stateRef}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            createMapElement={createMapElement}
+            player={player}
+            selectedPolygonId={selectedPolygonId}
+            nearbyInteractiveElements={nearbyInteractiveElements}
+            onCraft={handleCraft}
+            onSell={handleSell}
+            onBuy={handleBuy}
+            onBuild={handleBuild}
+            onUseTool={handleUseTool}
+            onPlayNewInstance={handlePlayNewInstance}
+            stageSize={stageSize}
+          />
+          <Map
+            game={game}
+            elementTypes={elementTypes}
+            isEditing={isEditing}
+            updateGame={updateGame}
+            debouncedUpdateGame={updateGameForDrawing}
+            drawingMode={drawingMode}
+            selectedMaterialId={selectedMaterialId}
+            stateRef={stateRef}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            stageSize={stageSize}
+            setStageSize={setStageSize}
+            player={player}
+            selectedPolygonId={selectedPolygonId}
+            setSelectedPolygonId={setSelectedPolygonId}
+            onDeselectAll={handleDeselectAll}
+            session={session}
+            setNearbyInteractiveElementIds={setNearbyInteractiveElementIds}
+            advanceTime={advanceTime}
+            tentativeMapObject={tentativeMapObject}
+          />
+        </div>
 
         {/* Action Modal */}
         <ActionModal
@@ -827,6 +1107,9 @@ export default function GamePage({session, userProfile}) {
           elementTypes={elementTypes}
           player={player}
         />
+
+        {/* Film Noise Overlay */}
+        <FilmNoise opacity={0.4} intensity={0.2} />
       </div>
     </>
   );
