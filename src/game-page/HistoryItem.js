@@ -1,22 +1,35 @@
 import { Button } from './Button';
-import { Currency } from './Currency';
-import { formatTime } from './helpers';
+import { getActionColor } from './actionColors';
 
-export function HistoryItem({ historyItem, game, onLoadCheckpoint }) {
+export function HistoryItem({ historyItem, onLoadCheckpoint }) {
   const { type, content } = historyItem;
 
   if (type === 'prompt') {
+    // Filter out instance IDs and position text from display
+    const displayContent = content
+      .replace(/\s*\(Instance \d+\)/g, '')
+      .replace(/\s+at position \([^)]+\)/g, '');
+
+    // Extract action type from prompt (first word)
+    const actionType = displayContent.split(' ')[0];
+    const actionColor = getActionColor(actionType);
+
     return (
-      <p style={{ fontWeight: 'bold', marginTop: 20, marginBottom: 20, color: '#0066cc' }}>
-        &gt; {content}
+      <p style={{
+        marginTop: 20,
+        marginBottom: 20,
+        fontSize: 24,
+        color: '#ffffffff',
+      }}>
+        {displayContent}
       </p>
     );
   }
 
   if (type === 'error') {
     return (
-      <div style={{ padding: '10px', backgroundColor: '#fee', borderLeft: '3px solid #f44336', color: '#c33' }}>
-        ⚠️ {content.message}
+      <div style={{color: 'rgba(153, 153, 153, 1)', fontStyle: 'italic'}}>
+        {content.message}
       </div>
     );
   }
@@ -48,66 +61,86 @@ export function HistoryItem({ historyItem, game, onLoadCheckpoint }) {
   }
 
   if (type === 'response') {
+    // Group updates by type for display
+    const updateSummary = {};
+
+    if (content.updates && content.updates.length > 0) {
+      content.updates.forEach(update => {
+        const { type: updateType, path, value } = update;
+
+        // Extract meaningful info from path
+        const pathParts = path.split('.');
+
+        // Inventory changes
+        if (path.includes('.inventory.')) {
+          const itemName = pathParts[pathParts.length - 1];
+          if (!updateSummary.inventory) updateSummary.inventory = {};
+          if (updateType === 'set') {
+            updateSummary.inventory[itemName] = value;
+          }
+        }
+        // Element instance changes (building/harvesting)
+        else if (path.includes('.elementInstances.')) {
+          if (updateType === 'set') {
+            if (value && value.element) {
+              if (!updateSummary.added) updateSummary.added = [];
+              updateSummary.added.push(value.element);
+            }
+          } else if (updateType === 'unset') {
+            if (!updateSummary.removed) updateSummary.removed = [];
+            updateSummary.removed.push(pathParts[pathParts.length - 1]);
+          }
+        }
+        // Clock changes
+        else if (path.includes('.clock.')) {
+          const clockProp = pathParts[pathParts.length - 1];
+          if (clockProp === 'time') {
+            updateSummary.time = value;
+          } else if (clockProp === 'day') {
+            updateSummary.day = value;
+          }
+        }
+        // Character XP/level changes
+        else if (path.includes('.levels.') || path.includes('.xp')) {
+          if (!updateSummary.xp) updateSummary.xp = [];
+          updateSummary.xp.push({ path, value });
+        }
+      });
+    }
+
     return (
       <div style={{position: 'relative'}}>
-        {/* Timestamp from updatedClock */}
-        {content.updatedClock && (
-          <div style={{ opacity: 0.4, position: 'absolute', right: 'calc(100% + 15px)', whiteSpace: 'nowrap' }}>
-            Day {content.updatedClock.day}, {formatTime(content.updatedClock.time)}
-          </div>
-        )}
-
         {/* Story text */}
-        {/* {content.additionalStoryText && (
-          <p style={{ whiteSpace: 'pre-wrap' }}>{content.additionalStoryText}</p>
-        )} */}
-
-        {/* Items sold */}
-        {content.itemsSold && Object.keys(content.itemsSold).length > 0 && (
-          <div style={{ padding: '8px', backgroundColor: '#f0f8ff', borderLeft: '3px solid #4CAF50', marginTop: '5px' }}>
-            <strong>Items Sold:</strong>
-            {Object.entries(content.itemsSold).map(([item, data]) => {
-              const qty = data.quantity;
-              const revenue = data.moneyMade;
-              return (
-                <div key={item} style={{ marginLeft: '10px' }}>
-                  • {qty}x {item}
-                  {revenue && <span style={{ marginLeft: '8px' }}>(+<Currency amount={revenue} />)</span>}
-                </div>
-              );
-            })}
-          </div>
+        {content.storyText && (
+          <p style={{ whiteSpace: 'pre-wrap', marginTop: '10px', marginBottom: '10px' }}>
+            {content.storyText}
+          </p>
         )}
 
-        {/* Money changes */}
-        {(content.netMoneyChange !== undefined && content.netMoneyChange !== 0) && (
-          <div style={{ marginTop: '20px' }}>
-            <div style={{
-              marginBottom: '5px'
-            }}>
-              Money: <Currency amount={content.updatedMoney} />
-              <span style={{ marginLeft: '8px', color: content.netMoneyChange >= 0 ? '#4CAF50' : '#F44336' }}>
-                ({(content.netMoneyChange) > 0 ? '+' : ''}<Currency amount={content.netMoneyChange} />)
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Inventory updates */}
-        {content.inventoryUpdates && Object.keys(content.inventoryUpdates).length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            {Object.entries(content.inventoryUpdates).map(([itemName, diff]) => {
-              const newValue = game.items?.[itemName]?.inventory || 0;
-
-              return (
-                <div key={itemName} style={{marginBottom: '5px' }}>
-                  {itemName}: {newValue}
-                  <span style={{ marginLeft: '8px', color: diff > 0 ? '#4CAF50' : '#F44336' }}>
-                    ({diff > 0 ? '+' : ''}{diff})
+        {/* Update summary */}
+        {Object.keys(updateSummary).length > 0 && (
+          <div style={{ fontSize: '0.9em', opacity: 0.7, marginTop: '8px' }}>
+            {/* Inventory changes */}
+            {updateSummary.inventory && (
+              <div style={{ marginBottom: '4px' }}>
+                {Object.entries(updateSummary.inventory).map(([item, qty]) => (
+                  <span key={item} style={{ marginRight: '12px' }}>
+                    {item}: {qty}
                   </span>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            )}
+            {/* Time/Day changes */}
+            {(updateSummary.time || updateSummary.day) && (
+              <div style={{ marginBottom: '4px' }}>
+                {updateSummary.day && <span>Day {updateSummary.day} </span>}
+                {updateSummary.time && (
+                  <span>
+                    {updateSummary.time[0]}:{String(updateSummary.time[1]).padStart(2, '0')} {updateSummary.time[2]}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

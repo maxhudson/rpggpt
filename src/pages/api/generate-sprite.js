@@ -28,43 +28,47 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { description, type = 'object', count = 3, userId } = req.body;
+    const { description, type = 'object', count = 3, userId, skipCredits = false } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
-    }
+    let profile = null;
+    let supabase = null;
 
-    // Initialize Supabase admin client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Only check credits if userId is provided and skipCredits is false
+    if (userId && !skipCredits) {
+      // Initialize Supabase admin client
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check user credits before proceeding
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', userId)
-      .single();
+      // Check user credits before proceeding
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('credits')
+        .eq('id', userId)
+        .single();
 
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
-      return res.status(500).json({ error: 'Failed to fetch user profile' });
-    }
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        return res.status(500).json({ error: 'Failed to fetch user profile' });
+      }
 
-    // Define credit cost using constant
-    const creditCost = K.spriteGenerationCost;
+      profile = profileData;
 
-    if (profile.credits < creditCost) {
-      return res.status(400).json({ error: 'Insufficient credits' });
-    }
+      // Define credit cost using constant
+      const creditCost = K.spriteGenerationCost;
 
-    // Deduct credits before generating
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ credits: profile.credits - creditCost })
-      .eq('id', userId);
+      if (profile.credits < creditCost) {
+        return res.status(400).json({ error: 'Insufficient credits' });
+      }
 
-    if (updateError) {
-      console.error('Error deducting credits:', updateError);
-      return res.status(500).json({ error: 'Failed to deduct credits' });
+      // Deduct credits before generating
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ credits: profile.credits - creditCost })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error deducting credits:', updateError);
+        return res.status(500).json({ error: 'Failed to deduct credits' });
+      }
     }
 
     // Different prompts for different object types using "low poly cartoon" style
@@ -119,11 +123,13 @@ ${transparentCanvas}`;
     try {
       results = await Promise.all(promises);
     } catch (generationError) {
-      // Revert credit deduction if generation fails
-      await supabase
-        .from('profiles')
-        .update({ credits: profile.credits })
-        .eq('id', userId);
+      // Revert credit deduction if generation fails (only if credits were deducted)
+      if (supabase && profile && userId) {
+        await supabase
+          .from('profiles')
+          .update({ credits: profile.credits })
+          .eq('id', userId);
+      }
 
       throw generationError;
     }
@@ -177,7 +183,19 @@ ${transparentCanvas}`;
         const cropWidth = maxX - minX + 1;
         const cropHeight = maxY - minY + 1;
 
-        // Create the cropped image (preserving original resolution)
+        // Make the crop square by taking the larger dimension
+        const squareSize = Math.max(cropWidth, cropHeight);
+
+        // Center the content in the square
+        const squareMinX = minX - Math.floor((squareSize - cropWidth) / 2);
+        const squareMinY = minY - Math.floor((squareSize - cropHeight) / 2);
+
+        // Clamp to image bounds
+        const finalMinX = Math.max(0, squareMinX);
+        const finalMinY = Math.max(0, squareMinY);
+        const finalSize = Math.min(squareSize, info.width - finalMinX, info.height - finalMinY);
+
+        // Create the cropped square image
         const croppedBuffer = await sharp(data, {
           raw: {
             width: info.width,
@@ -185,7 +203,7 @@ ${transparentCanvas}`;
             channels: 4
           }
         })
-          .extract({ left: minX, top: minY, width: cropWidth, height: cropHeight })
+          .extract({ left: finalMinX, top: finalMinY, width: finalSize, height: finalSize })
           .png()
           .toBuffer();
 
@@ -194,8 +212,8 @@ ${transparentCanvas}`;
         options.push({
           id: i,
           imageData: croppedImageBase64,
-          originalWidth: hasContent ? (maxX - minX + 1) : 50,
-          originalHeight: hasContent ? (maxY - minY + 1) : 50
+          originalWidth: hasContent ? finalSize : 50,
+          originalHeight: hasContent ? finalSize : 50
         });
       }
     }

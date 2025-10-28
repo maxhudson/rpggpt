@@ -37,9 +37,9 @@ export default function App({ Component, pageProps }) {
     };
   }, [router]);
 
-  // Check if the current route is an auth route (login, reset password)
+  // Check if the current route is an auth route (login, reset password) or public route
   const isAuthRoute = (path) => {
-    const authRoutes = ['/login', '/reset-password'];
+    const authRoutes = ['/login', '/reset-password', '/generate'];
     return authRoutes.includes(path);
   };
 

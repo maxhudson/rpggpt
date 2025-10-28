@@ -1,16 +1,16 @@
 
 export const surviville = {
-  title: "Surviville",
+  title: "A Ghost Town",
   description: "Classic town builder",
   quests: [
-    "Build Campsite",
-    "Attack Deer",
-    "Forage Berries",
+    "Harvest 5 branches to build a workbench",
+    "Build a workbench so you can craft an axe",
+    "Craft an axe so you can cut down a tree for wood",
+    "Harvest enough wood to build a basic shelter",
+    "Build a basic shelter so you can rest better and have more energy during the day",
+    "Forage for berries to keep your energy and health up",
     "Plant Bush",
-    "Craft Axe",
-    "Harvest Tree",
-    "Plant Tree",
-    "Attack Wolf"
+    "Plant Tree"
   ],
   enabledActions: {
     "Walk": {elementTypes: ["Objects", "Buildings", "Characters", "Plants"]},
@@ -19,12 +19,13 @@ export const surviville = {
     "Forage": {elementTypes: ["Plants"]},
     "Plant": {elementTypes: ["Items"]},
 
-    "Attack": {elementTypes: ["Animals", "Characters"]},
-    "Flee": {elementTypes: ["Animals"], notes: "Escape when being attacked"},
+    // "Attack": {elementTypes: ["Animals", "Characters"]},
+    // "Flee": {elementTypes: ["Animals"], notes: "Escape when being attacked"},
 
     "Build": {elementTypes: ["Buildings"]},
+    "Upgrade": {elementTypes: ["Buildings", "Items"]},
     "Deconstruct": {elementTypes: ["Buildings"]},
-    "Reside": {elementTypes: ["Buildings"]},
+    "Reside in": {elementTypes: ["Buildings"]},
     "Buy": {elementTypes: ["Buildings"]},
     "Sell": {elementTypes: ["Buildings"]},
 
@@ -38,8 +39,9 @@ export const surviville = {
         "Craft": {level: 10, xp: 0}
       }},
       "Hakira": {isPlayable: true, actions: {
-        "Attack": {level: 10, xp: 0},
+        "Plant": {level: 10, xp: 0},
         "Build": {level: 10, xp: 0},
+        // "Attack": {level: 10, xp: 0},
       }},
 
       "Tomislov": {isPlayable: false, actions: {
@@ -47,160 +49,351 @@ export const surviville = {
         "Build": {level: 3, xp: 0}
       }},
       "Luna": {isPlayable: false, actions: {
-        "Attack": {level: 3, xp: 0},
+        "Buy": {level: 5, xp: 0},
+        // "Attack": {level: 3, xp: 0},
         "Craft": {level: 4, xp: 0}
       }},
     },
     "Buildings": {
-      "Campsite": {maxLevel: 3, actions: {
-        "Build": {timeInHours: {base: 4, addPerLevel: 4}, cost: {base: {"Wood": 10, "Animal Hide": 6}, addPerLevel: {"Wood": 5, "Animal Hide": 4, "Stone": 2}}},
+      "Basic Shelter": {color: "#D2691E", spriteId: "Basic Shelter", maxLevel: 3, actions: {
+        "Build": {timeInHours: 4, cost: {"Wood": 10, "Animal Hide": 6}},
+        "Upgrade": {timeInHours: 4, cost: {"Wood": 5, "Animal Hide": 4, "Stone": 2}},
         "Deconstruct": {},
-        "Reside": {capacity: {base: 1, addPerLevel: 1}}
+        "Reside in": {capacity: {base: 1, addPerLevel: 1}}
       }},
-      "Cabin": {maxLevel: 3, actions: {
-        "Build": {timeInHours: {base: 200, addPerLevel: 200}, cost: {base: {"Wood": 100, "Stone": 50}, addPerLevel: {"Wood": 50, "Stone": 25}}},
+      "Cabin": {color: "#A0522D", maxLevel: 3, actions: {
+        "Build": {timeInHours: 200, cost: {"Wood": 100, "Stone": 50}},
+        "Upgrade": {timeInHours: 200, cost: {"Wood": 50, "Stone": 25}},
         "Deconstruct": {},
-        "Reside": {capacity: {base: 2, addPerLevel: 1}}
+        "Reside in": {capacity: {base: 2, addPerLevel: 1}}
       }},
-      "Smelter": {maxLevel: 5, actions: {
-        "Build": {timeInHours: {base: 50, addPerLevel: 50}, cost: {base: {"Stone": 30, "Clay": 20}, addPerLevel: {"Stone": 15, "Clay": 10}}},
+      "Smelter": {color: "#DC143C", maxLevel: 5, actions: {
+        "Build": {timeInHours: 50, cost: {"Stone": 30, "Clay": 20}},
+        "Upgrade": {timeInHours: 50, cost: {"Stone": 15, "Clay": 10}},
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Iron"]}
       }},
-      "Workbench": {maxLevel: 1, actions: {
-        "Build": {timeInHours: {base: 2}, cost: {base: {"Wood": 5, "Stone": 2}}},
+      "Workbench": {color: "#8B4513", maxLevel: 3, actions: {
+        "Build": {timeInHours: 2, cost: {"Wood": 5}},
+        "Upgrade": {timeInHours: 2, cost: {"Wood": 3}},
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Axe", "Pickaxe", "Bow"]}
       }},
-      "Trading Post": {maxLevel: 1, actions: {
-        "Build": {timeInHours: {base: 100}, cost: {base: {"Wood": 50, "Stone": 30, "Animal Hide": 10}}},
+      "Trading Post": {color: "#DAA520", maxLevel: 1, actions: {
+        "Build": {timeInHours: 100, cost: {"Wood": 50, "Stone": 30, "Animal Hide": 10}},
         "Deconstruct": {},
         "Buy": {prices: {"Berry": 5, "Wood": 2, "Stone": 3, "Animal Hide": 8, "Meat Cutlet": 12, "Mushroom": 4, "Fiber": 3, "Clay": 2, "Iron Ore": 10, "Iron": 20}},
         "Sell": {prices: {"Berry": 3, "Wood": 1, "Stone": 2, "Animal Hide": 5, "Meat Cutlet": 8, "Mushroom": 2, "Fiber": 2, "Clay": 1, "Iron Ore": 6, "Iron": 15}},
       }},
     },
     "Plants": {
-      "Tree": {actions: {
-        "Harvest": {output: {"Wood": [10, 20], "Tree Seed": [0, 1]}},
+      "Tree": {color: "#228B22", spriteId: "Tree", actions: {
+        "Harvest": {output: {"Wood": [10, 20], "Tree Seed": [0, 1]}, requiredItem: "Axe"},
+        "Plant": {timeInHours: 0.25, costs: {"Tree Seed": 1}}
       }},
-      "Berry Bush": {actions: {
-        "Forage": {output: {"Berry": [1, 10], "Berry Bush Seed": [0, 1]}}
+      "Berry Bush": {color: "#8B008B", spriteId: "Berry Bush", actions: {
+        "Forage": {output: {"Berry": [1, 10], "Berry Bush Seed": [0, 1]}},
+        "Plant": {timeInHours: 0.25, costs: {"Berry Bush Seed": 1}}
       }},
-      "Tall Grass": {actions: {
+      "Tall Grass": {color: "#90EE90", spriteId: "Tall Grass", actions: {
         "Forage": {output: {"Mushroom": [0, 5], "Fiber": [1, 5]}}
       }},
     },
     "Animals": {
       "Deer": {
+        color: "#D2691E",
         maxLevel: 10,
         stats: {base: {"Health": [15, 20], "Attack": 1, "Evasiveness": [3, 5]}, addPerLevel: {"Health": 2, "Attack": 1, "Evasiveness": 1}},
         actions: {
           "Attack": {},
-          "Harvest": {output: {"Meat Cutlet": 3, "Animal Hide": 2}}
+          "Harvest": {output: {"Meat Cutlet": 3, "Animal Hide": 2}, requiresZeroHealth: true}
         }
       },
       "Wolf": {
+        color: "#696969",
         maxLevel: 10,
         stats: {base: {"Health": [15, 20], "Attack": [3, 5], "Evasiveness": [5, 7]}, addPerLevel: {"Health": 3, "Attack": 1, "Evasiveness": 1}},
         actions: {
           "Attack": {},
-          "Harvest": {output: {"Meat Cutlet": 2, "Animal Hide": 1}},
+          "Harvest": {output: {"Meat Cutlet": 2, "Animal Hide": 1}, requiresZeroHealth: true},
           "Flee": {},
         }
       },
     },
     "Objects": {
       "Branch": {
-        actions: {"Harvest": {output: {"Wood": 1}}}
+        color: "#8B4513",
+        spriteId: "Branch",
+        actions: {"Harvest": {output: {"Wood": 1}}},
       },
       "Rock": {
+        color: "#808080",
+        spriteId: "Rock",
+        actions: {"Harvest": {output: {"Stone": 1}}}
+      },
+      "Boulder": {
+        color: "#696969",
         capacity: [20, 30],
-        actions: {"Harvest": {output: {"Stone": [5, 15]}}}
+        actions: {"Harvest": {output: {"Stone": [5, 15]}, requiredItem: "Pickaxe"}}
       },
       "Clay Deposit": {
+        color: "#CD853F",
         capacity: [500, 1000],
-        actions: {"Harvest": {output: {"Clay": [5, 15]}}}
+        actions: {"Harvest": {output: {"Clay": [5, 15]}, requiredItem: "Pickaxe"}}
       },
       "Iron Ore Deposit": {
+        color: "#B87333",
         capacity: [50, 100],
-        actions: {"Harvest": {output: {"Iron Ore": [1, 3]}}}
+        actions: {"Harvest": {output: {"Iron Ore": [1, 3]}, requiredItem: "Pickaxe"}}
       },
     },
     "Items": {
-      "Animal Hide": {},
-      "Wood": {},
-      "Stone": {actions: {
-        "Attack": {damage: [1, 2]}
-      }},
-      "Clay": {},
-      "Iron Ore": {},
-      "Fiber": {},
-      "Mushroom": {actions: {"Eat": {calories: 25}}},
+      "Animal Hide": {color: "#8B4513"},
+      "Wood": {color: "#8B4513"},
+      "Stone": {color: "#808080"},
+      "Clay": {color: "#CD853F"},
+      "Iron Ore": {color: "#B87333"},
+      "Fiber": {color: "#F5DEB3"},
+      "Mushroom": {color: "#A0522D", actions: {"Eat": {calories: 25}}},
 
-      "Berry": {actions: {"Eat": {calories: 50}}},
-      "Meat Cutlet": {actions: {"Eat": {calories: 100}}},
+      "Berry": {color: "#8B008B", actions: {"Eat": {calories: 50}}},
+      "Meat Cutlet": {color: "#DC143C", actions: {"Eat": {calories: 100}}},
 
-      "Iron": {actions: {
+      "Iron": {color: "#708090", actions: {
         "Craft": {timeInHours: 2, cost: {"Iron Ore": 2, "Wood": 1}}
       }},
 
-      "Tree Seed": {actions: {
-        "Plant": {timeInHours: 1, growsInto: "Tree"}
-      }},
-      "Berry Bush Seed": {actions: {
-        "Plant": {timeInHours: 1, growsInto: "Berry Bush"}
-      }},
+      "Tree Seed": {color: "#8B4513"},
+      "Berry Bush Seed": {color: "#8B008B"},
 
-      "Axe": {maxLevel: 5, actions: {
-        "Craft": {timeInHours: {base: 4, addPerLevel: 4}, cost: {base: {"Wood": 2, "Stone": 1}, addPerLevel: {"Wood": 2, "Stone": 1}}},
+      "Axe": {color: "#696969", maxLevel: 5, actions: {
+        "Craft": {timeInHours: 4, cost: {"Wood": 2, "Stone": 1}},
+        "Upgrade": {timeInHours: 4, cost: {"Wood": 2, "Stone": 1}},
         "Harvest": {compatibility: {"Plants": ["Tree"]}}
       }},
-      "Pickaxe": {maxLevel: 5, actions: {
-        "Craft": {timeInHours: {base: 4, addPerLevel: 4}, cost: {base: {"Wood": 4, "Stone": 2}, addPerLevel: {"Wood": 4, "Stone": 2}}},
-        "Harvest": {compatibility: {"Objects": ["Rock", "Clay Deposit", "Iron Ore Deposit"]}}
+      "Pickaxe": {color: "#696969", maxLevel: 5, actions: {
+        "Craft": {timeInHours: 4, cost: {"Wood": 4, "Stone": 2}},
+        "Upgrade": {timeInHours: 4, cost: {"Wood": 4, "Stone": 2}},
+        "Harvest": {compatibility: {"Objects": ["Boulder", "Clay Deposit", "Iron Ore Deposit"]}}
       }},
-      "Bow": {maxLevel: 10, actions: {
-        "Craft": {timeInHours: {base: 6, addPerLevel: 6}, cost: {base: {"Wood": 3, "Fiber": 2}, addPerLevel: {"Wood": 3, "Fiber": 2}}},
+      "Bow": {color: "#8B4513", maxLevel: 10, actions: {
+        "Craft": {timeInHours: 6, cost: {"Wood": 3, "Fiber": 2}},
+        "Upgrade": {timeInHours: 3, cost: {"Wood": 3, "Fiber": 2}},
         "Attack": {compatibility: {"Animals": ["Deer", "Wolf"]}, damage: {base: [5, 10], addPerLevel: [2, 3]}}
       }},
     },
     "Locations": {
-      "Forest": {
-        elementInstances: {
-          1: {x: 10, y: -10, type: "Tree"},
-          2: {x: 15, y: -5, type: "Berry Bush"},
-          3: {x: 20, y: -15, type: "Tall Grass"},
-          4: {x: 25, y: -20, type: "Rock"},
-          5: {x: 30, y: -25, type: "Clay Deposit"},
-          6: {x: 35, y: -30, type: "Iron Ore Deposit"},
-          7: {x: 40, y: -35, type: "Deer", level: 1, health: 17},
-          8: {x: 45, y: -40, type: "Wolf", level: 1, health: 18},
-          9: {x: 50, y: -45, type: "Campsite", level: 1},
-
-          // Hannes (active character)
-          10: {x: 0, y: 0, type: "Hannes"},
-
-          // Branch elements (for gathering wood)
-          11: {x: -20, y: 10, type: "Branch"},
-          12: {x: -10, y: 15, type: "Branch"},
-          13: {x: 5, y: 20, type: "Branch"},
-          14: {x: 25, y: 5, type: "Branch"},
-          15: {x: -15, y: -10, type: "Branch"},
-          16: {x: 10, y: 25, type: "Branch"},
-          17: {x: -25, y: -5, type: "Branch"},
-        },
-        inventory: {}
-      },
-      "The Cave": {
-        elementInstances: {},
-        inventory: {}
-      }
+      "Forest": {},
+      "The Cave": {}
     }
   },
   instance: {
     activeLocation: "Forest",
     activeCharacter: "Hannes",
-    clock: { day: 1, time: [8, 0, "am"] }
+    clock: { day: 1, time: [8, 0, "am"] },
+    storyText: "Hannes wakes up in the Forest alone. Hakira is missing.",
+    activeQuest: "Harvest 5 branches to build a workbench",
+    locations: {
+      "Forest": {
+        characters: {
+          "Hannes": {x: 0, y: 0, levels: {
+            "Forge": {level: 10, xp: 0},
+            "Craft": {level: 10, xp: 0},
+          }}
+        },
+        elementInstances: {
+          1: {x: 1, y: 0, collection: "Buildings", element: "Basic Shelter", level: 1},
+
+          10: {x: -1, y: -2, collection: "Plants", element: "Tree"},
+          23: {x: -2, y: -2, collection: "Objects", element: "Branch"},
+
+          11: {x: 2, y: -4, collection: "Plants", element: "Tree"},
+          12: {x: 3, y: -4, collection: "Plants", element: "Tree"},
+          20: {x: 2, y: -3, collection: "Objects", element: "Branch"},
+          21: {x: 3, y: -3, collection: "Objects", element: "Branch"},
+
+          30: {x: 3, y: -2, collection: "Plants", element: "Berry Bush"},
+          31: {x: 5, y: -2, collection: "Plants", element: "Berry Bush"},
+          32: {x: 5, y: -4, collection: "Plants", element: "Berry Bush"},
+
+          40: {x: 5, y: 1, collection: "Plants", element: "Tall Grass"},
+          41: {x: 3, y: 4, collection: "Plants", element: "Tall Grass"},
+          42: {x: 2, y: 4, collection: "Plants", element: "Tall Grass"},
+          43: {x: -3, y: 2, collection: "Plants", element: "Tall Grass"},
+
+          55: {x: 1, y: -3, collection: "Objects", element: "Rock"},
+          56: {x: 4, y: -1, collection: "Objects", element: "Rock"},
+          57: {x: 0, y: 4, collection: "Objects", element: "Rock"},
+          58: {x: -1, y: 3, collection: "Objects", element: "Rock"},
+
+          // Northern Forest - 50 trees with branches scattered throughout
+          // Path through forest: clear lane at x=0 going north
+
+          // West side of path (x: -8 to -1)
+          100: {x: -8, y: -5, collection: "Plants", element: "Tree"},
+          101: {x: -7, y: -5, collection: "Plants", element: "Tree"},
+          102: {x: -5, y: -5, collection: "Plants", element: "Tree"},
+          103: {x: -3, y: -5, collection: "Plants", element: "Tree"},
+          104: {x: -2, y: -5, collection: "Plants", element: "Tree"},
+
+          105: {x: -8, y: -7, collection: "Plants", element: "Tree"},
+          106: {x: -6, y: -7, collection: "Plants", element: "Tree"},
+          107: {x: -4, y: -7, collection: "Plants", element: "Tree"},
+          108: {x: -2, y: -7, collection: "Plants", element: "Tree"},
+          109: {x: -1, y: -7, collection: "Plants", element: "Tree"},
+
+          110: {x: -8, y: -9, collection: "Plants", element: "Tree"},
+          111: {x: -7, y: -9, collection: "Plants", element: "Tree"},
+          112: {x: -5, y: -9, collection: "Plants", element: "Tree"},
+          113: {x: -3, y: -9, collection: "Plants", element: "Tree"},
+          114: {x: -1, y: -9, collection: "Plants", element: "Tree"},
+
+          115: {x: -8, y: -11, collection: "Plants", element: "Tree"},
+          116: {x: -6, y: -11, collection: "Plants", element: "Tree"},
+          117: {x: -4, y: -11, collection: "Plants", element: "Tree"},
+          118: {x: -3, y: -11, collection: "Plants", element: "Tree"},
+          119: {x: -1, y: -11, collection: "Plants", element: "Tree"},
+
+          120: {x: -7, y: -13, collection: "Plants", element: "Tree"},
+          121: {x: -5, y: -13, collection: "Plants", element: "Tree"},
+          122: {x: -3, y: -13, collection: "Plants", element: "Tree"},
+          123: {x: -2, y: -13, collection: "Plants", element: "Tree"},
+
+          // East side of path (x: 1 to 8)
+          124: {x: 2, y: -5, collection: "Plants", element: "Tree"},
+          125: {x: 3, y: -5, collection: "Plants", element: "Tree"},
+          126: {x: 5, y: -5, collection: "Plants", element: "Tree"},
+          127: {x: 7, y: -5, collection: "Plants", element: "Tree"},
+          128: {x: 8, y: -5, collection: "Plants", element: "Tree"},
+
+          129: {x: 1, y: -7, collection: "Plants", element: "Tree"},
+          130: {x: 2, y: -7, collection: "Plants", element: "Tree"},
+          131: {x: 4, y: -7, collection: "Plants", element: "Tree"},
+          132: {x: 6, y: -7, collection: "Plants", element: "Tree"},
+          133: {x: 8, y: -7, collection: "Plants", element: "Tree"},
+
+          134: {x: 1, y: -9, collection: "Plants", element: "Tree"},
+          135: {x: 3, y: -9, collection: "Plants", element: "Tree"},
+          136: {x: 5, y: -9, collection: "Plants", element: "Tree"},
+          137: {x: 7, y: -9, collection: "Plants", element: "Tree"},
+          138: {x: 8, y: -9, collection: "Plants", element: "Tree"},
+
+          139: {x: 1, y: -11, collection: "Plants", element: "Tree"},
+          140: {x: 3, y: -11, collection: "Plants", element: "Tree"},
+          141: {x: 4, y: -11, collection: "Plants", element: "Tree"},
+          142: {x: 6, y: -11, collection: "Plants", element: "Tree"},
+          143: {x: 8, y: -11, collection: "Plants", element: "Tree"},
+
+          144: {x: 2, y: -13, collection: "Plants", element: "Tree"},
+          145: {x: 3, y: -13, collection: "Plants", element: "Tree"},
+          146: {x: 5, y: -13, collection: "Plants", element: "Tree"},
+          147: {x: 7, y: -13, collection: "Plants", element: "Tree"},
+
+          // Additional trees to reach 50
+          148: {x: -6, y: -6, collection: "Plants", element: "Tree"},
+          149: {x: 6, y: -6, collection: "Plants", element: "Tree"},
+
+          // Branches scattered among trees
+          200: {x: -7, y: -6, collection: "Objects", element: "Branch"},
+          201: {x: -4, y: -6, collection: "Objects", element: "Branch"},
+          202: {x: -2, y: -6, collection: "Objects", element: "Branch"},
+          203: {x: -6, y: -8, collection: "Objects", element: "Branch"},
+          204: {x: -3, y: -8, collection: "Objects", element: "Branch"},
+          205: {x: -1, y: -8, collection: "Objects", element: "Branch"},
+          206: {x: -7, y: -10, collection: "Objects", element: "Branch"},
+          207: {x: -4, y: -10, collection: "Objects", element: "Branch"},
+          208: {x: -2, y: -10, collection: "Objects", element: "Branch"},
+          209: {x: -5, y: -12, collection: "Objects", element: "Branch"},
+          210: {x: 3, y: -6, collection: "Objects", element: "Branch"},
+          211: {x: 5, y: -6, collection: "Objects", element: "Branch"},
+          212: {x: 7, y: -6, collection: "Objects", element: "Branch"},
+          213: {x: 2, y: -8, collection: "Objects", element: "Branch"},
+          214: {x: 5, y: -8, collection: "Objects", element: "Branch"},
+          215: {x: 7, y: -8, collection: "Objects", element: "Branch"},
+          216: {x: 2, y: -10, collection: "Objects", element: "Branch"},
+          217: {x: 4, y: -10, collection: "Objects", element: "Branch"},
+          218: {x: 6, y: -10, collection: "Objects", element: "Branch"},
+          219: {x: 4, y: -12, collection: "Objects", element: "Branch"},
+
+          // Southern area - Tall Grass scattered around
+          300: {x: -5, y: 2, collection: "Plants", element: "Tall Grass"},
+          301: {x: -3, y: 3, collection: "Plants", element: "Tall Grass"},
+          302: {x: -1, y: 2, collection: "Plants", element: "Tall Grass"},
+          303: {x: 2, y: 2, collection: "Plants", element: "Tall Grass"},
+          304: {x: 5, y: 2, collection: "Plants", element: "Tall Grass"},
+          305: {x: 7, y: 2, collection: "Plants", element: "Tall Grass"},
+
+          306: {x: -6, y: 5, collection: "Plants", element: "Tall Grass"},
+          307: {x: -4, y: 5, collection: "Plants", element: "Tall Grass"},
+          308: {x: -1, y: 5, collection: "Plants", element: "Tall Grass"},
+          309: {x: 2, y: 5, collection: "Plants", element: "Tall Grass"},
+          310: {x: 4, y: 5, collection: "Plants", element: "Tall Grass"},
+          311: {x: 6, y: 5, collection: "Plants", element: "Tall Grass"},
+
+          312: {x: -7, y: 7, collection: "Plants", element: "Tall Grass"},
+          313: {x: -4, y: 7, collection: "Plants", element: "Tall Grass"},
+          314: {x: -2, y: 7, collection: "Plants", element: "Tall Grass"},
+          315: {x: 1, y: 7, collection: "Plants", element: "Tall Grass"},
+          316: {x: 3, y: 7, collection: "Plants", element: "Tall Grass"},
+          317: {x: 5, y: 7, collection: "Plants", element: "Tall Grass"},
+          318: {x: 7, y: 7, collection: "Plants", element: "Tall Grass"},
+
+          319: {x: -6, y: 9, collection: "Plants", element: "Tall Grass"},
+          320: {x: -3, y: 9, collection: "Plants", element: "Tall Grass"},
+          321: {x: 0, y: 9, collection: "Plants", element: "Tall Grass"},
+          322: {x: 2, y: 9, collection: "Plants", element: "Tall Grass"},
+          323: {x: 4, y: 9, collection: "Plants", element: "Tall Grass"},
+          324: {x: 6, y: 9, collection: "Plants", element: "Tall Grass"},
+
+          // Southern area - Rocks scattered around
+          400: {x: -7, y: 3, collection: "Objects", element: "Rock"},
+          401: {x: -4, y: 3, collection: "Objects", element: "Rock"},
+          402: {x: 1, y: 3, collection: "Objects", element: "Rock"},
+          403: {x: 3, y: 3, collection: "Objects", element: "Rock"},
+          404: {x: 6, y: 3, collection: "Objects", element: "Rock"},
+
+          405: {x: -8, y: 5, collection: "Objects", element: "Rock"},
+          406: {x: -5, y: 5, collection: "Objects", element: "Rock"},
+          407: {x: -2, y: 5, collection: "Objects", element: "Rock"},
+          408: {x: 1, y: 5, collection: "Objects", element: "Rock"},
+          409: {x: 4, y: 6, collection: "Objects", element: "Rock"},
+          410: {x: 7, y: 6, collection: "Objects", element: "Rock"},
+
+          411: {x: -6, y: 7, collection: "Objects", element: "Rock"},
+          412: {x: -3, y: 8, collection: "Objects", element: "Rock"},
+          413: {x: 0, y: 8, collection: "Objects", element: "Rock"},
+          414: {x: 3, y: 8, collection: "Objects", element: "Rock"},
+          415: {x: 5, y: 8, collection: "Objects", element: "Rock"},
+          416: {x: 8, y: 8, collection: "Objects", element: "Rock"},
+
+          417: {x: -7, y: 10, collection: "Objects", element: "Rock"},
+          418: {x: -4, y: 10, collection: "Objects", element: "Rock"},
+          419: {x: -1, y: 10, collection: "Objects", element: "Rock"},
+          420: {x: 2, y: 10, collection: "Objects", element: "Rock"},
+          421: {x: 5, y: 10, collection: "Objects", element: "Rock"},
+          422: {x: 7, y: 10, collection: "Objects", element: "Rock"},
+
+          // // Resource deposits (far corners)
+          // 60: {x: 24, y: -20, collection: "Objects", element: "Boulder"},
+          // 61: {x: -25, y: 19, collection: "Objects", element: "Clay Deposit"},
+          // 62: {x: 22, y: 22, collection: "Objects", element: "Iron Ore Deposit"},
+
+          // // Deer near different biome areas
+          // 70: {x: 19, y: 1, collection: "Animals", element: "Deer", level: 1, health: 17},
+          // 71: {x: -15, y: -13, collection: "Animals", element: "Deer", level: 1, health: 18},
+          // 72: {x: -7, y: 16, collection: "Animals", element: "Deer", level: 1, health: 16},
+
+          // // Wolf in the dangerous northwest area
+          // 80: {x: -22, y: -18, collection: "Animals", element: "Wolf", level: 1, health: 18},
+        },
+        inventory: {}
+      },
+      "The Cave": {
+        characters: {},
+        elementInstances: {},
+        inventory: {}
+      }
+    }
   }
 };
 

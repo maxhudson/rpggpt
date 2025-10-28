@@ -9,87 +9,99 @@ Previous history: ${JSON.stringify(history, null, 2)}
 
 Generate a JSON response with the following structure:
 {
-  "additionalStoryText": "Describe what happened next in the story very concisely.",
-  "gameUpdates": {
-    "updates": [
-      ["clock.day": 1],
-      ["clock.time": [7, 30, "am"]],
-
-      //i.e. "Travel Home"
-      ["location": "Home"]
-
-      //i.e. "Build House"
-      ["locations.Home.elements.House", ]
-      ["]
-
-
-      //i.e. "Craft Stew"
-      ["items.Stew.inventory": 1], //new inventory value after action
-
-
-    },
-    "deletions": [
-      //i.e. Deconstruct House
-      ["locations.", "House1"]
-    ],
-
-  "items": {
-    "Lemons": {"inventory": 2},
-    "Serving of Ice": {"inventory": 1},
-  },
-  "itemsSold": { //sales happen naturally over time based on specified market behavior by location - they should reduce inventory and increase money correspondingly, in addition to any other side-effect costs/incomes from the selected action
-    "Lemonade": {"quantity": 3, "revenue": 15}
-  },
-  "moneySpent": 10, //money spent on purchases, fees, etc. (optional)
-  "grossMoneyMade": 15, //revenue before expenses (optional)
-  "updatedMoney": {
-    <new money amount if changed (optional)>,
-  ",
-  "gameOverMessage": null, //or a string explaining why the game is over if any gameOverConditions are met
-  "nextAvailableActions": [
-    {
-      "type": "Travel",
-      "options": [
-        {"label": "Grocery Store", "costs": {"minutes": 10}},
-        {"label": "Park", "costs": {"minutes": 15}}
-      ]
-    },
-    {
-      "type": "Craft",
-      "options": [
-        {"label": "Lemonade", "costs": {"minutes": 0.5, "Lemons": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Cup": 1}}
-      ]
-    },
-    {
-      "type": "Investigate", "label": "Search near the window"}
-  ]
+  "storyText": "Describe what happened as a result of the action. Be concise but engaging.",
+  "updates": [
+    {"type": "set", "path": "instance.clock.day", "value": 1},
+    {"type": "set", "path": "instance.clock.time", "value": [7, 30, "am"]},
+    {"type": "set", "path": "instance.activeLocation", "value": "Forest"},
+    {"type": "set", "path": "instance.locations.Forest.characters.Hannes.x", "value": 10},
+    {"type": "set", "path": "instance.locations.Forest.characters.Hannes.y", "value": -5},
+    {"type": "set", "path": "instance.locations.Forest.inventory.Wood", "value": 15},
+    {"type": "set", "path": "instance.locations.Forest.elementInstances.50", "value": {"x": 25, "y": -10, "collection": "Buildings", "element": "Workbench", "level": 1}},
+    {"type": "unset", "path": "instance.locations.Forest.elementInstances.11"}
+  ],
+  "success": true,
+  "gameOverMessage": null
 }
 
-Rules:
-- IMPORTANT: Only use "options" array for Go/Travel, Buy, Craft, Build, and Plant actions (actions that loop over collections like locations, items, buildings, seeds). All other actions (Hum, Sleep, Investigate, Talk, Fight, etc.) should be direct actions without options - just {"type": "ActionName", "label": "2-5 words providing context"}.
-- Never extend the schema beyond current structure
-- Only allow actions that are possible given current inventory, money, time, and location
-- Update clock based on time costs
-- Write engaging story text for each action
-- Don't allow users to craft/build/buy/sell things not in the spec
-- Don't allow the user to buy items they can't afford or have not yet unlocked - don't allow user to buy anything that doesn't have a cost defined.
-- Don't apply multiple actions at once other than selling - for example, Renting should not automatically happen just because you Travel somewhere.
-- Check gameOverConditions each turn. If any condition is met, set gameOverMessage to a descriptive string explaining what happened.
-- If action cannot be completed (insufficient inventory, money, etc), respond with:
-  {"success": false, "message": "You don't have enough inventory to craft X" or "You can't afford that"}
-- Don't create any new items, locations, actions, etc that are not already defined in the game.`;
+Action Implementation Rules:
 
-  // Add Build-specific rule if Build actions exist
-  if (game.availableActions?.some(a => a.type === 'Build')) {
-    prompt += '\n- Build actions: Only include buildings the player can currently afford (check money and building materials). Users select one building at a time.';
+${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => {
+  const validCollections = actionConfig.elementTypes || [];
+
+  let implementation = '';
+  switch(actionName) {
+    case 'Harvest':
+      implementation = 'Valid on: Plants, Objects. (1) Check requiredTool in inventory, (2) Set inventory with harvested items, (3) UNSET the harvested elementInstance';
+      break;
+    case 'Build':
+      implementation = 'Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in inventory meet cost requirements - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory';
+      break;
+    case 'Craft':
+      implementation = 'Valid on: Items. (1) VERIFY all materials in inventory meet cost requirements - reject if insufficient, (2) Increase crafted item in inventory, (3) Decrease materials from inventory';
+      break;
+    case 'Plant':
+      implementation = 'Valid on: Plants. User prompt includes "at position (x, y)". Plant action has costs (e.g., "Tree Seed": 1). (1) VERIFY all costs are met in inventory - reject if not, (2) Create new elementInstance (Plant) at specified x,y coordinates, (3) Decrease costs from inventory';
+      break;
+    case 'Deconstruct':
+      implementation = 'Valid on: Buildings. (1) UNSET the building elementInstance, (2) Return partial materials to inventory based on level';
+      break;
+    case 'Attack':
+      implementation = 'Valid on: Animals. (1) Calculate combat (Health, Attack, Evasiveness), (2) Reduce animal Health or kill, (3) Add loot to inventory if killed';
+      break;
+    case 'Buy':
+      implementation = 'Valid on: Buildings (Trading Post). (1) Check building.actions.Buy.prices for item cost, (2) VERIFY player has sufficient money - reject if not, (3) Add item to inventory, (4) Decrease money';
+      break;
+    case 'Sell':
+      implementation = 'Valid on: Buildings (Trading Post). (1) Check building.actions.Sell.prices for item value, (2) VERIFY item exists in inventory - reject if not, (3) Remove item from inventory, (4) Increase money';
+      break;
+    case 'Travel':
+      implementation = 'Valid on: Locations. (1) Set instance.activeLocation to new location';
+      break;
+    default:
+      implementation = `Valid on: ${validCollections.join(', ')}. Check element definition for specific action rules.`;
   }
+  return `- ${actionName}: ${implementation}`;
+}).join('\n')}
 
-  // Add Plant-specific rule if Plant actions exist
-  if (game.availableActions?.some(a => a.type === 'Plant')) {
-    prompt += '\n- Plant actions: Allow quantity selection like Buy/Craft. Users can plant multiple seeds in one action.';
-  }
+General update rules:
+- Use "set" to create or update any value at a given path
+- Use "unset" to remove elements from elementInstances
+- Path uses dot notation: "instance.locations.Forest.inventory.Wood"
+- Update clock time based on action's timeInHours
+- Don't update character position (client handles movement)
 
-  prompt += '\n\nDon\'t include any other text or markdown formatting - we\'ll be calling JSON.parse() directly on your response';
+CRITICAL INVENTORY RULES:
+- NEVER allow negative inventory values
+- Before any action that costs materials (Build, Craft, Plant, Buy), check that ALL required items exist in sufficient quantity
+- If ANY required material is missing or insufficient, set success: false with a message explaining what's missing
+- Example: Building Workbench costs Wood: 5, Stone: 2. If inventory has Wood: 3, Stone: 2, reject with message "Not enough Wood (have 3, need 5)"
+- Only decrease inventory AFTER verifying all costs can be paid
+
+Time rules:
+- Time format is [hour, minute, period] where period is "am" or "pm"
+- Add timeInHours from action to current time
+- Advance day when time goes past 11:59pm
+- Actions without timeInHours cost 0 time (like Walk)
+
+Response format rules:
+- If action cannot be completed, respond with: {"success": false, "message": "Explanation of why it failed", "updates": []}
+- If game over condition is met, set gameOverMessage to explanation string
+- IMPORTANT: Don't include any other text or markdown formatting - we'll be calling JSON.parse() directly on your response
+- Return ONLY the JSON object, no code blocks, no explanations
+
+Story text rules:
+- Keep story text concise (2-4 sentences)
+- Describe the immediate result of the action
+- Include any important state changes (items gained/lost, time passed, etc.)
+- Don't repeat information that's already visible in the UI
+
+Quest system:
+- instance.activeQuest is a string matching an entry in game.quests array (linear progression)
+- When user completes activeQuest (e.g., "Harvest Branch" when user harvests Branch), advance to next quest in array
+- Update: {"type": "set", "path": "instance.activeQuest", "value": "nextQuestString"}
+- If no more quests, unset activeQuest
+- Mention completion in storyText`;
 
   return prompt;
 }

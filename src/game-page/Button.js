@@ -1,9 +1,10 @@
-export function Button({ children, onClick, variant = 'filled', disabled = false, style = {} }) {
+export function Button({ children, onClick, variant = 'filled', disabled = false, active, theme, style = {} }) {
   const baseStyle = {
-    height: '40px',
+    height: '36px',
     padding: '0 16px',
-    backgroundColor: variant === 'outline' ? 'transparent' : (disabled ? '#E0DDD4' : '#111'),
-    color: disabled ? '#999' : '#ffffff',
+    backgroundColor: variant === 'outline' ? 'transparent' : (disabled ? '#E0DDD4' : (active ? '#555' : (theme === 'secondary' ? '#676767ff' : '#555555ff'))),
+
+    color: disabled ? '#999' : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: '14px',
     border: 'none',
@@ -11,11 +12,12 @@ export function Button({ children, onClick, variant = 'filled', disabled = false
     transition: 'all 0.2s',
     fontFamily: 'inherit',
     transform: 'translateY(0)',
+    opacity: 1,
     ...style
   };
 
   const hoverStyle = !disabled ? {
-    backgroundColor: variant === 'outline' ? '#555' : '#555',
+    opacity: 0.9,
     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
     transform: 'translateY(-2px)'
   } : {};
