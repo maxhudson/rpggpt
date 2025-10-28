@@ -14,7 +14,7 @@ if (typeof window !== 'undefined') {
   Konva = require('konva');
 }
 
-export default function MapSimpleCharacter({
+const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
   x,
   y,
   isWalking = false
@@ -99,4 +99,13 @@ export default function MapSimpleCharacter({
       </>)}
     </Group>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if position or walking state changes
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.isWalking === nextProps.isWalking
+  );
+});
+
+export default MapSimpleCharacter;

@@ -15,7 +15,7 @@ if (typeof window !== 'undefined') {
   Konva = require('konva');
 }
 
-export default function MapSimpleObject({
+const MapSimpleObject = React.memo(function MapSimpleObject({
   instance,
   instanceId,
   elementDef,
@@ -61,11 +61,11 @@ export default function MapSimpleObject({
             ref={imageRef}
             image={image}
             width={imageSize}
-            height={imageSize * (spriteData.yScale || 1)}
+            height={imageSize / yScale}
             x={-imageSize / 2 + spriteData.width * cellSize / 2}
-            y={(spriteData.yOffset || 0) * cellSize - imageSize + spriteData.width * cellSize * yScale / 2 * (spriteData.imageScale || 1)}
-            filters={Konva ? [Konva.Filters.Pixelate] : []}
-            pixelSize={8}
+            y={(spriteData.yOffset || 0) * cellSize / yScale - imageSize / yScale + spriteData.width * cellSize / 2 * (spriteData.imageScale || 1)}
+            // filters={Konva ? [Konva.Filters.Pixelate] : []}
+            // pixelSize={8}
           />
         </>
       ) : (
@@ -86,4 +86,16 @@ export default function MapSimpleObject({
       )}
     </Group>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.opacity === nextProps.opacity &&
+    prevProps.instanceId === nextProps.instanceId &&
+    prevProps.instance.level === nextProps.instance.level &&
+    prevProps.displayText === nextProps.displayText
+  );
+});
+
+export default MapSimpleObject;

@@ -1,5 +1,5 @@
 var sprites = {
-  "Branch": {width: 1, yOffset: 0.48, yScale: 0.8, imageScale: 0.6, shadowScale: 0.4, shadowOpacity: 0.8},
+  "Branch": {width: 1, yOffset: 0.43, yScale: 0.8, imageScale: 0.6, shadowScale: 0.4, shadowOpacity: 0.8},
   "Berry Bush": {width: 1, yOffset: 0.3, imageScale: 0.8, shadowScale: 0.7},
   "Tree": {width: 1, yOffset: 0.08, height: 2.5, shadowScale: 0.7},
   "Rock": {width: 1, yOffset: 0.35, imageScale: 0.4, shadowScale: 0.6, shadowOpacity: 0.6},

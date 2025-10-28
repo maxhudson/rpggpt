@@ -116,14 +116,6 @@ export default function MapSimple({
   const sortedElements = [...elementInstances].sort((a, b) => a[1].y - b[1].y);
 
   const yScale = 0.75; // 45-degree camera angle
-  var offset = {
-    x: stageSize.width / 2 + -playerPosition.x * cellSize,
-    y: stageSize.height / 2 + -playerPosition.y * cellSize * yScale
-  };
-
-  // Calculate background position for infinite checkerboard
-  const bgX = offset.x % (cellSize * 2);
-  const bgY = (offset.y) % (cellSize * 2);
 
   return (
     <Stage
@@ -134,13 +126,19 @@ export default function MapSimple({
         background: 'linear-gradient(to top left, #a3b488, #afb98dff)'
       }}
     >
-      <Layer>
+      <Layer
+        x={stageSize.width / 2}
+        y={stageSize.height / 2}
+        scaleY={yScale}
+        offsetX={playerPosition.x * cellSize}
+        offsetY={playerPosition.y * cellSize}
+      >
         {/* Render shadows for all elements */}
         {sortedElements.map(([instanceId, instance]) => {
           const spriteConfig = sprites[instance.element] || {};
           const width = cellSize * (spriteConfig.width || 1);
           const shadowScale = spriteConfig.shadowScale || 1;
-          var height = width * yScale;
+          var height = width;
 
           // Full opacity only for the nearest object, reduced for all others
           const isNearest = instanceId === nearestInstanceId;
@@ -149,15 +147,15 @@ export default function MapSimple({
           return (<>
             <Rect
               key={`shadow-${instanceId}`}
-              x={offset.x + instance.x * cellSize + 1}
-              y={offset.y + (instance.y * cellSize) * yScale + 1}
+              x={instance.x * cellSize + 1}
+              y={instance.y * cellSize + 1}
               width={width - 2}
               height={height - 2}
               fill={`rgba(0, 0, 0, ${opacity * 0.2})`}
             />
             {sprites[instance.element] && spriteConfig.shadowScale !== 0 && (<Ellipse
-              x={offset.x + instance.x * cellSize + width / 2}
-              y={offset.y + (instance.y * cellSize) * yScale + height / 2}
+              x={instance.x * cellSize + width / 2}
+              y={instance.y * cellSize + height / 2}
               radiusX={width / 2 * shadowScale}
               radiusY={height / 2 * shadowScale}
               fill={`rgba(0, 0, 0, 0.1)`}
@@ -168,10 +166,10 @@ export default function MapSimple({
 
         {/* Shadow for player character */}
         <Ellipse
-          x={stageSize.width / 2}
-          y={stageSize.height / 2 + 1}
+          x={playerPosition.x * cellSize}
+          y={playerPosition.y * cellSize + 1}
           radiusX={cellSize / 6}
-          radiusY={cellSize / 6 * yScale}
+          radiusY={cellSize / 6}
           fill="rgba(0, 0, 0, 0.1)"
         />
 
@@ -192,8 +190,8 @@ export default function MapSimple({
               instance={instance}
               instanceId={instanceId}
               elementDef={elementDef}
-              x={offset.x + instance.x * cellSize}
-              y={offset.y + (instance.y * cellSize * yScale)}
+              x={instance.x * cellSize}
+              y={instance.y * cellSize}
               opacity={opacity}
               displayText={displayText}
             />
@@ -203,8 +201,8 @@ export default function MapSimple({
         {/* Render active character (player) on top */}
         <MapSimpleCharacter
           characterName={activeCharacter}
-          x={stageSize.width / 2}
-          y={stageSize.height / 2}
+          x={playerPosition.x * cellSize}
+          y={playerPosition.y * cellSize}
           isWalking={isWalking}
         />
       </Layer>
