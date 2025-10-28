@@ -22,7 +22,8 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   x,
   y,
   opacity,
-  displayText
+  displayText,
+  characterIsBehind = false
 }) {
   const imageRef = useRef(null);
   const spriteId = elementDef?.spriteId;
@@ -54,7 +55,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   var yScale = 0.75;
 
   return (
-    <Group x={x} y={y}>
+    <Group x={x} y={y} opacity={characterIsBehind ? 0.5 : 1}>
       {image ? (
         <>
           <Image
@@ -94,7 +95,8 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     prevProps.opacity === nextProps.opacity &&
     prevProps.instanceId === nextProps.instanceId &&
     prevProps.instance.level === nextProps.instance.level &&
-    prevProps.displayText === nextProps.displayText
+    prevProps.displayText === nextProps.displayText &&
+    prevProps.characterIsBehind === nextProps.characterIsBehind
   );
 });
 

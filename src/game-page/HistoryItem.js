@@ -121,7 +121,7 @@ export function HistoryItem({ historyItem, onLoadCheckpoint }) {
         {Object.keys(updateSummary).length > 0 && (
           <div style={{ fontSize: '0.9em', opacity: 0.7, marginTop: '8px' }}>
             {/* Inventory changes */}
-            {updateSummary.inventory && (
+            {/* {updateSummary.inventory && (
               <div style={{ marginBottom: '4px' }}>
                 {Object.entries(updateSummary.inventory).map(([item, qty]) => (
                   <span key={item} style={{ marginRight: '12px' }}>
@@ -129,7 +129,7 @@ export function HistoryItem({ historyItem, onLoadCheckpoint }) {
                   </span>
                 ))}
               </div>
-            )}
+            )} */}
             {/* Time/Day changes */}
             {(updateSummary.time || updateSummary.day) && (
               <div style={{ marginBottom: '4px' }}>

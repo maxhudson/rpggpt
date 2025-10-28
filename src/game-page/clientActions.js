@@ -47,6 +47,18 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     };
   }
 
+  // For Forage, check if already foraged today
+  if (actionType === 'Forage' && instance.lastForaged) {
+    const currentDay = game.instance.clock.day;
+    if (instance.lastForaged >= currentDay) {
+      return {
+        success: false,
+        message: `The ${targetElement} has already been foraged today`,
+        updates: []
+      };
+    }
+  }
+
   // Check if required tool is present
   if (harvestAction.requiredItem) {
     const hasItem = location.inventory[harvestAction.requiredItem] > 0;
@@ -85,15 +97,37 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     }
   });
 
-  // Remove the harvested element
-  updates.push({
-    type: 'unset',
-    path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}`
-  });
+  // Remove the element only for Harvest, not for Forage
+  if (actionType === 'Harvest') {
+    updates.push({
+      type: 'unset',
+      path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}`
+    });
+  } else if (actionType === 'Forage') {
+    // Mark the instance as foraged today
+    updates.push({
+      type: 'set',
+      path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}.lastForaged`,
+      value: game.instance.clock.day
+    });
+  }
 
   // Update time (if specified)
   if (harvestAction.timeInHours) {
     const timeUpdate = calculateTimeUpdate(game.instance.clock, harvestAction.timeInHours);
+    if (timeUpdate) {
+      updates.push(timeUpdate);
+    }
+  } else if (harvestAction.timeInMinutes) {
+    let minutes;
+    if (Array.isArray(harvestAction.timeInMinutes)) {
+      // Random range [min, max]
+      const [min, max] = harvestAction.timeInMinutes;
+      minutes = Math.floor(Math.random() * (max - min + 1)) + min;
+    } else {
+      minutes = harvestAction.timeInMinutes;
+    }
+    const timeUpdate = calculateTimeUpdate(game.instance.clock, minutes / 60);
     if (timeUpdate) {
       updates.push(timeUpdate);
     }
@@ -186,7 +220,7 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
   }
 }
 
-function calculateTimeUpdate(clock, hoursToAdd) {
+export function calculateTimeUpdate(clock, hoursToAdd) {
   if (!hoursToAdd || hoursToAdd === 0) return null;
 
   let [hour, minute, period] = clock.time;
@@ -259,8 +293,8 @@ export function validateInventory(game, actionType, action) {
 
 /**
  * Checks if an action can be handled client-side
- * Disabled for now to allow AI to track quest progress
+ * Returns true for Harvest to enable instant client-side updates
  */
-export function canHandleClientSide() {
-  return false; // Disabled - let AI handle all actions for quest tracking
+export function canHandleClientSide(actionType) {
+  return actionType === 'Harvest' || actionType === 'Forage';
 }

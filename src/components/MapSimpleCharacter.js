@@ -81,16 +81,16 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
         <Ellipse
           radiusX={2.5}
           radiusY={2.5 / yScale}
-          fill="#ffffffff"
+          fill="#555"
           strokeWidth={2}
           x={0}
           y={0 - 23 / yScale}
           //shadow
-          shadowColor="#fff"
-          shadowBlur={5}
-          shadowOffsetX={0}
-          shadowOffsetY={0}
-          shadowOpacity={1}
+          // shadowColor="#fff"
+          // shadowBlur={5}
+          // shadowOffsetX={0}
+          // shadowOffsetY={0}
+          // shadowOpacity={1}
         />
         <Ellipse
           x={0}

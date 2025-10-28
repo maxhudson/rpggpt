@@ -9,7 +9,7 @@ import { HistoryItem } from './HistoryItem';
 import { getPrompt } from './getPrompt';
 import { formatTime, calculateAvailableActions } from './helpers';
 import { getActionColor } from './actionColors';
-import { handleClientAction, canHandleClientSide, validateInventory } from './clientActions';
+import { handleClientAction, canHandleClientSide, validateInventory, calculateTimeUpdate } from './clientActions';
 import { primaryFont } from '../styles/fonts';
 import styles from './GamePage.module.css';
 import { Tooltip } from 'react-tooltip';
@@ -71,9 +71,9 @@ export default function GamePage() {
   }
 
   // Methods to update refs
-  const updateGame = (newGame) => {
+  const updateGame = (newGame, {save=true}={}) => {
     gameRef.current = newGame;
-    if (typeof window !== 'undefined' && gameId) {
+    if (typeof window !== 'undefined' && gameId && save) {
       localStorage.setItem(`game-state-${gameId}`, JSON.stringify(newGame));
 
       // Update last played timestamp
@@ -98,6 +98,28 @@ export default function GamePage() {
       localStorage.setItem(`game-history-${gameId}`, JSON.stringify(newHistory));
     }
     forceUpdate();
+  };
+
+  // Save to localStorage without updating UI
+  var gameIdRef = useRef(null);
+
+  gameIdRef.current = gameId;
+
+  const saveToLocalStorage = (game) => {
+    console.log(gameId, game)
+    if (typeof window !== 'undefined' && gameIdRef.current) {
+      localStorage.setItem(`game-state-${gameIdRef.current}`, JSON.stringify(game));
+    }
+  };
+
+  // Debounced save using lodash - only saves to localStorage after movement stops
+  const debouncedSave = useRef(_.debounce(saveToLocalStorage, 100)).current;
+
+  // Update game in memory immediately, save to disk with debounce
+  const updateGameWithDebounce = (newGame) => {
+    gameRef.current = newGame;
+    forceUpdate();
+    debouncedSave(newGame);
   };
 
   const addToHistory = (historyItem) => {
@@ -180,10 +202,42 @@ export default function GamePage() {
       }
 
       let data;
+      let clientSideData = null;
+
       if (canHandleClientSide(extractedActionType) && action) {
-        // Handle client-side
-        data = handleClientAction(gameRef.current, extractedActionType, action);
-        console.log('Client-side action:', data);
+        // Handle client-side first for immediate feedback
+        clientSideData = handleClientAction(gameRef.current, extractedActionType, action);
+        console.log('Client-side action:', clientSideData);
+
+        if (clientSideData.success) {
+          // Apply client-side updates immediately
+          const newGame = applyUpdates(gameRef.current, clientSideData.updates);
+          updateGame(newGame);
+
+          // Add initial story text to history
+          addToHistory({
+            content: {
+              storyText: clientSideData.storyText,
+              updates: clientSideData.updates || []
+            },
+            type: 'response'
+          });
+        }
+
+        // // Still make API call to get quest updates and additional messages
+        // const response = await fetch('/api/handle-prompt', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //   },
+        //   body: JSON.stringify({ prompt: getPrompt(gameRef.current, historyRef.current, userInput) }),
+        // });
+
+        // data = await response.json();
+        // if (!response.ok) {
+        //   console.error('Error:', data.error);
+        //   return;
+        // }
       } else {
         // Use AI for complex actions
         const response = await fetch('/api/handle-prompt', {
@@ -204,47 +258,84 @@ export default function GamePage() {
       console.log(data);
 
       // Check for game over
-      if (data.gameOverMessage) {
+      if (data && data.gameOverMessage) {
         setIsGameOver(true);
         setGameOverMessage(data.gameOverMessage);
       }
 
       // Check if action failed
-      if (data.success === false) {
+      if (data && data.success === false) {
         // Show error message and redisplay previous state
         addToHistory({
           content: { error: true, message: data.message },
           type: 'error'
         });
-      } else {
-        // Add story text and updates to history
-        addToHistory({
-          content: {
-            storyText: data.storyText,
-            updates: data.updates || []
-          },
-          type: 'response'
-        });
+      } else if (data) {
+        // If we already handled client-side, only add additional story text and updates from AI
+        if (clientSideData && clientSideData.success) {
+          // Only add additional story text if AI provided something different
+          // if (data.storyText && data.storyText !== clientSideData.storyText) {
+          //   addToHistory({
+          //     content: {
+          //       storyText: data.storyText,
+          //       updates: []
+          //     },
+          //     type: 'response'
+          //   });
+          // }
 
-        // Apply delta updates to game state
-        if (data.updates && data.updates.length > 0) {
-          const oldDay = gameRef.current.instance?.clock?.day;
-          const newGame = applyUpdates(gameRef.current, data.updates);
-          const newDay = newGame.instance?.clock?.day;
+          // Apply any additional updates from AI (like quest progress)
+          // if (data.updates && data.updates.length > 0) {
+          //   const oldDay = gameRef.current.instance?.clock?.day;
+          //   const newGame = applyUpdates(gameRef.current, data.updates);
+          //   const newDay = newGame.instance?.clock?.day;
 
-          // Update the game first
-          updateGame(newGame);
+          //   // Update the game with additional updates
+          //   updateGame(newGame);
 
-          // If day changed, add checkpoint to history
-          if (oldDay && newDay && newDay > oldDay) {
-            addToHistory({
-              type: 'checkpoint',
-              content: {
-                day: newDay,
-                gameState: newGame,
-                timestamp: new Date().toISOString()
-              }
-            });
+          //   // If day changed, add checkpoint to history
+          //   if (oldDay && newDay && newDay > oldDay) {
+          //     addToHistory({
+          //       type: 'checkpoint',
+          //       content: {
+          //         day: newDay,
+          //         gameState: newGame,
+          //         timestamp: new Date().toISOString()
+          //       }
+          //     });
+          //   }
+          // }
+        } else {
+          // Normal flow for non-client-side actions
+          // Add story text and updates to history
+          addToHistory({
+            content: {
+              storyText: data.storyText,
+              updates: data.updates || []
+            },
+            type: 'response'
+          });
+
+          // Apply delta updates to game state
+          if (data.updates && data.updates.length > 0) {
+            const oldDay = gameRef.current.instance?.clock?.day;
+            const newGame = applyUpdates(gameRef.current, data.updates);
+            const newDay = newGame.instance?.clock?.day;
+
+            // Update the game first
+            updateGame(newGame);
+
+            // If day changed, add checkpoint to history
+            if (oldDay && newDay && newDay > oldDay) {
+              addToHistory({
+                type: 'checkpoint',
+                content: {
+                  day: newDay,
+                  gameState: newGame,
+                  timestamp: new Date().toISOString()
+                }
+              });
+            }
           }
         }
       }
@@ -271,9 +362,7 @@ export default function GamePage() {
     }}>
       <div>
         <div className={styles.storyWrapper}>
-          <h1 className={styles.title} style={{ fontSize: '48px', fontWeight: 400, marginBottom: 10 }}>{game.title}</h1>
-
-          <div style={{fontSize: '1em', marginBottom: 20, fontSize: '1.1rem', opacity: 0.5, top: 60, right: 40}}>
+          <div style={{fontSize: '1em', marginBottom: 20, fontSize: '1.1rem', top: 60, right: 40}}>
             <div>
               {game.instance?.clock && (
                 <span>Day {game.instance.clock.day}, {formatTime(game.instance.clock.time)}</span>
@@ -293,7 +382,8 @@ export default function GamePage() {
               <div style={{
                 marginTop: 12,
                 fontSize: '0.9em',
-                opacity: 0.85
+                opacity: 1,
+                color: '#ffffff',
               }}>
                 <div style={{marginBottom: 4, }}>
                   {game.instance.activeQuest}
@@ -305,7 +395,7 @@ export default function GamePage() {
           {/* Inventory Display */}
           {game.instance?.locations?.[game.instance.activeLocation]?.inventory &&
            Object.keys(game.instance.locations[game.instance.activeLocation].inventory).length > 0 && (
-            <div style={{position: 'fixed', top: 40, left: 40, zIndex: 100, display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: 1}}>
+            <div style={{position: 'fixed', top: 40, right: 40, zIndex: 100, display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: 1}}>
               {Object.entries(game.instance.locations[game.instance.activeLocation].inventory)
                 .filter(([, qty]) => qty > 0)
                 .map(([itemName, qty]) => {
@@ -324,7 +414,7 @@ export default function GamePage() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '14px',
-                        cursor: 'default'
+                        cursor: 'default',
                       }}
                       data-tooltip-id={`inventory-tooltip-${itemName}`}
                       data-tooltip-content={itemName.toUpperCase()}
@@ -336,13 +426,14 @@ export default function GamePage() {
                         left: 0,
                         right: 0,
                         bottom: 0,
+                        backgroundColor: '#555555ff',
                         backgroundColor: itemColor,
-                        opacity: 0.5,
+                        // opacity: 0.5,
                         pointerEvents: 'none'
                       }} />
 
                       {/* Content layer */}
-                      <span style={{ color: 'black', position: 'relative', zIndex: 1 }}>
+                      <span style={{ color: 'white', position: 'relative', zIndex: 1 }}>
                         {itemName.charAt(0).toUpperCase()}
                       </span>
                       <span style={{
@@ -350,7 +441,7 @@ export default function GamePage() {
                         position: 'absolute',
                         bottom: '2px',
                         right: '5px',
-                        color: 'black',
+                        color: 'white',
                         zIndex: 1
                       }}>
                         {qty}
@@ -593,7 +684,7 @@ export default function GamePage() {
                   width: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerWidth : window.innerWidth / 2) : 600,
                   height: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerHeight / 2 : window.innerHeight) : 600
                 }}
-                onPositionUpdate={(newPosition) => {
+                onPositionUpdate={(newPosition, options = {}) => {
                   // Update character position in game state
                   const locationName = gameRef.current.instance.activeLocation;
                   const characterName = gameRef.current.instance.activeCharacter;
@@ -603,8 +694,18 @@ export default function GamePage() {
                     { type: 'set', path: `instance.locations.${locationName}.characters.${characterName}.y`, value: newPosition.y }
                   ];
 
+                  // Add time progression if crossing cell boundaries (1 minute per cell)
+                  if (options.timeProgression) {
+                    const timeUpdate = calculateTimeUpdate(gameRef.current.instance.clock, 1 / 60); // 1 minute
+                    if (timeUpdate) {
+                      updates.push(timeUpdate);
+                    }
+                  }
+
                   const newGame = applyUpdates(gameRef.current, updates);
-                  updateGame(newGame);
+
+                  // Use debounced save for movement to avoid excessive localStorage writes
+                  updateGameWithDebounce(newGame);
                 }}
               />
               <FilmNoise opacity={0.2} intensity={0.2} />

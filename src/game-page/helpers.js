@@ -132,7 +132,7 @@ export const calculateAvailableActions = (game) => {
   }
 
   // Plant - show all plantable plants
-  if (game.enabledActions?.Plant) {
+  if (game.enabledActions?.Plant && !nearestObject) {
     const plants = game.elements.Plants || {};
     const plantOptions = Object.entries(plants)
       .filter(([, def]) => def.actions?.Plant)
@@ -169,6 +169,8 @@ export const calculateAvailableActions = (game) => {
           if (actionName === 'Harvest' && instance.collection === 'Animals' && instance.health && instance.health > 0) {
             return;
           }
+
+          if (actionName === 'Build' || actionName === 'Plant') return;
 
           // Special handling for Craft action on Buildings
           if (actionName === 'Craft' && instance.collection === 'Buildings') {

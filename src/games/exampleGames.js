@@ -24,13 +24,14 @@ export const surviville = {
 
     "Build": {elementTypes: ["Buildings"]},
     "Upgrade": {elementTypes: ["Buildings", "Items"]},
-    "Deconstruct": {elementTypes: ["Buildings"]},
     "Reside in": {elementTypes: ["Buildings"]},
     "Buy": {elementTypes: ["Buildings"]},
     "Sell": {elementTypes: ["Buildings"]},
 
     "Craft": {elementTypes: ["Items"]},
     "Eat": {elementTypes: ["Items"]},
+
+    "Deconstruct": {elementTypes: ["Buildings"]},
   },
   elements: {
     "Characters": {
@@ -88,15 +89,15 @@ export const surviville = {
     },
     "Plants": {
       "Tree": {color: "#228B22", spriteId: "Tree", actions: {
-        "Harvest": {output: {"Wood": [10, 20], "Tree Seed": [0, 1]}, requiredItem: "Axe"},
+        "Harvest": {output: {"Wood": [10, 20], "Tree Seed": [0, 1]}, requiredItem: "Axe", timeInMinutes: [45, 120]},
         "Plant": {timeInHours: 0.25, costs: {"Tree Seed": 1}}
       }},
       "Berry Bush": {color: "#8B008B", spriteId: "Berry Bush", actions: {
-        "Forage": {output: {"Berry": [1, 10], "Berry Bush Seed": [0, 1]}},
+        "Forage": {output: {"Berry": [1, 10], "Berry Bush Seed": [0, 1]}, timeInMinutes: [3, 8]},
         "Plant": {timeInHours: 0.25, costs: {"Berry Bush Seed": 1}}
       }},
       "Tall Grass": {color: "#90EE90", spriteId: "Tall Grass", actions: {
-        "Forage": {output: {"Mushroom": [0, 5], "Fiber": [1, 5]}}
+        "Forage": {output: {"Mushroom": [0, 5], "Fiber": [1, 5]}, timeInMinutes: [5, 15]}
       }},
     },
     "Animals": {
@@ -217,8 +218,6 @@ export const surviville = {
           32: {x: 5, y: -4, collection: "Plants", element: "Berry Bush"},
 
           40: {x: 5, y: 1, collection: "Plants", element: "Tall Grass"},
-          41: {x: 3, y: 4, collection: "Plants", element: "Tall Grass"},
-          42: {x: 2, y: 4, collection: "Plants", element: "Tall Grass"},
           43: {x: -3, y: 2, collection: "Plants", element: "Tall Grass"},
 
           55: {x: 1, y: -3, collection: "Objects", element: "Rock"},

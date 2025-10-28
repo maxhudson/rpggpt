@@ -34,6 +34,9 @@ ${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => 
     case 'Harvest':
       implementation = 'Valid on: Plants, Objects. (1) Check requiredTool in inventory, (2) Set inventory with harvested items, (3) UNSET the harvested elementInstance';
       break;
+    case 'Forage':
+      implementation = 'Valid on: Plants. Output items as specified. Keep plant instance unchanged other than setting a "lastForaged" clock value on it so we can keep the user from foraging too often.';
+      break;
     case 'Build':
       implementation = 'Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in inventory meet cost requirements - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory';
       break;
