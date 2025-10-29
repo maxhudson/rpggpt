@@ -113,10 +113,14 @@ Story text rules:
 - Don't repeat information that's already visible in the UI
 
 Quest system:
-- instance.activeQuest is a string matching an entry in game.quests array (linear progression)
-- When user completes activeQuest (e.g., "Harvest Branch" when user harvests Branch), advance to next quest in array
-- Update: {"type": "set", "path": "instance.activeQuest", "value": "nextQuestString"}
-- If no more quests, unset activeQuest
+- instance.activeQuest is a string ID
+- game.quests array contains quest definitions: objects {id, conditions: [{action, item/element, quantity}]} or plain strings
+- Object quests (with id): client-tracked, completion is automatic based on conditions (e.g., having 5 Wood in inventory)
+- String quests: AI-tracked, when user completes the quest objective, advance to next quest
+- To find quest details: lookup instance.activeQuest in game.quests array by matching quest.id or the string itself
+- When user completes AI-tracked activeQuest, advance to next quest in array
+- Update: {"type": "set", "path": "instance.activeQuest", "value": "nextQuest.id or nextQuestString"}
+- If no more quests, set activeQuest to null
 - Mention completion in storyText`;
 
   return prompt;

@@ -85,6 +85,64 @@ export default function HUD({
     setLastClearedIndex(lastMessageIndex);
   };
 
+  // Format quest display text with progress
+  const getQuestDisplayText = (questInput) => {
+    let quest = questInput;
+
+    // If quest is a string, try to find the matching quest object by ID
+    if (typeof questInput === 'string') {
+      const questList = game.quests || [];
+      const foundQuest = questList.find(q =>
+        (typeof q === 'object' && q.id === questInput)
+      );
+
+      // If found a quest object with matching ID, use it
+      if (foundQuest) {
+        quest = foundQuest;
+      } else {
+        // Otherwise it's an AI-tracked string quest, display as-is
+        return questInput;
+      }
+    }
+
+    // Object quests with conditions - show progress
+    if (quest.conditions && Array.isArray(quest.conditions)) {
+      const conditionTexts = quest.conditions.map(condition => {
+        const { action, item, element, quantity } = condition;
+        const targetName = item || element;
+
+        // Get current progress based on action type
+        let current = 0;
+        const location = game.instance?.locations?.[activeLocation];
+
+        if (action === 'Harvest' || action === 'Forage' || action === 'Craft') {
+          // Check inventory
+          current = inventory[targetName] || 0;
+        } else if (action === 'Build' || action === 'Plant') {
+          // Check built structures
+          const elementInstances = location?.elementInstances || {};
+          current = Object.values(elementInstances).filter(
+            instance => instance.element === targetName
+          ).length;
+        }
+
+        // Format the condition text
+        if (quantity && quantity > 1) {
+          return `${action} (${current}/${quantity}) ${targetName}`;
+        } else if (quantity === 1) {
+          return `${action} ${targetName}`;
+        } else {
+          // No quantity specified
+          return `${action} ${targetName}`;
+        }
+      });
+
+      // Combine all condition texts
+      return conditionTexts.join(' and ');
+    }
+    return '';
+  };
+
   return (
     <>
       {/* Top Center - Quest/Message, Time, Location */}
@@ -121,7 +179,7 @@ export default function HUD({
             </div>
           ) : activeQuest ? (
             <div className={styles.questDisplay}>
-              <TypingText text={activeQuest} speed={16} />
+              <TypingText text={getQuestDisplayText(activeQuest)} speed={16} />
             </div>
           ) : null}
         </div>

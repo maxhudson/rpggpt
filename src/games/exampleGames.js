@@ -3,15 +3,32 @@ export const surviville = {
   title: "Ghost Town",
   description: "Classic town builder",
   quests: [
-    // "Search for clues",
-    "Harvest 5 wood to build a workbench",
-    "Build a workbench so you can craft an axe",
-    "Craft an axe so you can cut down a tree",
-    "Harvest enough wood to build a basic shelter",
-    "Build a basic shelter so you can rest better and have more energy during the day",
-    "Forage for berries to keep your energy and health up",
-    "Plant Bush",
-    "Plant Tree"
+    // Object-based quests with completion conditions (client-side tracking)
+    {
+      id: "harvest_wood",
+      conditions: [
+        {action: "Harvest", item: "Wood", quantity: 5}
+      ]
+    },
+    {
+      id: "build_workbench",
+      conditions: [
+        {action: "Build", element: "Workbench", quantity: 1}
+      ]
+    },
+    {
+      id: "craft_axe",
+      conditions: [
+        {action: "Craft", item: "Axe", quantity: 1}
+      ]
+    },
+    { id: "harvest_shelter_costs", conditions: [{action: "Harvest", item: "Wood", quantity: 10}, {action: 'Harvest', item: "Fiber", quantity: 5}] },
+    { "id": "build_shelter", conditions: [{action: "Build", element: "Basic Shelter", quantity: 1}] },
+    { "id": "forage_berries", conditions: [{action: "Forage", element: "Berry", quantity: 1}] },
+    { id: "plant_bush", conditions: [{action: "Plant", element: "Berry Bush", quantity: 1}] },
+    { id: "plant_tree", conditions: [{action: "Plant", element: "Tree", quantity: 1}] },
+    { id: "hunt_deer", conditions: [{action: "Attack", element: "Deer", quantity: 1}] },
+
   ],
   enabledActions: {
     "Walk": {elementTypes: ["Objects", "Buildings", "Characters", "Plants"]},
@@ -198,7 +215,7 @@ export const surviville = {
     activeCharacter: "Hannes",
     clock: { day: 1, time: [8, 0, "am"] },
     storyText: "Hannes wakes up in the Forest alone. Hakira is missing.",
-    activeQuest: "Harvest 5 branches to build a workbench",
+    activeQuest: "harvest_wood",
     characters: {
       "Hannes": {
         location: "The Forest",

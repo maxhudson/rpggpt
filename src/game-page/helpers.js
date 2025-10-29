@@ -148,8 +148,8 @@ export const calculateAvailableActions = (game) => {
     }
   }
 
-  // Eat - always available, show all food items with actions.Eat
-  if (game.enabledActions?.Eat) {
+  // Eat - only show when there's NO nearby object (like Build/Plant)
+  if (game.enabledActions?.Eat && !nearestObject) {
     const items = game.elements.Items || {};
     const eatOptions = Object.entries(items)
       .filter(([, def]) => def.actions?.Eat)
