@@ -19,6 +19,12 @@ export function handleClientAction(game, actionType, action) {
     case 'Attack':
       return handleAttack(game, action, location, activeLocation, activeCharacter);
 
+    case 'Eat':
+      return handleEat(game, action, location, activeLocation, activeCharacter);
+
+    case 'Sleep':
+      return handleSleep(game, action, location, activeLocation, activeCharacter);
+
     default:
       return null; // Not a client-side action
   }
@@ -71,9 +77,11 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     }
   }
 
-  // Calculate output
+  // Calculate output (output can be either structured {Items: {}, Stats: {}} or legacy flat object)
   const output = {};
-  Object.entries(harvestAction.output).forEach(([itemName, amount]) => {
+  const outputItems = harvestAction.output?.Items || harvestAction.output || {};
+
+  Object.entries(outputItems).forEach(([itemName, amount]) => {
     if (Array.isArray(amount)) {
       // Random range [min, max]
       output[itemName] = Math.floor(Math.random() * (amount[1] - amount[0] + 1)) + amount[0];
@@ -112,9 +120,11 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     });
   }
 
-  // Update time (if specified)
+  // Update time (if specified) and apply energy depletion
+  let hoursElapsed = 0;
   if (harvestAction.timeInHours) {
-    const timeUpdate = calculateTimeUpdate(game.instance.clock, harvestAction.timeInHours);
+    hoursElapsed = harvestAction.timeInHours;
+    const timeUpdate = calculateTimeUpdate(game.instance.clock, hoursElapsed);
     if (timeUpdate) {
       updates.push(timeUpdate);
     }
@@ -127,10 +137,17 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     } else {
       minutes = harvestAction.timeInMinutes;
     }
-    const timeUpdate = calculateTimeUpdate(game.instance.clock, minutes / 60);
+    hoursElapsed = minutes / 60;
+    const timeUpdate = calculateTimeUpdate(game.instance.clock, hoursElapsed);
     if (timeUpdate) {
       updates.push(timeUpdate);
     }
+  }
+
+  // Apply energy depletion (1 per hour)
+  if (hoursElapsed > 0) {
+    const energyDepletionUpdates = applyEnergyDepletion(game, hoursElapsed, activeCharacter, false);
+    updates.push(...energyDepletionUpdates);
   }
 
   // Generate story text
@@ -180,7 +197,8 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
     // Animal killed - remove instance and add loot
     const harvestAction = animalDef.actions?.Harvest;
     if (harvestAction?.output) {
-      Object.entries(harvestAction.output).forEach(([itemName, amount]) => {
+      const outputItems = harvestAction.output?.Items || harvestAction.output || {};
+      Object.entries(outputItems).forEach(([itemName, amount]) => {
         const currentAmount = location.inventory[itemName] || 0;
         updates.push({
           type: 'set',
@@ -195,8 +213,9 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
       path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}`
     });
 
-    const lootList = harvestAction?.output
-      ? Object.entries(harvestAction.output).map(([item, amt]) => `${amt} ${item}`).join(', ')
+    const outputItems = harvestAction?.output?.Items || harvestAction?.output || {};
+    const lootList = Object.keys(outputItems).length > 0
+      ? Object.entries(outputItems).map(([item, amt]) => `${amt} ${item}`).join(', ')
       : 'nothing';
 
     return {
@@ -251,7 +270,192 @@ export function calculateTimeUpdate(clock, hoursToAdd) {
     value: {
       day: newDay,
       time: [newHour, newMinute, newPeriod]
+    },
+    hoursElapsed: Math.floor(hoursToAdd) // Track how many hours passed for energy depletion
+  };
+}
+
+/**
+ * Applies energy depletion based on time passed
+ * Loses 1 energy per hour when not sleeping
+ * @param {Object} game - Current game state
+ * @param {number} hoursElapsed - Number of hours that passed
+ * @param {string} activeCharacter - Active character name
+ * @param {boolean} isSleeping - Whether the character is sleeping
+ * @returns {Array} - Array of update objects for energy depletion
+ */
+export function applyEnergyDepletion(game, hoursElapsed, activeCharacter, isSleeping = false) {
+  if (isSleeping || hoursElapsed <= 0) return [];
+
+  const characterData = game.instance.characters[activeCharacter];
+  const currentEnergy = characterData?.stats?.Energy || 0;
+
+  // Lose 1 energy per hour
+  const energyLoss = Math.floor(hoursElapsed);
+  const newEnergy = Math.max(0, currentEnergy - energyLoss);
+
+  return [{
+    type: 'set',
+    path: `instance.characters.${activeCharacter}.stats.Energy`,
+    value: newEnergy
+  }];
+}
+
+function handleEat(game, action, location, activeLocation, activeCharacter) {
+  const { targetElement } = action;
+  const elementDef = game.elements?.Items?.[targetElement];
+  const eatAction = elementDef?.actions?.Eat;
+
+  if (!eatAction) {
+    return {
+      success: false,
+      message: `Cannot eat ${targetElement}`,
+      updates: []
+    };
+  }
+
+  const characterData = game.instance.characters[activeCharacter];
+
+  // Check daily eating limit (15 energy worth per day)
+  const energyFromEatingSinceLastSlept = characterData?.energyFromEatingSinceLastSlept || 0;
+  const energyGain = eatAction.output?.Stats?.Energy || 0;
+
+  if (energyFromEatingSinceLastSlept + energyGain > 15) {
+    return {
+      success: false,
+      message: `You can't eat any more today (${energyFromEatingSinceLastSlept}/15 energy consumed)`,
+      updates: []
+    };
+  }
+
+  // Check if item is in inventory (from cost.Items)
+  const itemCost = eatAction.cost?.Items || {};
+  for (const [itemName, amount] of Object.entries(itemCost)) {
+    const currentAmount = location.inventory[itemName] || 0;
+    if (currentAmount < amount) {
+      return {
+        success: false,
+        message: `You need ${itemName} to eat`,
+        updates: []
+      };
     }
+  }
+
+  const updates = [];
+
+  // Consume items from inventory (cost.Items)
+  Object.entries(itemCost).forEach(([itemName, amount]) => {
+    const currentAmount = location.inventory[itemName] || 0;
+    updates.push({
+      type: 'set',
+      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      value: currentAmount - amount
+    });
+  });
+
+  // Add to character stats (output.Stats)
+  const statsOutput = eatAction.output?.Stats || {};
+  Object.entries(statsOutput).forEach(([statName, amount]) => {
+    const currentStatValue = characterData?.stats?.[statName] || 0;
+    const statDef = game.elements?.Stats?.[statName];
+    const maxAmount = statDef?.maxAmount || 10;
+
+    // Cap at max
+    const newValue = Math.min(currentStatValue + amount, maxAmount);
+
+    updates.push({
+      type: 'set',
+      path: `instance.characters.${activeCharacter}.stats.${statName}`,
+      value: newValue
+    });
+  });
+
+  // Update energyFromEatingSinceLastSlept
+  updates.push({
+    type: 'set',
+    path: `instance.characters.${activeCharacter}.energyFromEatingSinceLastSlept`,
+    value: energyFromEatingSinceLastSlept + energyGain
+  });
+
+  const storyText = `You ate ${targetElement} and gained ${energyGain} energy. (${energyFromEatingSinceLastSlept + energyGain}/15 today)`;
+
+  return {
+    success: true,
+    storyText,
+    updates
+  };
+}
+
+function handleSleep(game, action, location, activeLocation, activeCharacter) {
+  const { targetElement, targetInstanceId } = action;
+  const instance = location.elementInstances[targetInstanceId];
+
+  if (!instance) {
+    return {
+      success: false,
+      message: `${targetElement} not found`,
+      updates: []
+    };
+  }
+
+  const elementDef = game.elements?.Buildings?.[targetElement];
+  const sleepAction = elementDef?.actions?.Sleep;
+
+  if (!sleepAction) {
+    return {
+      success: false,
+      message: `Cannot sleep in ${targetElement}`,
+      updates: []
+    };
+  }
+
+  const characterData = game.instance.characters[activeCharacter];
+  const updates = [];
+
+  // Restore stats (output.Stats)
+  const statsOutput = sleepAction.output?.Stats || {};
+  Object.entries(statsOutput).forEach(([statName, amount]) => {
+    const currentStatValue = characterData?.stats?.[statName] || 0;
+    const statDef = game.elements?.Stats?.[statName];
+    const maxAmount = statDef?.maxAmount || 10;
+
+    // Add the amount to current stat (don't just set it)
+    const newValue = Math.min(currentStatValue + amount, maxAmount);
+
+    updates.push({
+      type: 'set',
+      path: `instance.characters.${activeCharacter}.stats.${statName}`,
+      value: newValue
+    });
+  });
+
+  // Reset daily eating limit
+  updates.push({
+    type: 'set',
+    path: `instance.characters.${activeCharacter}.energyFromEatingSinceLastSlept`,
+    value: 0
+  });
+
+  // Update lastDaySlept
+  updates.push({
+    type: 'set',
+    path: `instance.characters.${activeCharacter}.lastDaySlept`,
+    value: game.instance.clock.day
+  });
+
+  // Add time progression
+  const timeInHours = sleepAction.timeInHours || 8;
+  const timeUpdate = calculateTimeUpdate(game.instance.clock, timeInHours);
+  if (timeUpdate) {
+    updates.push(timeUpdate);
+  }
+
+  const storyText = `You slept for ${timeInHours} hours and feel refreshed. You can eat again.`;
+
+  return {
+    success: true,
+    storyText,
+    updates
   };
 }
 
@@ -263,8 +467,9 @@ export function calculateTimeUpdate(clock, hoursToAdd) {
  * @returns {Object} - { valid: boolean, message: string }
  */
 export function validateInventory(game, actionType, action) {
-  const { activeLocation } = game.instance;
+  const { activeLocation, activeCharacter } = game.instance;
   const location = game.instance.locations[activeLocation];
+  const characterData = game.instance.characters[activeCharacter];
 
   // Get the cost from actionData (which comes from helpers.js)
   const actionData = action.actionData;
@@ -272,19 +477,34 @@ export function validateInventory(game, actionType, action) {
     return { valid: true }; // No cost, valid
   }
 
-  // Check each required material
   const missingItems = [];
-  Object.entries(actionData.cost).forEach(([itemName, requiredAmount]) => {
+  const missingStats = [];
+
+  // Handle structured cost format {Items: {}, Stats: {}} or legacy flat format
+  const itemCosts = actionData.cost?.Items || (actionData.cost?.Stats ? {} : actionData.cost);
+  const statCosts = actionData.cost?.Stats || {};
+
+  // Check each required item
+  Object.entries(itemCosts).forEach(([itemName, requiredAmount]) => {
     const currentAmount = location.inventory[itemName] || 0;
     if (currentAmount < requiredAmount) {
       missingItems.push(`${itemName} (have ${currentAmount}, need ${requiredAmount})`);
     }
   });
 
-  if (missingItems.length > 0) {
+  // Check each required stat (e.g., Energy)
+  Object.entries(statCosts).forEach(([statName, requiredAmount]) => {
+    const currentAmount = characterData?.stats?.[statName] || 0;
+    if (currentAmount < requiredAmount) {
+      missingStats.push(`${statName} (have ${currentAmount}, need ${requiredAmount})`);
+    }
+  });
+
+  const allMissing = [...missingItems, ...missingStats];
+  if (allMissing.length > 0) {
     return {
       valid: false,
-      message: `Insufficient materials: ${missingItems.join(', ')}`
+      message: `Insufficient resources: ${allMissing.join(', ')}`
     };
   }
 
@@ -293,8 +513,37 @@ export function validateInventory(game, actionType, action) {
 
 /**
  * Checks if an action can be handled client-side
- * Returns true for Harvest to enable instant client-side updates
+ * Returns true for Harvest, Forage, Eat, Sleep to enable instant client-side updates
  */
 export function canHandleClientSide(actionType) {
-  return actionType === 'Harvest' || actionType === 'Forage';
+  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep';
+}
+
+/**
+ * Checks if game is over (Energy or Health reached 0)
+ * @param {Object} game - Current game state
+ * @returns {Object} - { isGameOver: boolean, reason: string }
+ */
+export function checkGameOver(game) {
+  const { activeCharacter } = game.instance;
+  const characterData = game.instance.characters[activeCharacter];
+
+  const energy = characterData?.stats?.Energy || 0;
+  const health = characterData?.stats?.Health || 0;
+
+  if (energy <= 0) {
+    return {
+      isGameOver: true,
+      reason: 'You ran out of energy and collapsed. Game Over!'
+    };
+  }
+
+  if (health <= 0) {
+    return {
+      isGameOver: true,
+      reason: 'Your health reached zero. Game Over!'
+    };
+  }
+
+  return { isGameOver: false };
 }

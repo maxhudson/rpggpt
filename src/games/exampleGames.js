@@ -4,9 +4,9 @@ export const surviville = {
   description: "Classic town builder",
   quests: [
     // "Search for clues",
-    "Harvest 5 branches to build a workbench",
+    "Harvest 5 wood to build a workbench",
     "Build a workbench so you can craft an axe",
-    "Craft an axe so you can cut down a tree for wood",
+    "Craft an axe so you can cut down a tree",
     "Harvest enough wood to build a basic shelter",
     "Build a basic shelter so you can rest better and have more energy during the day",
     "Forage for berries to keep your energy and health up",
@@ -25,7 +25,7 @@ export const surviville = {
 
     "Build": {elementTypes: ["Buildings"]},
     "Upgrade": {elementTypes: ["Buildings", "Items"]},
-    "Reside in": {elementTypes: ["Buildings"]},
+    "Sleep": {elementTypes: ["Buildings"]},
     "Buy": {elementTypes: ["Buildings"]},
     "Sell": {elementTypes: ["Buildings"]},
 
@@ -58,66 +58,68 @@ export const surviville = {
     },
     "Buildings": {
       "Basic Shelter": {color: "#D2691E", spriteId: "Basic Shelter", maxLevel: 3, actions: {
-        "Build": {timeInHours: 4, cost: {"Wood": 10, "Animal Hide": 6}},
-        "Upgrade": {timeInHours: 4, cost: {"Wood": 5, "Animal Hide": 4, "Stone": 2}},
+        "Build": {timeInHours: 4, cost: {Items: {"Wood": 10, "Fiber": 5}, Stats: {"Energy": 5}}},
+        "Upgrade": {timeInHours: 4, cost: {Items: {"Wood": 20, "Fiber": 10, "Stone": 2}, Stats: {"Energy": 10}}},
         "Deconstruct": {},
-        "Reside in": {capacity: {base: 1, addPerLevel: 1}}
+        "Sleep": {output: {Items: {}, Stats: {"Energy": 25}}, timeInHours: 8, capacity: {base: 1, addPerLevel: 1}}
       }},
       "Cabin": {color: "#A0522D", maxLevel: 3, actions: {
-        "Build": {timeInHours: 200, cost: {"Wood": 100, "Stone": 50}},
-        "Upgrade": {timeInHours: 200, cost: {"Wood": 50, "Stone": 25}},
+        "Build": {timeInHours: 200, cost: {Items: {"Wood": 100, "Stone": 50}, Stats: {"Energy": 30}}},
+        "Upgrade": {timeInHours: 200, cost: {Items: {"Wood": 50, "Stone": 25}, Stats: {"Energy": 20}}},
         "Deconstruct": {},
-        "Reside in": {capacity: {base: 2, addPerLevel: 1}}
+        "Sleep": {output: {Items: {}, Stats: {"Energy": 25}}, timeInHours: 8, capacity: {base: 2, addPerLevel: 1}}
       }},
       "Smelter": {color: "#DC143C", maxLevel: 5, actions: {
-        "Build": {timeInHours: 50, cost: {"Stone": 30, "Clay": 20}},
-        "Upgrade": {timeInHours: 50, cost: {"Stone": 15, "Clay": 10}},
+        "Build": {timeInHours: 50, cost: {Items: {"Stone": 30, "Clay": 20}, Stats: {"Energy": 20}}},
+        "Upgrade": {timeInHours: 50, cost: {Items: {"Stone": 15, "Clay": 10}, Stats: {"Energy": 15}}},
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Iron"]}
       }},
       "Workbench": {color: "#8B4513", spriteId: "Workbench", maxLevel: 3, actions: {
-        "Build": {timeInHours: 2, cost: {"Wood": 5}},
-        "Upgrade": {timeInHours: 2, cost: {"Wood": 3}},
+        "Build": {timeInHours: 2, cost: {Items: {"Wood": 5}, Stats: {"Energy": 3}}},
+        "Upgrade": {timeInHours: 2, cost: {Items: {"Wood": 3}, Stats: {"Energy": 2}}},
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Axe", "Pickaxe", "Bow"]}
       }},
       "Trading Post": {color: "#DAA520", maxLevel: 1, actions: {
-        "Build": {timeInHours: 100, cost: {"Wood": 50, "Stone": 30, "Animal Hide": 10}},
+        "Build": {timeInHours: 100, cost: {Items: {"Wood": 50, "Stone": 30, "Animal Hide": 10}, Stats: {"Energy": 25}}},
         "Deconstruct": {},
         "Buy": {prices: {"Berry": 5, "Wood": 2, "Stone": 3, "Animal Hide": 8, "Meat Cutlet": 12, "Mushroom": 4, "Fiber": 3, "Clay": 2, "Iron Ore": 10, "Iron": 20}},
-        "Sell": {prices: {"Berry": 3, "Wood": 1, "Stone": 2, "Animal Hide": 5, "Meat Cutlet": 8, "Mushroom": 2, "Fiber": 2, "Clay": 1, "Iron Ore": 6, "Iron": 15}},
+        "Sell": {prices: {"Berry": 3, "Wood": 1, "Stone": 2, "Animal Hide": 5, "Meat Cutlet": 8, "Mushroom": 2, "Fiber": 2, "Clay": 1, "Iron Ore": 6, "Iron": 15}}
       }},
     },
     "Plants": {
       "Tree": {color: "#228B22", spriteId: "Tree", actions: {
-        "Harvest": {output: {"Wood": [10, 20], "Tree Seed": [0, 1]}, requiredItem: "Axe", timeInMinutes: [45, 120]},
-        "Plant": {timeInHours: 0.25, costs: {"Tree Seed": 1}}
+        "Harvest": {output: {Items: {"Wood": [10, 20], "Tree Seed": [0, 1]}}, requiredItem: "Axe", timeInMinutes: [45, 120]},
+        "Plant": {timeInHours: 0.25, cost: {Items: {"Tree Seed": 1}, Stats: {"Energy": 1}}}
       }},
       "Berry Bush": {color: "#8B008B", spriteId: "Berry Bush", actions: {
-        "Forage": {output: {"Berry": [1, 10], "Berry Bush Seed": [0, 1]}, timeInMinutes: [3, 8]},
-        "Plant": {timeInHours: 0.25, costs: {"Berry Bush Seed": 1}}
+        "Forage": {output: {Items: {"Berry": [1, 3]}}, timeInMinutes: [3, 8]},
+        "Plant": {timeInHours: 0.25, cost: {Items: {"Berry": 1}, Stats: {"Energy": 1}}}
       }},
       "Tall Grass": {color: "#90EE90", spriteId: "Tall Grass", actions: {
-        "Forage": {output: {"Mushroom": [0, 5], "Fiber": [1, 5]}, timeInMinutes: [5, 15]}
+        "Forage": {output: {Items: {"Mushroom": [0, 5], "Fiber": [1, 5]}}, timeInMinutes: [5, 15]}
       }},
     },
     "Animals": {
       "Deer": {
         color: "#D2691E",
+        spriteId: "Deer",
         maxLevel: 10,
         stats: {base: {"Health": [15, 20], "Attack": 1, "Evasiveness": [3, 5]}, addPerLevel: {"Health": 2, "Attack": 1, "Evasiveness": 1}},
         actions: {
           "Attack": {},
-          "Harvest": {output: {"Meat Cutlet": 3, "Animal Hide": 2}, requiresZeroHealth: true}
+          "Harvest": {output: {Items: {"Meat": 3, "Animal Hide": 2}}, requiresZeroHealth: true}
         }
       },
       "Wolf": {
         color: "#696969",
+        spriteId: "Wolf",
         maxLevel: 10,
         stats: {base: {"Health": [15, 20], "Attack": [3, 5], "Evasiveness": [5, 7]}, addPerLevel: {"Health": 3, "Attack": 1, "Evasiveness": 1}},
         actions: {
           "Attack": {},
-          "Harvest": {output: {"Meat Cutlet": 2, "Animal Hide": 1}, requiresZeroHealth: true},
+          "Harvest": {output: {Items: {"Meat": 2, "Animal Hide": 1}}, requiresZeroHealth: true},
           "Flee": {},
         }
       },
@@ -135,6 +137,7 @@ export const surviville = {
       },
       "Boulder": {
         color: "#696969",
+        spriteId: "Boulder",
         capacity: [20, 30],
         actions: {"Harvest": {output: {"Stone": [5, 15]}, requiredItem: "Pickaxe"}}
       },
@@ -156,33 +159,36 @@ export const surviville = {
       "Clay": {color: "#CD853F"},
       "Iron Ore": {color: "#B87333"},
       "Fiber": {color: "#F5DEB3"},
-      "Mushroom": {color: "#A0522D", actions: {"Eat": {calories: 25}}},
-
-      "Berry": {color: "#8B008B", actions: {"Eat": {calories: 50}}},
-      "Meat Cutlet": {color: "#DC143C", actions: {"Eat": {calories: 100}}},
+      "Mushroom": {color: "#A0522D", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 2}}, cost: {Items: {"Mushroom": 1}, Stats: {}}}}},
+      "Berry": {color: "#8B008B", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 1}}, cost: {Items: {"Berry": 1}, Stats: {}}}}},
+      "Meat": {color: "#DC143C", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 5}}, cost: {Items: {"Meat": 1}, Stats: {}}}}},
 
       "Iron": {color: "#708090", actions: {
-        "Craft": {timeInHours: 2, cost: {"Iron Ore": 2, "Wood": 1}}
+        "Craft": {timeInHours: 2, cost: {Items: {"Iron Ore": 2, "Wood": 1}, Stats: {"Energy": 3}}}
       }},
 
       "Tree Seed": {color: "#8B4513"},
       "Berry Bush Seed": {color: "#8B008B"},
 
       "Axe": {color: "#696969", maxLevel: 5, actions: {
-        "Craft": {timeInHours: 4, cost: {"Wood": 2, "Stone": 1}},
-        "Upgrade": {timeInHours: 4, cost: {"Wood": 2, "Stone": 1}},
+        "Craft": {timeInHours: 4, cost: {Items: {"Wood": 2, "Stone": 1}, Stats: {"Energy": 4}}},
+        "Upgrade": {timeInHours: 4, cost: {Items: {"Wood": 2, "Stone": 1}, Stats: {"Energy": 4}}},
         "Harvest": {compatibility: {"Plants": ["Tree"]}}
       }},
       "Pickaxe": {color: "#696969", maxLevel: 5, actions: {
-        "Craft": {timeInHours: 4, cost: {"Wood": 4, "Stone": 2}},
-        "Upgrade": {timeInHours: 4, cost: {"Wood": 4, "Stone": 2}},
+        "Craft": {timeInHours: 4, cost: {Items: {"Wood": 4, "Stone": 2}, Stats: {"Energy": 5}}},
+        "Upgrade": {timeInHours: 4, cost: {Items: {"Wood": 4, "Stone": 2}, Stats: {"Energy": 5}}},
         "Harvest": {compatibility: {"Objects": ["Boulder", "Clay Deposit", "Iron Ore Deposit"]}}
       }},
       "Bow": {color: "#8B4513", maxLevel: 10, actions: {
-        "Craft": {timeInHours: 6, cost: {"Wood": 3, "Fiber": 2}},
-        "Upgrade": {timeInHours: 3, cost: {"Wood": 3, "Fiber": 2}},
+        "Craft": {timeInHours: 6, cost: {Items: {"Wood": 3, "Fiber": 2}, Stats: {"Energy": 5}}},
+        "Upgrade": {timeInHours: 3, cost: {Items: {"Wood": 3, "Fiber": 2}, Stats: {"Energy": 3}}},
         "Attack": {compatibility: {"Animals": ["Deer", "Wolf"]}, damage: {base: [5, 10], addPerLevel: [2, 3]}}
       }},
+    },
+    "Stats": {
+      "Energy": {maxAmount: 100, startingAmount: 100, color: "#ebb94cff"},
+      "Health": {maxAmount: 10, startingAmount: 10, color: "#b8485eff"}
     },
     "Locations": {
       "The Forest": {},
@@ -195,17 +201,26 @@ export const surviville = {
     clock: { day: 1, time: [8, 0, "am"] },
     storyText: "Hannes wakes up in the Forest alone. Hakira is missing.",
     activeQuest: "Harvest 5 branches to build a workbench",
+    characters: {
+      "Hannes": {
+        location: "The Forest",
+        x: 0,
+        y: 0,
+        actions: {
+          "Forage": {level: 10, xp: 0},
+          "Craft": {level: 10, xp: 0},
+        },
+        stats: {
+          "Energy": 100,
+          "Health": 10
+        },
+        lastDaySlept: 1,
+        energyFromEatingSinceLastSlept: 0
+      }
+    },
     locations: {
       "The Forest": {
-        characters: {
-          "Hannes": {x: 0, y: 0, levels: {
-            "Forge": {level: 10, xp: 0},
-            "Craft": {level: 10, xp: 0},
-          }}
-        },
         elementInstances: {
-          1: {x: 1, y: 0, collection: "Buildings", element: "Basic Shelter", level: 1},
-
           10: {x: -1, y: -2, collection: "Plants", element: "Tree"},
           23: {x: -2, y: -2, collection: "Objects", element: "Branch"},
 
@@ -392,23 +407,34 @@ export const surviville = {
           421: {x: 2, y: 11, collection: "Objects", element: "Rock"},
           422: {x: 7, y: 11, collection: "Objects", element: "Rock"},
 
-          // // Resource deposits (far corners)
-          // 60: {x: 24, y: -20, collection: "Objects", element: "Boulder"},
-          // 61: {x: -25, y: 19, collection: "Objects", element: "Clay Deposit"},
-          // 62: {x: 22, y: 22, collection: "Objects", element: "Iron Ore Deposit"},
+          // Boulders randomly
+          500: {x: -20, y: -20, collection: "Objects", element: "Boulder"},
+          501: {x: 20, y: 20, collection: "Objects", element: "Boulder"},
+          502: {x: -15, y: 15, collection: "Objects", element: "Boulder"},
+          503: {x: 15, y: -15, collection: "Objects", element: "Boulder"},
 
-          // // Deer near different biome areas
-          // 70: {x: 19, y: 1, collection: "Animals", element: "Deer", level: 1, health: 17},
-          // 71: {x: -15, y: -13, collection: "Animals", element: "Deer", level: 1, health: 18},
-          // 72: {x: -7, y: 16, collection: "Animals", element: "Deer", level: 1, health: 16},
+          //trees more sparsely spread around the map
+          600: {x: -10, y: -10, collection: "Plants", element: "Tree"},
+          601: {x: 10, y: 10, collection: "Plants", element: "Tree"},
+          602: {x: -12, y: 12, collection: "Plants", element: "Tree"},
+          603: {x: 12, y: -12, collection: "Plants", element: "Tree"},
+          604: {x: -14, y: -14, collection: "Plants", element: "Tree"},
+          605: {x: 14, y: 14, collection: "Plants", element: "Tree"},
+          606: {x: -18, y: 18, collection: "Plants", element: "Tree"},
+          607: {x: 18, y: -18, collection: "Plants", element: "Tree"},
 
-          // // Wolf in the dangerous northwest area
-          // 80: {x: -22, y: -18, collection: "Animals", element: "Wolf", level: 1, health: 18},
+
+          // Deer near different biome areas - each with a patrol rectangle
+          70: {x: 19, y: 1, collection: "Animals", element: "Deer", level: 1, health: 17, patrol: {minX: 17, maxX: 22, minY: -2, maxY: 4}, movementAngle: 0},
+          71: {x: -15, y: -13, collection: "Animals", element: "Deer", level: 1, health: 18, patrol: {minX: -18, maxX: -12, minY: -16, maxY: -10}, movementAngle: 90},
+          72: {x: -7, y: 16, collection: "Animals", element: "Deer", level: 1, health: 16, patrol: {minX: -10, maxX: -4, minY: 13, maxY: 19}, movementAngle: 180},
+
+          // Wolf in the dangerous northwest area
+          80: {x: -22, y: -18, collection: "Animals", element: "Wolf", level: 1, health: 18, patrol: {minX: -25, maxX: -19, minY: -21, maxY: -15}, movementAngle: 270},
         },
         inventory: {}
       },
       "The Cave": {
-        characters: {},
         elementInstances: {},
         inventory: {}
       }

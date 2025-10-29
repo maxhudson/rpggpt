@@ -7,7 +7,7 @@ export const ACTION_COLORS = {
   'Craft': '#55728fff',      // Slate gray - crafting/tools
   'Attack': '#DC143C',     // Crimson red - combat
   'Deconstruct': '#865050ff', // Brown - tearing down
-  'Reside in': '#D2691E',  // Chocolate - shelter/home
+  'Sleep': '#D2691E',  // Chocolate - shelter/home
   'Buy': '#DAA520',        // Goldenrod - commerce/buying
   'Sell': '#B8860B',       // Dark goldenrod - selling
   'Eat': '#FF6347',        // Tomato red - food/consumption

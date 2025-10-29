@@ -6,6 +6,7 @@ import Joystick from './Joystick';
 import { cellSize } from '../k';
 import sprites from '../sprites';
 import { findNearestObject } from '../game-page/helpers';
+import { updateAnimalPositions, calculateViewportBounds } from '../game-page/animalMovement';
 
 const Stage = dynamic(() => import('react-konva').then(mod => ({ default: mod.Stage })), { ssr: false });
 const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Layer })), { ssr: false });
@@ -13,11 +14,10 @@ const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 
 export default function MapSimple({
-  activeLocation,
-  activeCharacter,
+  game,
+  gameRef,
   stageSize,
-  onPositionUpdate,
-  gameElements
+  onPositionUpdate
 }) {
   const keysPressed = useRef({});
   const playerPositionRef = useRef(null);
@@ -26,19 +26,23 @@ export default function MapSimple({
   const stageRef = useRef(null);
   const joystickDirection = useRef({ x: 0, y: 0, speed: 0 });
 
-  // Initialize player position from character's location
+  // Extract data from game
+  const activeCharacterName = game?.instance?.activeCharacter;
+  const activeLocationName = game?.instance?.activeLocation;
+  const characterData = game?.instance?.characters?.[activeCharacterName];
+  const activeLocation = game?.instance?.locations?.[activeLocationName];
+  const gameElements = game?.elements;
+
+  // Initialize player position from character's data
   useEffect(() => {
-    if (activeLocation && activeLocation.characters && !playerPositionRef.current) {
-      const characterData = activeLocation.characters[activeCharacter];
-      if (characterData) {
-        playerPositionRef.current = { x: characterData.x, y: characterData.y };
-        forceUpdate(prev => prev + 1);
-      }
+    if (characterData && !playerPositionRef.current) {
+      playerPositionRef.current = { x: characterData.x, y: characterData.y };
+      forceUpdate(prev => prev + 1);
     }
-  }, [activeLocation, activeCharacter]);
+  }, [characterData]);
 
   useEffect(() => {
-    const baseMoveSpeed = 0.06;
+    const baseMoveSpeed = 0.03;
 
     const handleKeyDown = (e) => {
       keysPressed.current[e.key.toLowerCase()] = true;
@@ -87,7 +91,9 @@ export default function MapSimple({
         deltaY *= diagonalFactor;
       }
 
-      if ((deltaX !== 0 || deltaY !== 0) && playerPositionRef.current) {
+      const playerMoved = (deltaX !== 0 || deltaY !== 0) && playerPositionRef.current;
+
+      if (playerMoved) {
         const oldPosition = playerPositionRef.current;
         const newPosition = {
           x: playerPositionRef.current.x + deltaX,
@@ -100,7 +106,6 @@ export default function MapSimple({
         const crossedBoundary = crossedXBoundary || crossedYBoundary;
 
         playerPositionRef.current = newPosition;
-        forceUpdate(prev => prev + 1);
         setIsWalking(true);
 
         // Notify parent component of position change if callback provided
@@ -111,9 +116,33 @@ export default function MapSimple({
       } else {
         setIsWalking(false);
       }
+
+      // Update animal positions (always, regardless of player movement)
+      if (gameRef?.current && playerPositionRef.current && stageSize) {
+        const viewport = calculateViewportBounds(playerPositionRef.current, stageSize, cellSize);
+        const animalUpdates = updateAnimalPositions(gameRef.current, viewport);
+
+        if (animalUpdates.length > 0) {
+          // Apply updates directly to gameRef (mutate in place for performance)
+          animalUpdates.forEach(update => {
+            const pathParts = update.path.split('.');
+            // Skip 'instance' prefix since we're already at gameRef.current
+            const relevantPath = pathParts.slice(1); // Remove 'instance'
+
+            let target = gameRef.current.instance;
+            for (let i = 0; i < relevantPath.length - 1; i++) {
+              target = target[relevantPath[i]];
+            }
+            target[relevantPath[relevantPath.length - 1]] = update.value;
+          });
+
+          // Force re-render to show animal movement
+          forceUpdate(prev => prev + 1);
+        }
+      }
     };
 
-    const intervalId = setInterval(updatePlayerPosition, 30); // ~30fps
+    const intervalId = setInterval(updatePlayerPosition, 16); // ~30fps
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -123,6 +152,7 @@ export default function MapSimple({
       window.removeEventListener('keyup', handleKeyUp);
       clearInterval(intervalId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!activeLocation || !activeLocation.elementInstances || !playerPositionRef.current) {
@@ -133,7 +163,7 @@ export default function MapSimple({
   const playerPosition = playerPositionRef.current;
 
   // Find the nearest object to the character
-  const nearestObject = findNearestObject(activeLocation, activeCharacter);
+  const nearestObject = findNearestObject(game);
   const nearestInstanceId = nearestObject?.instanceId;
 
   // Get all element instances
@@ -149,7 +179,7 @@ export default function MapSimple({
     })),
     {
       type: 'character',
-      id: activeCharacter,
+      id: activeCharacterName,
       data: playerPosition,
       y: playerPosition.y
     }
@@ -167,7 +197,7 @@ export default function MapSimple({
         width={stageSize.width}
         height={stageSize.height}
         style={{
-          background: 'linear-gradient(to top left, #a3b488, #afb98dff)'
+          background: 'linear-gradient(to top left, #b4c599ff, #c1caa5ff)'
         }}
       >
       <Layer
@@ -186,20 +216,23 @@ export default function MapSimple({
             const width = cellSize * (spriteConfig.width || 1);
             const shadowScale = spriteConfig.shadowScale || 1;
             var height = width;
+            const isAnimal = instance.collection === 'Animals';
 
             // Full opacity only for the nearest object, reduced for all others
             const isNearest = instanceId === nearestInstanceId;
             const opacity = isNearest ? 0.5 : 0.25;
 
             return (<>
-              <Rect
-                key={`shadow-${instanceId}`}
-                x={instance.x * cellSize + 1}
-                y={instance.y * cellSize + 1}
-                width={width - 2}
-                height={height - 2}
-                fill={`rgba(0, 0, 0, ${opacity * 0.2})`}
-              />
+              {!isAnimal && (
+                <Rect
+                  key={`shadow-${instanceId}`}
+                  x={instance.x * cellSize + 1}
+                  y={instance.y * cellSize + 1}
+                  width={width - 2}
+                  height={height - 2}
+                  fill={`rgba(0, 0, 0, ${opacity * 0.2})`}
+                />
+              )}
               {sprites[instance.element] && spriteConfig.shadowScale !== 0 && (<Ellipse
                 x={instance.x * cellSize + width / 2}
                 y={instance.y * cellSize + height / 2}
@@ -280,7 +313,7 @@ export default function MapSimple({
             return (
               <MapSimpleCharacter
                 key={entity.id}
-                characterName={activeCharacter}
+                characterName={activeCharacterName}
                 x={playerPosition.x * cellSize}
                 y={playerPosition.y * cellSize}
                 isWalking={isWalking}

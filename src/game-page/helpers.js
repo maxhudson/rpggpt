@@ -49,25 +49,26 @@ export const isNearby = (objectX, objectY, characterX, characterY, maxDistance =
   return calculateDistance(objectX, objectY, characterX, characterY) <= maxDistance;
 };
 
-// Get character position from location and character name
-export const getCharacterPosition = (location, characterName) => {
-  const characterData = location?.characters?.[characterName];
+// Get character position from game and character name
+export const getCharacterPosition = (game, characterName) => {
+  const characterData = game?.instance?.characters?.[characterName];
   if (!characterData) return null;
   return { x: characterData.x, y: characterData.y };
 };
 
 // Find the nearest object to the character from a location
 // Returns { instanceId, instance, distance } or null if no objects in range
-export const findNearestObject = (location, characterName, maxDistance = INTERACTION_DISTANCE) => {
-  const characterPosition = getCharacterPosition(location, characterName);
+export const findNearestObject = (game, maxDistance = INTERACTION_DISTANCE) => {
+  const characterPosition = getCharacterPosition(game, game.instance.activeCharacter);
   if (!characterPosition) return null;
 
   const { x: charX, y: charY } = characterPosition;
+  const location = game.instance.locations[game.instance.activeLocation];
 
   let nearestObject = null;
   let minDistance = Infinity;
 
-  Object.entries(location.elementInstances || {}).forEach(([instanceId, instance]) => {
+  Object.entries(location?.elementInstances || {}).forEach(([instanceId, instance]) => {
     // Calculate distance to the nearest edge of the object
     const distance = calculateDistanceToObject(charX, charY, instance, sprites);
 
@@ -89,16 +90,16 @@ export const findNearestObject = (location, characterName, maxDistance = INTERAC
 export const calculateAvailableActions = (game) => {
   if (!game || !game.instance || !game.elements) return {};
 
-  const { activeLocation, activeCharacter, locations } = game.instance;
+  const { activeLocation, locations } = game.instance;
   const location = locations?.[activeLocation];
 
-  if (!location || !location.elementInstances || !location.characters) return {};
+  if (!location || !location.elementInstances) return {};
 
   const alwaysAvailable = {}; // Actions without proximity requirements
   const proximityBased = {}; // Actions that require being near elements
 
   // Find the nearest object within interaction distance
-  const nearestObject = findNearestObject(location, activeCharacter);
+  const nearestObject = findNearestObject(game);
 
   // Add always-available actions (Build, Plant)
   // These show up even when not near specific elements
@@ -121,10 +122,10 @@ export const calculateAvailableActions = (game) => {
           existingInstanceId: existingBuilding ? existingBuilding[0] : null
         };
       })
-      .filter(option => {
-        // Only show new buildings (not already built)
-        return !option.existingInstanceId;
-      });
+      // .filter(option => {
+      //   // Only show new buildings (not already built)
+      //   return !option.existingInstanceId;
+      // });
 
     if (buildOptions.length > 0) {
       alwaysAvailable.Build = buildOptions;

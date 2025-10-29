@@ -6,13 +6,13 @@ import { Button } from './Button';
 import { Currency } from './Currency';
 import { ActionSelector } from './ActionSelector';
 import { HistoryItem } from './HistoryItem';
+import HUD from './HUD';
 import { getPrompt } from './getPrompt';
 import { formatTime, calculateAvailableActions } from './helpers';
 import { getActionColor } from './actionColors';
-import { handleClientAction, canHandleClientSide, validateInventory, calculateTimeUpdate } from './clientActions';
+import { handleClientAction, canHandleClientSide, validateInventory, calculateTimeUpdate, applyEnergyDepletion, checkGameOver } from './clientActions';
 import { primaryFont } from '../styles/fonts';
 import styles from './GamePage.module.css';
-import { Tooltip } from 'react-tooltip';
 
 const MapSimple = dynamic(() => import('../components/MapSimple'), { ssr: false });
 const FilmNoise = dynamic(() => import('../components/FilmNoise'), { ssr: false });
@@ -73,6 +73,16 @@ export default function GamePage() {
   // Methods to update refs
   const updateGame = (newGame, {save=true}={}) => {
     gameRef.current = newGame;
+
+    // Check for game over
+    const gameOverStatus = checkGameOver(newGame);
+    if (gameOverStatus.isGameOver) {
+      // Add game over message to story text
+      newGame.instance.storyText = gameOverStatus.reason;
+      // Optionally disable further actions by setting a game over flag
+      newGame.instance.isGameOver = true;
+    }
+
     if (typeof window !== 'undefined' && gameId && save) {
       localStorage.setItem(`game-state-${gameId}`, JSON.stringify(newGame));
 
@@ -117,6 +127,15 @@ export default function GamePage() {
 
   // Update game in memory immediately, save to disk with debounce
   const updateGameWithDebounce = (newGame) => {
+    // Check for game over
+    const gameOverStatus = checkGameOver(newGame);
+    if (gameOverStatus.isGameOver) {
+      // Add game over message to story text
+      newGame.instance.storyText = gameOverStatus.reason;
+      // Optionally disable further actions by setting a game over flag
+      newGame.instance.isGameOver = true;
+    }
+
     gameRef.current = newGame;
     forceUpdate();
     debouncedSave(newGame);
@@ -365,106 +384,137 @@ export default function GamePage() {
   return (
     <div className={primaryFont.className} style={{
       minHeight: '100vh',
-      backgroundColor: '#303030ff',
+      backgroundColor: '#686152ff',
       color: '#171717',
     }}>
-      <div>
-        <div className={styles.storyWrapper}>
-          <h1 style={{ color: '#fff', marginBottom: 5, fontSize: '1.5rem', fontWeight: 'normal'}}>
-            {game.title}
-          </h1>
-          <div style={{fontSize: '1em', marginBottom: 20, fontSize: '1.1rem', top: 60, right: 40}}>
-            <div style={{opacity: 0.7}}>
-              {game.instance?.clock && (
-                <span>Day {game.instance.clock.day}, {formatTime(game.instance.clock.time)}</span>
-              )}
-              <span>, {game.instance?.activeLocation}</span>
-              {game.money !== undefined && (
-                <div style={{marginTop: 3}}><b><Currency amount={game.money} /></b></div>
-              )}
-            </div>
+      <div className={styles.container}>
+        <div className={styles.canvasWrapper}>
+          {/* Map Component */}
+          {game.instance && game.instance.locations && typeof(window) !== 'undefined' && (
+            <>
+              <MapSimple
+                game={game}
+                gameRef={gameRef}
+                stageSize={{
+                  width: window.innerWidth,
+                  height: window.innerHeight
+                }}
+                onPositionUpdate={(newPosition, options = {}) => {
+                  // Update character position in game state
+                  const characterName = gameRef.current.instance.activeCharacter;
 
-            {game.weather && (
-              <p>{game.weather.condition} {game.weather.high && `(${game.weather.low}°F - ${game.weather.high}°F)`}</p>
+                  const updates = [
+                    { type: 'set', path: `instance.characters.${characterName}.x`, value: newPosition.x },
+                    { type: 'set', path: `instance.characters.${characterName}.y`, value: newPosition.y }
+                  ];
+
+                  // Add time progression if crossing cell boundaries (1 minute per cell)
+                  if (options.timeProgression) {
+                    const hoursElapsed = 1 / 60; // 1 minute
+                    const timeUpdate = calculateTimeUpdate(gameRef.current.instance.clock, hoursElapsed);
+                    if (timeUpdate) {
+                      updates.push(timeUpdate);
+                    }
+                    // Apply energy depletion (1 per hour)
+                    const energyDepletionUpdates = applyEnergyDepletion(gameRef.current, hoursElapsed, characterName, false);
+                    updates.push(...energyDepletionUpdates);
+                  }
+
+                  const newGame = applyUpdates(gameRef.current, updates);
+                  // Use debounced save for movement to avoid excessive localStorage writes
+                  updateGameWithDebounce(newGame);
+                }}
+              />
+              <FilmNoise opacity={0.2} intensity={0.2} />
+              <HUD
+                game={game}
+                history={history}
+                actionsByType={actionsByType}
+                isProcessing={isProcessing}
+                isGameOver={isGameOver}
+                selectedActionType={selectedActionType}
+                setSelectedActionType={setSelectedActionType}
+                onActionClick={(actionType, isSingleOption, action) => {
+                  if (isSingleOption) {
+                    // If only one option, execute it directly
+                    let prompt = '';
+                    if (action.targetInstanceId) {
+                      prompt = `${actionType} ${action.targetElement} (Instance ${action.targetInstanceId})`;
+                    } else {
+                      prompt = `${actionType} ${action.targetElement}`;
+                    }
+
+                    // For Build and Plant actions, append player position
+                    if (actionType === 'Build' || actionType === 'Plant') {
+                      const characterName = gameRef.current.instance.activeCharacter;
+                      const characterData = gameRef.current.instance.characters[characterName];
+                      if (characterData) {
+                        const x = Math.round(characterData.x);
+                        const y = Math.round(characterData.y);
+                        prompt += ` at position (${x}, ${y})`;
+                      }
+                    }
+
+                    handlePrompt(prompt, actionType, action);
+                  } else {
+                    // Multiple options or submenu item
+                    if (selectedActionType === actionType && (!action || !action.targetElement)) {
+                      // Clicking the same action type - toggle off
+                      setSelectedActionType(null);
+                    } else if (action && action.targetElement) {
+                      // Submenu item clicked
+                      let prompt = '';
+                      const isUpgrade = action.isUpgrade;
+
+                      // For upgrades, use the existing instance ID
+                      if (isUpgrade && action.existingInstanceId) {
+                        prompt = `${actionType} ${action.targetElement} (Instance ${action.existingInstanceId})`;
+                      } else if (action.targetInstanceId) {
+                        prompt = `${actionType} ${action.targetElement} (Instance ${action.targetInstanceId})`;
+                      } else {
+                        prompt = `${actionType} ${action.targetElement}`;
+                      }
+
+                      // For Build and Plant actions, append player position (only if new build, not upgrade)
+                      if ((actionType === 'Build' && !isUpgrade) || actionType === 'Plant') {
+                        const characterName = gameRef.current.instance.activeCharacter;
+                        const characterData = gameRef.current.instance.characters[characterName];
+                        if (characterData) {
+                          const x = Math.round(characterData.x);
+                          const y = Math.round(characterData.y);
+                          prompt += ` at position (${x}, ${y})`;
+                        }
+                      }
+
+                      handlePrompt(prompt, actionType, action);
+                      setSelectedActionType(null);
+                    } else {
+                      // Show submenu
+                      setSelectedActionType(actionType);
+                    }
+                  }
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        <div className={styles.storyWrapper}>
+          {/* <h1 style={{ color: '#fff', marginBottom: 5, fontSize: '1.5rem', fontWeight: 'normal'}}>
+            {game.title}
+          </h1> */}
+          <div style={{fontSize: '1em', marginBottom: 20}}>
+            {game.money !== undefined && (
+              <div style={{marginBottom: 8}}><b><Currency amount={game.money} /></b></div>
             )}
 
-            {/* Active Quest Display */}
-            {game.instance?.activeQuest && (
-              <div style={{
-                marginTop: 3,
-                fontSize: '0.9em',
-                opacity: 1,
-                color: '#ffffff',
-              }}>
-                <div style={{marginBottom: 4, }}>
-                  {game.instance.activeQuest}
-                </div>
-              </div>
+            {game.weather && (
+              <p style={{opacity: 0.7}}>{game.weather.condition} {game.weather.high && `(${game.weather.low}°F - ${game.weather.high}°F)`}</p>
             )}
           </div>
 
-          {/* Inventory Display */}
-          {game.instance?.locations?.[game.instance.activeLocation]?.inventory &&
-           Object.keys(game.instance.locations[game.instance.activeLocation].inventory).length > 0 && (
-            <div style={{position: 'fixed', top: 40, right: 40, display: 'flex', gap: '2px', flexWrap: 'wrap', marginBottom: 1, zIndex: 2000}}>
-              {Object.entries(game.instance.locations[game.instance.activeLocation].inventory)
-                .filter(([, qty]) => qty > 0)
-                .map(([itemName, qty]) => {
-                  const itemDef = game.elements?.Items?.[itemName];
-                  const itemColor = itemDef?.color || 'rgba(0, 0, 0, 0.3)';
-
-                  return (
-                    <div
-                      key={itemName}
-                      style={{
-                        position: 'relative',
-                        padding: '0 16px',
-                        height: '36px',
-                        width: '36px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        cursor: 'default',
-                      }}
-                      data-tooltip-id={`inventory-tooltip-${itemName}`}
-                      data-tooltip-content={itemName.toUpperCase()}
-                    >
-                      {/* Background color layer */}
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: '#555555ff',
-                        backgroundColor: itemColor,
-                        // opacity: 0.5,
-                        pointerEvents: 'none'
-                      }} />
-
-                      {/* Content layer */}
-                      <span style={{ color: 'white', position: 'relative', zIndex: 1 }}>
-                        {itemName.charAt(0).toUpperCase()}
-                      </span>
-                      <span style={{
-                        fontSize: '9px',
-                        position: 'absolute',
-                        bottom: '2px',
-                        right: '5px',
-                        color: 'white',
-                        zIndex: 1
-                      }}>
-                        {qty}
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-
-          {/* Available Actions - Grouped by Type */}
-          {!isProcessing && !isGameOver && Object.keys(actionsByType).length > 0 && (
+          {/* Action buttons moved to HUD - keep this comment for reference */}
+          {false && !isProcessing && !isGameOver && Object.keys(actionsByType).length > 0 && (
             <div style={{ marginTop: 30, marginBottom: '20px' }}>
               {/* Show action type buttons */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 15 }}>
@@ -490,9 +540,8 @@ export default function GamePage() {
 
                           // For Build and Plant actions, append player position
                           if (actionType === 'Build' || actionType === 'Plant') {
-                            const locationName = gameRef.current.instance.activeLocation;
                             const characterName = gameRef.current.instance.activeCharacter;
-                            const characterData = gameRef.current.instance.locations[locationName]?.characters[characterName];
+                            const characterData = gameRef.current.instance.characters[characterName];
                             if (characterData) {
                               const x = Math.round(characterData.x);
                               const y = Math.round(characterData.y);
@@ -565,9 +614,8 @@ export default function GamePage() {
 
                             // For Build and Plant actions, append player position (only if new build, not upgrade)
                             if ((selectedActionType === 'Build' && !isUpgrade) || selectedActionType === 'Plant') {
-                              const locationName = gameRef.current.instance.activeLocation;
                               const characterName = gameRef.current.instance.activeCharacter;
-                              const characterData = gameRef.current.instance.locations[locationName]?.characters[characterName];
+                              const characterData = gameRef.current.instance.characters[characterName];
                               if (characterData) {
                                 const x = Math.round(characterData.x);
                                 const y = Math.round(characterData.y);
@@ -683,67 +731,8 @@ export default function GamePage() {
             </div>
           )}
         </div>
-        <div className={styles.canvasWrapper}>
-          {/* Map Component */}
-          {game.instance && game.instance.locations && (
-            <>
-              <MapSimple
-                activeLocation={game.instance.locations[game.instance.activeLocation]}
-                activeCharacter={game.instance.activeCharacter}
-                gameElements={game.elements}
-                stageSize={{
-                  width: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerWidth : window.innerWidth / 2) : 600,
-                  height: typeof(window) !== 'undefined' ? (window.innerWidth <= 768 ? window.innerWidth : window.innerHeight) : 600
-                }}
-                onPositionUpdate={(newPosition, options = {}) => {
-                  // Update character position in game state
-                  const locationName = gameRef.current.instance.activeLocation;
-                  const characterName = gameRef.current.instance.activeCharacter;
-
-                  const updates = [
-                    { type: 'set', path: `instance.locations.${locationName}.characters.${characterName}.x`, value: newPosition.x },
-                    { type: 'set', path: `instance.locations.${locationName}.characters.${characterName}.y`, value: newPosition.y }
-                  ];
-
-                  // Add time progression if crossing cell boundaries (1 minute per cell)
-                  if (options.timeProgression) {
-                    const timeUpdate = calculateTimeUpdate(gameRef.current.instance.clock, 1 / 60); // 1 minute
-                    if (timeUpdate) {
-                      updates.push(timeUpdate);
-                    }
-                  }
-
-                  const newGame = applyUpdates(gameRef.current, updates);
-
-                  // Use debounced save for movement to avoid excessive localStorage writes
-                  updateGameWithDebounce(newGame);
-                }}
-              />
-              <FilmNoise opacity={0.2} intensity={0.2} />
-            </>
-          )}
-        </div>
-
-        {/* Inventory Tooltips */}
-        {game.instance?.locations?.[game.instance.activeLocation]?.inventory &&
-          Object.entries(game.instance.locations[game.instance.activeLocation].inventory)
-            .filter(([, qty]) => qty > 0)
-            .map(([itemName]) => (
-              <Tooltip
-                key={`inventory-tooltip-${itemName}`}
-                id={`inventory-tooltip-${itemName}`}
-                place="right"
-                style={{
-                  borderRadius: '0px',
-                  textTransform: 'uppercase',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  zIndex: 1000
-                }}
-              />
-            ))
-        }
       </div>
+
     </div>
   );
 }

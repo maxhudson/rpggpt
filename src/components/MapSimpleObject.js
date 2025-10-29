@@ -47,6 +47,10 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     return () => clearTimeout(timeoutId);
   }, [image]);
 
+  // Animation and flipping for animals
+  const isAnimal = instance.collection === 'Animals';
+  const facingRight = instance.facingRight !== undefined ? instance.facingRight : false;
+
   if (image) {
     var spriteData = sprites[spriteId];
     var imageSize = cellSize * Math.max(spriteData.width || 1, spriteData.height || 1) * (spriteData.imageScale || 1);
@@ -55,7 +59,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   var yScale = 0.75;
 
   return (
-    <Group x={x} y={y} opacity={characterIsBehind ? 0.5 : 1}>
+    <Group x={x} y={y} opacity={characterIsBehind ? 1 : 1}>
       {image ? (
         <>
           <Image
@@ -65,6 +69,8 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
             height={imageSize / yScale}
             x={-imageSize / 2 + spriteData.width * cellSize / 2}
             y={(spriteData.yOffset || 0) * cellSize / yScale - imageSize / yScale + spriteData.width * cellSize / 2 * (spriteData.imageScale || 1)}
+            scaleX={isAnimal && facingRight ? -1 : 1} // Flip horizontally when facing right
+            offsetX={isAnimal && facingRight ? imageSize : 0} // Adjust offset for flip
             // filters={Konva ? [Konva.Filters.Pixelate] : []}
             // pixelSize={8}
           />
@@ -96,7 +102,10 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     prevProps.instanceId === nextProps.instanceId &&
     prevProps.instance.level === nextProps.instance.level &&
     prevProps.displayText === nextProps.displayText &&
-    prevProps.characterIsBehind === nextProps.characterIsBehind
+    prevProps.characterIsBehind === nextProps.characterIsBehind &&
+    prevProps.instance.facingRight === nextProps.instance.facingRight &&
+    prevProps.instance.animationFrame === nextProps.instance.animationFrame &&
+    prevProps.instance.isPaused === nextProps.instance.isPaused
   );
 });
 

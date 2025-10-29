@@ -14,8 +14,10 @@ Generate a JSON response with the following structure:
     {"type": "set", "path": "instance.clock.day", "value": 1},
     {"type": "set", "path": "instance.clock.time", "value": [7, 30, "am"]},
     {"type": "set", "path": "instance.activeLocation", "value": "Forest"},
-    {"type": "set", "path": "instance.locations.Forest.characters.Hannes.x", "value": 10},
-    {"type": "set", "path": "instance.locations.Forest.characters.Hannes.y", "value": -5},
+    {"type": "set", "path": "instance.characters.Hannes.x", "value": 10},
+    {"type": "set", "path": "instance.characters.Hannes.y", "value": -5},
+    {"type": "set", "path": "instance.characters.Hannes.stats.Energy", "value": 8},
+    {"type": "set", "path": "instance.characters.Hannes.stats.Health", "value": 10},
     {"type": "set", "path": "instance.locations.Forest.inventory.Wood", "value": 15},
     {"type": "set", "path": "instance.locations.Forest.elementInstances.50", "value": {"x": 25, "y": -10, "collection": "Buildings", "element": "Workbench", "level": 1}},
     {"type": "unset", "path": "instance.locations.Forest.elementInstances.11"}
@@ -23,6 +25,13 @@ Generate a JSON response with the following structure:
   "success": true,
   "gameOverMessage": null
 }
+
+Cost and Output Format:
+- Actions use structured format: cost: {Items: {Wood: 5, Stone: 2}, Stats: {Energy: 10}}
+- Items are from location inventory (Wood, Stone, etc.)
+- Stats are from character stats (Energy, Health, etc.)
+- Both Items and Stats must be verified before allowing action
+- Output follows same format: output: {Items: {Wood: 5}, Stats: {Energy: 25}}
 
 Action Implementation Rules:
 
@@ -32,25 +41,25 @@ ${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => 
   let implementation = '';
   switch(actionName) {
     case 'Harvest':
-      implementation = 'Valid on: Plants, Objects. (1) Check requiredTool in inventory, (2) Set inventory with harvested items, (3) UNSET the harvested elementInstance';
+      implementation = 'Valid on: Plants, Objects. (1) Check requiredTool in inventory, (2) Set inventory with harvested items from output.Items, (3) UNSET the harvested elementInstance';
       break;
     case 'Forage':
-      implementation = 'Valid on: Plants. Output items as specified. Keep plant instance unchanged other than setting a "lastForaged" clock value on it so we can keep the user from foraging too often.';
+      implementation = 'Valid on: Plants. Add items from output.Items to inventory. Keep plant instance unchanged other than setting a "lastForaged" clock value on it so we can keep the user from foraging too often.';
       break;
     case 'Build':
-      implementation = 'Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in inventory meet cost requirements - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory';
+      implementation = 'Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in cost.Items exist in inventory AND cost.Stats (e.g., Energy) exist in character stats - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory AND stats from character';
       break;
     case 'Craft':
-      implementation = 'Valid on: Items. (1) VERIFY all materials in inventory meet cost requirements - reject if insufficient, (2) Increase crafted item in inventory, (3) Decrease materials from inventory';
+      implementation = 'Valid on: Items. (1) VERIFY all materials in cost.Items exist in inventory AND cost.Stats (e.g., Energy) exist in character stats - reject if insufficient, (2) Increase crafted item in inventory, (3) Decrease materials from inventory AND stats from character';
       break;
     case 'Plant':
-      implementation = 'Valid on: Plants. User prompt includes "at position (x, y)". Plant action has costs (e.g., "Tree Seed": 1). (1) VERIFY all costs are met in inventory - reject if not, (2) Create new elementInstance (Plant) at specified x,y coordinates, (3) Decrease costs from inventory';
+      implementation = 'Valid on: Plants. User prompt includes "at position (x, y)". Plant action has costs like {Items: {"Tree Seed": 1}, Stats: {Energy: 1}}. (1) VERIFY all costs.Items are met in inventory AND costs.Stats are met in character stats - reject if not, (2) Create new elementInstance (Plant) at specified x,y coordinates, (3) Decrease Items from inventory AND Stats from character';
       break;
     case 'Deconstruct':
       implementation = 'Valid on: Buildings. (1) UNSET the building elementInstance, (2) Return partial materials to inventory based on level';
       break;
     case 'Attack':
-      implementation = 'Valid on: Animals. (1) Calculate combat (Health, Attack, Evasiveness), (2) Reduce animal Health or kill, (3) Add loot to inventory if killed';
+      implementation = 'Valid on: Animals. (1) Calculate combat (Health, Attack, Evasiveness), (2) Reduce animal Health or kill, (3) Add loot from output.Items to inventory if killed';
       break;
     case 'Buy':
       implementation = 'Valid on: Buildings (Trading Post). (1) Check building.actions.Buy.prices for item cost, (2) VERIFY player has sufficient money - reject if not, (3) Add item to inventory, (4) Decrease money';
@@ -74,12 +83,16 @@ General update rules:
 - Update clock time based on action's timeInHours
 - Don't update character position (client handles movement)
 
-CRITICAL INVENTORY RULES:
-- NEVER allow negative inventory values
-- Before any action that costs materials (Build, Craft, Plant, Buy), check that ALL required items exist in sufficient quantity
-- If ANY required material is missing or insufficient, set success: false with a message explaining what's missing
-- Example: Building Workbench costs Wood: 5, Stone: 2. If inventory has Wood: 3, Stone: 2, reject with message "Not enough Wood (have 3, need 5)"
-- Only decrease inventory AFTER verifying all costs can be paid
+CRITICAL INVENTORY AND STATS RULES:
+- NEVER allow negative inventory values or character stats
+- Before any action with costs (Build, Craft, Plant, Buy), check that ALL required resources exist:
+  * Check cost.Items against location inventory
+  * Check cost.Stats (e.g., Energy) against character stats
+- If ANY required resource is missing or insufficient, set success: false with a message explaining what's missing
+- Example 1: Building Workbench costs {Items: {Wood: 5}, Stats: {Energy: 3}}. If inventory has Wood: 3 OR character Energy: 2, reject with message "Not enough Wood (have 3, need 5)" or "Not enough Energy (have 2, need 3)"
+- Example 2: Planting Tree costs {Items: {"Tree Seed": 1}, Stats: {Energy: 1}}. Verify both before allowing action.
+- Only decrease inventory AND stats AFTER verifying all costs can be paid
+- Energy depletes 1 per hour during time-based actions (handled by client, but you should still account for it)
 
 Time rules:
 - Time format is [hour, minute, period] where period is "am" or "pm"

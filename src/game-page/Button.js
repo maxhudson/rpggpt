@@ -2,13 +2,13 @@ export function Button({ children, onClick, variant = 'filled', disabled = false
   const baseStyle = {
     height: '36px',
     padding: '0 16px',
-    backgroundColor: variant === 'outline' ? 'transparent' : (disabled ? '#E0DDD4' : (active ? '#555' : (theme === 'secondary' ? '#676767ff' : '#555555ff'))),
+    backgroundColor: variant === 'outline' ? 'transparent' : (disabled ? '#E0DDD4' : (active ? '#555' : (theme === 'secondary' ? '#676767ff' : 'rgba(68, 64, 61, 1)'))),
 
     color: disabled ? '#999' : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: '14px',
     border: 'none',
-    fontWeight: '500',
+    fontWeight: 'bold',
     transition: 'all 0.2s',
     fontFamily: 'inherit',
     transform: 'translateY(0)',

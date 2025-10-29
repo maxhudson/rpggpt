@@ -1,8 +1,8 @@
 import {
-  EB_Garamond,
+  Quantico,
  } from 'next/font/google';
 
-export const primaryFont = EB_Garamond({
+export const primaryFont = Quantico({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400"],
 });

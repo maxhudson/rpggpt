@@ -81,7 +81,7 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
         <Ellipse
           radiusX={2.5}
           radiusY={2.5 / yScale}
-          fill="#555"
+          fill="#000"
           strokeWidth={2}
           x={0}
           y={0 - 23 / yScale}
@@ -95,7 +95,7 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
         <Ellipse
           x={0}
           y={-9 / yScale}
-          radiusX={3.5 + bounceOffset / 4}
+          radiusX={4 + bounceOffset / 4}
           radiusY={10 / yScale}
           fill="black"
         />

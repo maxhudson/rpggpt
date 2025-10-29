@@ -4,9 +4,11 @@ import { useRouter } from 'next/router';
 import { allGames } from '../games/exampleGames';
 import { v4 as uuidv4 } from 'uuid';
 import { primaryFont } from '../styles/fonts';
+import { Button } from '@/game-page/Button';
 
 export default function Home() {
   const [gameInstances, setGameInstances] = useState([]);
+  const [mode, setMode] = useState(null); // null, 'new', or 'continue'
   const router = useRouter();
 
   useEffect(() => {
@@ -94,166 +96,141 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title></title>
+        <title>RPG GPT</title>
         <meta name="description" content="AI-powered text-based RPG games" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <div className={primaryFont.className} style={{
         minHeight: '100vh',
-        backgroundColor: '#EFECE3',
+        backgroundColor: 'rgba(68, 64, 61, 1)',
         color: '#171717',
-        padding: '40px 20px'
+        padding: '40px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <h1 style={{
-            fontSize: '48px',
-            marginBottom: '40px',
-            fontWeight: 600,
-            textAlign: 'center'
-          }}>
-
-          </h1>
-
-          {/* Start a New Game Section */}
-          <section>
-            <h2 style={{
-              fontSize: '32px',
-              marginBottom: '24px',
-              paddingLeft: '24px',
-              fontWeight: 500
-            }}>
-              Start a New Game
-            </h2>
-            <div style={{
-              display: 'grid',
-              gap: '16px',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))'
-            }}>
-              {Object.entries(allGames).map(([key, game]) => (
-                <div
-                  key={key}
-                  onClick={() => createNewGame(key)}
-                  style={{
-                    border: '1px solid #C4B9A6',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    backgroundColor: '#FFFFFF'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
+        <div style={{ maxWidth: '600px', width: '100%' }}>
+          {/* Initial Mode Selection */}
+          {mode === null && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <Button
+                onClick={() => setMode('new')}
+              >
+                New Game
+              </Button>
+              {gameInstances.length > 0 && (
+                <Button
+                  onClick={() => setMode('continue')}
                 >
-                  <h3 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '24px',
-                    fontWeight: 500
-                  }}>
-                    {game.title}
-                  </h3>
-                  {game.description && (
+                  Continue
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* New Game Mode */}
+          {mode === 'new' && (
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {Object.entries(allGames).map(([key, game]) => (
+                  <div
+                    key={key}
+                    onClick={() => createNewGame(key)}
+                  >
+                    <h3 style={{
+                      margin: '0 0 12px 0',
+                      fontSize: '24px',
+                      fontWeight: 500
+                    }}>
+                      {game.title}
+                    </h3>
+                    {game.description && (
+                      <p style={{
+                        margin: '0',
+                        color: '#666',
+                        fontSize: '16px',
+                        lineHeight: '1.5'
+                      }}>
+                        {game.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+                {/* Back Button */}
+                <Button
+                  onClick={() => setMode(null)}
+                >
+                  ← Back
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Continue Game Mode */}
+          {mode === 'continue' && (
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* Back Button */}
+                <Button
+                  onClick={() => setMode(null)}
+                >
+                  ← Back
+                </Button>
+                {gameInstances.map(instance => (
+                  <div
+                    key={instance.id}
+                    onClick={() => continueGame(instance.id)}
+                    style={{
+                      padding: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      position: 'relative'
+                    }}
+                  >
+                    <button
+                      onClick={(e) => deleteGameInstance(instance.id, e)}
+                      style={{
+                        position: 'absolute',
+                        top: '9px',
+                        left: '-24px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '20px',
+                        cursor: 'pointer',
+                        color: '#999',
+                        padding: '4px 8px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#c33';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#999';
+                      }}
+                    >
+                      ×
+                    </button>
+                    <h3 style={{
+                      margin: '0 0 2px 0',
+                      fontSize: '16px',
+                      fontWeight: 500
+                    }}>
+                      {instance.title}
+                    </h3>
                     <p style={{
                       margin: '0',
                       color: '#666',
-                      fontSize: '16px',
-                      lineHeight: '1.5'
+                      fontSize: '12px'
                     }}>
-                      {game.description}
+                      {new Date(instance.lastPlayed).toLocaleDateString()}
                     </p>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          </section>
+          )}
         </div>
-
-
-        {/* Continue Your Games Section */}
-        {gameInstances.length > 0 && (
-          <section style={{ marginBottom: '60px', maxWidth: '900px', margin: '0 auto', marginTop: '60px', }}>
-            <h2 style={{
-              fontSize: '32px',
-              marginBottom: '24px',
-              paddingLeft: '24px',
-              fontWeight: 500
-            }}>
-              Continue
-            </h2>
-            <div style={{
-              display: 'grid',
-              gap: '16px',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))'
-            }}>
-              {gameInstances.map(instance => (
-                <div
-                  key={instance.id}
-                  onClick={() => continueGame(instance.id)}
-                  style={{
-                    border: '1px solid #C4B9A6',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    backgroundColor: '#FAF8F3',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <button
-                    onClick={(e) => deleteGameInstance(instance.id, e)}
-                    style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '20px',
-                      cursor: 'pointer',
-                      color: '#999',
-                      padding: '4px 8px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#c33';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#999';
-                    }}
-                  >
-                    ×
-                  </button>
-                  <h3 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '24px',
-                    fontWeight: 500
-                  }}>
-                    {instance.title}
-                  </h3>
-                  <p style={{
-                    margin: '0',
-                    color: '#666',
-                    fontSize: '14px'
-                  }}>
-                    Last played: {new Date(instance.lastPlayed).toLocaleDateString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     </>
   );
