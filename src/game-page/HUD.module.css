@@ -1,0 +1,82 @@
+.topCenter {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 20px;
+  z-index: 100;
+  /* border-radius: 5px; */
+  pointer-events: none;
+  background-color: rgba(68, 64, 61, 0.8);
+}
+
+.timeDisplay {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: '0.05em';
+  opacity: 0.7;
+  margin-bottom: 4px;
+  /* text-shadow: 0 0 10px rgba(0, 0, 0, 0.4); */
+}
+
+.questDisplay {
+  font-weight: bold;
+  font-size: 12px;
+  letter-spacing: '0.05em';
+  margin-bottom: 1px;
+  /* text-shadow: 0 0 10px rgba(0, 0, 0, 0.4); */
+
+}
+
+.questLabel {
+  margin-right: 6px;
+}
+
+.bottomLeft {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 100;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+@media (min-width: 769px) {
+  .topCenter {
+    width: 400px;
+  }
+  .bottomLeft {
+    width: calc(100vw - 40px);
+  }
+  .footerSpacer {
+    flex-grow: 1;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .topCenter {
+    width: calc(100vw - 40px);
+  }
+}
+
+/* Hide on mobile to avoid blocking view */
+/* @media (max-width: 768px) {
+  .topCenter {
+    top: 10px;
+  }
+
+  .questDisplay {
+    max-width: 280px;
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+
+  .bottomLeft {
+    bottom: 80px;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+  }
+} */
