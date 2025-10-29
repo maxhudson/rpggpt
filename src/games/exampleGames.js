@@ -1,7 +1,7 @@
 
 export const surviville = {
-  title: "Ghost Town",
-  description: "Classic town builder",
+  title: "Survival Demo",
+  description: "Classic survival game with crafting, building, and exploration.",
   quests: [
     // Object-based quests with completion conditions (client-side tracking)
     {
@@ -27,7 +27,7 @@ export const surviville = {
     },
     { id: "harvest_shelter_costs", to: "Build a Tent", conditions: [{action: "Harvest", item: "Wood", quantity: 10}, {action: 'Harvest', item: "Fiber", quantity: 5}] },
     { "id": "build_shelter", to: "Sleep and gain Energy", conditions: [{action: "Build", element: "Basic Shelter", quantity: 1}] },
-    { "id": "forage_berries", to: "gain Energy and Health", conditions: [{action: "Forage", element: "Berry", quantity: 1}] },
+    { "id": "forage_berries", to: "get berries", conditions: [{action: "Forage", element: "Berry Bush", quantity: 1}] },
     { id: "plant_bush", to: "increase Berry availability", conditions: [{action: "Plant", element: "Berry Bush", quantity: 1}] },
     { id: "plant_tree", conditions: [{action: "Plant", element: "Tree", quantity: 1}] },
     { id: "hunt_deer", conditions: [{action: "Attack", element: "Deer", quantity: 1}] },
@@ -202,9 +202,9 @@ export const surviville = {
       "Clay": {color: "#CD853F"},
       "Iron Ore": {color: "#B87333"},
       "Fiber": {color: "#F5DEB3"},
-      "Mushroom": {color: "#A0522D", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 2}}, cost: {Items: {"Mushroom": 1}, Stats: {}}}}},
-      "Berry": {color: "#8B008B", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 1}}, cost: {Items: {"Berry": 1}, Stats: {}}}}},
-      "Meat": {color: "#DC143C", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 5}}, cost: {Items: {"Meat": 1}, Stats: {}}}}},
+      "Mushroom": {color: "#A0522D", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 2, health: 2}}, cost: {Items: {"Mushroom": 1}, Stats: {}}}}},
+      "Berry": {color: "#8B008B", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 1, health: 1}}, cost: {Items: {"Berry": 1}, Stats: {}}}}},
+      "Meat": {color: "#DC143C", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 5, health: 5}}, cost: {Items: {"Meat": 1}, Stats: {}}}}},
 
       "Iron": {color: "#708090", actions: {
         "Craft": {timeInHours: 2, cost: {Items: {"Iron Ore": 2, "Wood": 1}, Stats: {"Energy": 3}}}

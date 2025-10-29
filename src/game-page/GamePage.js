@@ -531,7 +531,8 @@ export default function GamePage() {
                 onClearMessage={(index) => {
                   // Mark the history item as cleared
                   if (historyRef.current[index]) {
-                    historyRef.current[index].cleared = true;
+                    _.forEach (historyRef.current, (historyItem) => historyItem.cleared = true);
+
                     // Save to localStorage
                     localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
                     forceUpdate();

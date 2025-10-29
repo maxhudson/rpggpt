@@ -167,7 +167,7 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     .map(([itemName, amount]) => `${amount} ${itemName}`)
     .join(', ');
 
-  const storyText = ''; //`${activeCharacter} ${actionType.toLowerCase()}s the ${targetElement} and collects ${itemsList}.`;
+  const storyText = `${activeCharacter} ${actionType.toLowerCase()}s the ${targetElement} and collects ${itemsList}.`;
 
   return {
     success: true,
