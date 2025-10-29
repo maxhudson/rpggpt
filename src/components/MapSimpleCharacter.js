@@ -19,10 +19,11 @@ if (typeof window !== 'undefined') {
 const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
   x,
   y,
-  isWalking = false
+  characterName,
+  isWalking = false,
+  isActive = false
 }) {
-  var sprite = null;
-  // const [sprite] = useImage('/elements/playerWalking.gif');
+  const [sprite] = useImage(`/Characters/${characterName}.png`);
   const imageRef = useRef(null);
   const [bounceOffset, setBounceOffset] = useState(0);
 
@@ -64,50 +65,48 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
     return () => clearTimeout(timeoutId);
   }, [sprite]);
 
+  // Non-active characters appear slightly transparent
+  const opacity = isActive ? 1 : 1;
+  const fillColor = isActive ? "black" : "#555";
+
   return (
-    <Group x={x} y={y - bounceOffset}>
+    <Group x={x} y={y - bounceOffset} opacity={opacity}>
       {sprite ? (
         <Image
           ref={imageRef}
           image={sprite}
-          width={64}
-          height={64}
-          offsetX={cellSize}
-          offsetY={cellSize + 18 / 2}
-          filters={Konva ? [Konva.Filters.Pixelate] : []}
-          pixelSize={2}
+          width={40}
+          height={40 / yScale}
+          offsetX={20}
+          offsetY={40 / yScale - 7}
         />
       ) : (<>
         <Ellipse
           radiusX={2.5}
           radiusY={2.5 / yScale}
-          fill="#000"
+          fill={fillColor}
           strokeWidth={2}
           x={0}
           y={0 - 23 / yScale}
-          //shadow
-          // shadowColor="#fff"
-          // shadowBlur={5}
-          // shadowOffsetX={0}
-          // shadowOffsetY={0}
-          // shadowOpacity={1}
         />
         <Ellipse
           x={0}
           y={-9 / yScale}
           radiusX={4 + bounceOffset / 4}
           radiusY={10 / yScale}
-          fill="black"
+          fill={fillColor}
         />
       </>)}
     </Group>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if position or walking state changes
+  // Only re-render if position, walking state, or active state changes
   return (
     prevProps.x === nextProps.x &&
     prevProps.y === nextProps.y &&
-    prevProps.isWalking === nextProps.isWalking
+    prevProps.isWalking === nextProps.isWalking &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.characterName === nextProps.characterName
   );
 });
 

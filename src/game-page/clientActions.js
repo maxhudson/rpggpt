@@ -1,5 +1,4 @@
 // Client-side action handlers for deterministic actions that don't require AI
-import { updateActiveQuest } from './questTracking';
 
 /**
  * Handles Harvest action client-side
@@ -33,38 +32,6 @@ export function handleClientAction(game, actionType, action) {
 
     default:
       return null; // Not a client-side action
-  }
-
-  // Check quest completion after successful action
-  if (result && result.success) {
-    const questUpdate = updateActiveQuest(game);
-    if (questUpdate) {
-      result.updates.push(questUpdate);
-      // Add quest completion message to story text
-      const currentQuestId = game.instance.activeQuest;
-
-      // Look up the quest to get a display name
-      const quests = game.quests || [];
-      const currentQuest = quests.find(q => {
-        const id = typeof q === 'string' ? q : q.id;
-        return id === currentQuestId;
-      });
-
-      // Generate quest display text
-      let questDisplayText = currentQuestId;
-      if (currentQuest && typeof currentQuest === 'object' && currentQuest.conditions) {
-        // For object quests, generate from conditions
-        const condition = currentQuest.conditions[0]; // Use first condition for display
-        const targetName = condition.item || condition.element;
-        if (condition.quantity && condition.quantity > 1) {
-          questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
-        } else {
-          questDisplayText = `${condition.action} ${targetName}`;
-        }
-      }
-
-      result.message = `${result.message || result.storyText}\n\nQuest complete: ${questDisplayText}`;
-    }
   }
 
   return result;
@@ -196,7 +163,7 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
     .map(([itemName, amount]) => `${amount} ${itemName}`)
     .join(', ');
 
-  const storyText = `${activeCharacter} ${actionType.toLowerCase()}s the ${targetElement} and collects ${itemsList}.`;
+  const storyText = ''; //`${activeCharacter} ${actionType.toLowerCase()}s the ${targetElement} and collects ${itemsList}.`;
 
   return {
     success: true,

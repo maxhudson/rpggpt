@@ -8,7 +8,8 @@ import { Button } from '@/game-page/Button';
 
 export default function Home() {
   const [gameInstances, setGameInstances] = useState([]);
-  const [mode, setMode] = useState(null); // null, 'new', or 'continue'
+  const [mode, setMode] = useState(null); // null, 'new', 'selectCharacter', or 'continue'
+  const [selectedGame, setSelectedGame] = useState(null); // Store selected game for character selection
   const router = useRouter();
 
   useEffect(() => {
@@ -45,12 +46,46 @@ export default function Home() {
     setGameInstances(instances);
   };
 
-  const createNewGame = (gameKey) => {
+  const selectGame = (gameKey) => {
+    setSelectedGame(gameKey);
+    setMode('selectCharacter');
+  };
+
+  const createNewGame = (gameKey, characterName) => {
     const gameId = uuidv4();
     const game = allGames[gameKey];
 
     // Copy the full game state to localStorage
     const gameState = JSON.parse(JSON.stringify(game));
+
+    // Initialize all characters with defaultLocation into the instance
+    const characters = game.elements?.Characters || {};
+    gameState.instance.characters = {};
+
+    Object.entries(characters).forEach(([charName, charDef]) => {
+      if (charDef.defaultLocation) {
+        // Get starting stats from Stats definitions
+        const statsDefinitions = game.elements?.Stats || {};
+        const initialStats = {};
+        Object.entries(statsDefinitions).forEach(([statName, statDef]) => {
+          initialStats[statName] = statDef.startingAmount || statDef.maxAmount || 10;
+        });
+
+        gameState.instance.characters[charName] = {
+          location: charDef.defaultLocation,
+          x: charDef.defaultPosition?.x || 0,
+          y: charDef.defaultPosition?.y || 0,
+          actions: JSON.parse(JSON.stringify(charDef.actions || {})),
+          stats: initialStats,
+          lastDaySlept: 1,
+          energyFromEatingSinceLastSlept: 0
+        };
+      }
+    });
+
+    // Set the active character to the selected one
+    gameState.instance.activeCharacter = characterName;
+
     localStorage.setItem(`game-state-${gameId}`, JSON.stringify(gameState));
 
     // Initialize empty history
@@ -136,10 +171,11 @@ export default function Home() {
                 {Object.entries(allGames).map(([key, game]) => (
                   <div
                     key={key}
-                    onClick={() => createNewGame(key)}
+                    onClick={() => selectGame(key)}
+                    style={{ cursor: 'pointer', padding: 12}}
                   >
                     <h3 style={{
-                      margin: '0 0 12px 0',
+                      margin: '',
                       fontSize: '24px',
                       fontWeight: 500
                     }}>
@@ -161,6 +197,49 @@ export default function Home() {
                 {/* Back Button */}
                 <Button
                   onClick={() => setMode(null)}
+                >
+                  ← Back
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Character Selection Mode */}
+          {mode === 'selectCharacter' && selectedGame && (
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '32px' }}>
+                <h2 style={{ margin: '16px', fontSize: '28px', fontWeight: 500 }}>
+                  Select Your Character
+                </h2>
+                {Object.entries(allGames[selectedGame]?.elements?.Characters || {})
+                  .filter(([, charDef]) => charDef.isPlayable)
+                  .map(([charName, charDef]) => (
+                    <Button
+                      key={charName}
+                      onClick={() => createNewGame(selectedGame, charName)}
+                      style={{display: 'flex', alignItems: 'center'}}
+                    >
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: '18px', fontWeight: 500, marginBottom: '4px' }}>
+                          {charName}
+                        </div>
+                        {charDef.description && (
+                          <div style={{ fontSize: '14px', opacity: 0.7, width: 250}}>
+                            {charDef.description}
+                          </div>
+                        )}
+                      </div>
+                      <img src={`/Characters/${charName}.png`} alt={charName} style={{width: 50, height: 50}}/>
+                    </Button>
+                  ))}
+
+                {/* Back Button */}
+                <Button
+                  onClick={() => {
+                    setMode('new');
+                    setSelectedGame(null);
+                  }}
+                  style={{marginTop: 20}}
                 >
                   ← Back
                 </Button>

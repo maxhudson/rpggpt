@@ -10,14 +10,14 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
 
   useEffect(() => {
+    // AUTHENTICATION DISABLED - Everything runs from localStorage
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
         fetchUserProfile(session.user.id);
-      } else if (!isAuthRoute(router.pathname)) {
-        router.push('/login');
       }
+      // Removed redirect to /login - authentication not required
       setLoading(false);
     });
 
@@ -26,9 +26,8 @@ export default function App({ Component, pageProps }) {
       setSession(session);
       if (session) {
         fetchUserProfile(session.user.id);
-      } else if (!isAuthRoute(router.pathname)) {
-        router.push('/login');
       }
+      // Removed redirect to /login - authentication not required
       setLoading(false);
     });
 

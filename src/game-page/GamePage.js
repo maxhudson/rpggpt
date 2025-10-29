@@ -11,6 +11,7 @@ import { getPrompt } from './getPrompt';
 import { formatTime, calculateAvailableActions } from './helpers';
 import { getActionColor } from './actionColors';
 import { handleClientAction, canHandleClientSide, validateInventory, calculateTimeUpdate, applyEnergyDepletion, checkGameOver } from './clientActions';
+import { updateActiveQuest } from './questTracking';
 import { primaryFont } from '../styles/fonts';
 import styles from './GamePage.module.css';
 
@@ -231,7 +232,38 @@ export default function GamePage() {
 
         if (clientSideData.success) {
           // Apply client-side updates immediately
-          const newGame = applyUpdates(gameRef.current, clientSideData.updates);
+          let newGame = applyUpdates(gameRef.current, clientSideData.updates);
+
+          // Check if quest is complete after applying updates
+          const questUpdate = updateActiveQuest(newGame);
+          if (questUpdate) {
+            // Get current quest info for completion message
+            const currentQuestId = newGame.instance.activeQuest;
+            const quests = newGame.quests || [];
+            const currentQuest = quests.find(q => {
+              const id = typeof q === 'string' ? q : q.id;
+              return id === currentQuestId;
+            });
+
+            // Generate quest completion message
+            let questDisplayText = currentQuestId;
+            if (currentQuest && typeof currentQuest === 'object' && currentQuest.conditions) {
+              const condition = currentQuest.conditions[0];
+              const targetName = condition.item || condition.element;
+              if (condition.quantity && condition.quantity > 1) {
+                questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
+              } else {
+                questDisplayText = `${condition.action} ${targetName}`;
+              }
+            }
+
+            // Apply quest update
+            newGame = applyUpdates(newGame, [questUpdate]);
+
+            // Add quest completion to story text
+            clientSideData.storyText = `${clientSideData.storyText}\n\nQuest complete: ${questDisplayText}`;
+          }
+
           updateGame(newGame);
 
           // Add initial story text to history

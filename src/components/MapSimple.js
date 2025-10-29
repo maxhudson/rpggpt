@@ -181,7 +181,18 @@ export default function MapSimple({
   // Get all element instances
   const elementInstances = Object.entries(activeLocation.elementInstances);
 
-  // Create an array that includes both objects and the active character for depth sorting
+  // Get all characters in the current location
+  const allCharacters = Object.entries(game.instance.characters || {})
+    .filter(([, charData]) => charData.location === activeLocationName)
+    .map(([charName, charData]) => ({
+      type: 'character',
+      id: charName,
+      data: charData,
+      y: charData.y,
+      isActive: charName === activeCharacterName
+    }));
+
+  // Create an array that includes both objects and all characters for depth sorting
   const allEntities = [
     ...elementInstances.map(([id, instance]) => ({
       type: 'object',
@@ -189,12 +200,7 @@ export default function MapSimple({
       data: instance,
       y: instance.y
     })),
-    {
-      type: 'character',
-      id: activeCharacterName,
-      data: playerPosition,
-      y: playerPosition.y
-    }
+    ...allCharacters
   ];
 
   // Sort all entities by Y position for depth
@@ -256,11 +262,12 @@ export default function MapSimple({
             </>);
           } else {
             // Character shadow
+            const charData = entity.data;
             return (
               <Ellipse
                 key={`shadow-${entity.id}`}
-                x={playerPosition.x * cellSize}
-                y={playerPosition.y * cellSize + 1}
+                x={charData.x * cellSize}
+                y={charData.y * cellSize + 1}
                 radiusX={cellSize / 6}
                 radiusY={cellSize / 6}
                 fill="rgba(0, 0, 0, 0.1)"
@@ -322,13 +329,17 @@ export default function MapSimple({
             );
           } else {
             // Character
+            const charData = entity.data;
+            const charName = entity.id;
+            const isActiveChar = entity.isActive;
             return (
               <MapSimpleCharacter
                 key={entity.id}
-                characterName={activeCharacterName}
-                x={playerPosition.x * cellSize}
-                y={playerPosition.y * cellSize}
-                isWalking={isWalking}
+                characterName={charName}
+                x={charData.x * cellSize}
+                y={charData.y * cellSize}
+                isWalking={isActiveChar && isWalking}
+                isActive={isActiveChar}
               />
             );
           }

@@ -51,15 +51,28 @@ export const surviville = {
   },
   elements: {
     "Characters": {
-      "Hannes": {isPlayable: true, actions: {
-        "Forage": {level: 10, xp: 0},
-        "Craft": {level: 10, xp: 0}
-      }},
-      "Hakira": {isPlayable: true, actions: {
-        "Plant": {level: 10, xp: 0},
-        "Build": {level: 10, xp: 0},
-        // "Attack": {level: 10, xp: 0},
-      }},
+      "Hannes": {
+        isPlayable: true,
+        description: "A skilled forager and craftsman",
+        defaultLocation: "The Forest",
+        defaultPosition: {x: 0, y: 0},
+        actions: {
+          "Forage": {level: 10, xp: 0},
+          "Craft": {level: 10, xp: 0},
+          "Attack": {level: 5, xp: 0},
+        }
+      },
+      "Hakira": {
+        isPlayable: true,
+        description: "A strong builder and planter",
+        defaultLocation: "The Forest",
+        defaultPosition: {x: 1, y: 1},
+        actions: {
+          "Plant": {level: 10, xp: 0},
+          "Build": {level: 10, xp: 0},
+          "Attack": {level: 5, xp: 0},
+        }
+      },
 
       "Tomislov": {isPlayable: false, actions: {
         "Forage": {level: 5, xp: 0},
@@ -243,6 +256,8 @@ export const surviville = {
           12: {x: 3, y: -4, collection: "Plants", element: "Tree"},
           20: {x: 2, y: -3, collection: "Objects", element: "Branch"},
           21: {x: 3, y: -3, collection: "Objects", element: "Branch"},
+          5: {x: -2, y: -1, collection: "Objects", element: "Branch"},
+          4: {x: -3, y: 0, collection: "Objects", element: "Branch"},
 
           30: {x: 3, y: -2, collection: "Plants", element: "Berry Bush"},
           31: {x: 5, y: -2, collection: "Plants", element: "Berry Bush"},
