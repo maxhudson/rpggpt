@@ -5,6 +5,7 @@ import { allGames } from '../games/exampleGames';
 import { v4 as uuidv4 } from 'uuid';
 import { primaryFont } from '../styles/fonts';
 import { Button } from '@/game-page/Button';
+import Image from 'next/image';
 
 export default function Home() {
   const [gameInstances, setGameInstances] = useState([]);
@@ -229,7 +230,7 @@ export default function Home() {
                           </div>
                         )}
                       </div>
-                      <img src={`/Characters/${charName}.png`} alt={charName} style={{width: 50, height: 50}}/>
+                      <Image src={`/Characters/${charName}.png`} alt={charName} width={50} height={50}/>
                     </Button>
                   ))}
 
