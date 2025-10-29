@@ -56,18 +56,20 @@ export const getCharacterPosition = (game, characterName) => {
   return { x: characterData.x, y: characterData.y };
 };
 
-// Find the nearest object to the character from a location
-// Returns { instanceId, instance, distance } or null if no objects in range
+// Find the nearest object or character to the active character
+// Returns { instanceId, instance, distance, isCharacter } or null if nothing in range
 export const findNearestObject = (game, maxDistance = INTERACTION_DISTANCE) => {
   const characterPosition = getCharacterPosition(game, game.instance.activeCharacter);
   if (!characterPosition) return null;
 
   const { x: charX, y: charY } = characterPosition;
   const location = game.instance.locations[game.instance.activeLocation];
+  const { activeCharacter, activeLocation, characters } = game.instance;
 
   let nearestObject = null;
   let minDistance = Infinity;
 
+  // Check element instances (objects, buildings, plants, animals)
   Object.entries(location?.elementInstances || {}).forEach(([instanceId, instance]) => {
     // Calculate distance to the nearest edge of the object
     const distance = calculateDistanceToObject(charX, charY, instance, sprites);
@@ -77,7 +79,34 @@ export const findNearestObject = (game, maxDistance = INTERACTION_DISTANCE) => {
       nearestObject = {
         instanceId,
         instance,
-        distance
+        distance,
+        isCharacter: false
+      };
+    }
+  });
+
+  // Check other characters in the same location
+  Object.entries(characters || {}).forEach(([charName, charData]) => {
+    // Skip the active character
+    if (charName === activeCharacter || charData.location !== activeLocation) return;
+
+    // Calculate distance to character
+    const dx = charData.x - charX;
+    const dy = charData.y - charY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance <= maxDistance + 0.6 && distance < minDistance) {
+      minDistance = distance;
+      nearestObject = {
+        instanceId: charName,
+        instance: {
+          element: charName,
+          collection: "Characters",
+          x: charData.x,
+          y: charData.y
+        },
+        distance,
+        isCharacter: true
       };
     }
   });
@@ -189,6 +218,11 @@ export const calculateAvailableActions = (game) => {
 
           // Skip Attack action on dead animals
           if (actionName === 'Attack' && instance.collection === 'Animals' && instance.isDead) {
+            return;
+          }
+
+          // Skip Attack action on Characters (no attacking other players)
+          if (actionName === 'Attack' && instance.collection === 'Characters') {
             return;
           }
 

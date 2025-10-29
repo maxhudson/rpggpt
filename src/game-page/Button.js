@@ -27,14 +27,6 @@ export function Button({ children, onClick, variant = 'filled', disabled = false
       onClick={onClick}
       disabled={disabled}
       style={baseStyle}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          Object.assign(e.target.style, hoverStyle);
-        }
-      }}
-      onMouseLeave={(e) => {
-        Object.assign(e.target.style, baseStyle);
-      }}
     >
       {children}
     </button>

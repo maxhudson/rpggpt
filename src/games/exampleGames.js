@@ -6,26 +6,29 @@ export const surviville = {
     // Object-based quests with completion conditions (client-side tracking)
     {
       id: "harvest_wood",
+      to: "Build a Workbench",
       conditions: [
         {action: "Harvest", item: "Wood", quantity: 5}
       ]
     },
     {
       id: "build_workbench",
+      to: "Craft an Axe",
       conditions: [
         {action: "Build", element: "Workbench", quantity: 1}
       ]
     },
     {
       id: "craft_axe",
+      to: "cut down a Tree",
       conditions: [
         {action: "Craft", item: "Axe", quantity: 1}
       ]
     },
-    { id: "harvest_shelter_costs", conditions: [{action: "Harvest", item: "Wood", quantity: 10}, {action: 'Harvest', item: "Fiber", quantity: 5}] },
-    { "id": "build_shelter", conditions: [{action: "Build", element: "Basic Shelter", quantity: 1}] },
-    { "id": "forage_berries", conditions: [{action: "Forage", element: "Berry", quantity: 1}] },
-    { id: "plant_bush", conditions: [{action: "Plant", element: "Berry Bush", quantity: 1}] },
+    { id: "harvest_shelter_costs", to: "Build a Tent", conditions: [{action: "Harvest", item: "Wood", quantity: 10}, {action: 'Harvest', item: "Fiber", quantity: 5}] },
+    { "id": "build_shelter", to: "Sleep and gain Energy", conditions: [{action: "Build", element: "Basic Shelter", quantity: 1}] },
+    { "id": "forage_berries", to: "gain Energy and Health", conditions: [{action: "Forage", element: "Berry", quantity: 1}] },
+    { id: "plant_bush", to: "increase Berry availability", conditions: [{action: "Plant", element: "Berry Bush", quantity: 1}] },
     { id: "plant_tree", conditions: [{action: "Plant", element: "Tree", quantity: 1}] },
     { id: "hunt_deer", conditions: [{action: "Attack", element: "Deer", quantity: 1}] },
 
@@ -47,6 +50,8 @@ export const surviville = {
     "Craft": {elementTypes: ["Items"]},
     "Eat": {elementTypes: ["Items"]},
 
+    "Talk": {elementTypes: ["Characters"]},
+
     "Deconstruct": {elementTypes: ["Buildings"]},
   },
   elements: {
@@ -60,6 +65,7 @@ export const surviville = {
           "Forage": {level: 10, xp: 0},
           "Craft": {level: 10, xp: 0},
           "Attack": {level: 5, xp: 0},
+          "Talk": {timeInMinutes: [5, 15]}
         }
       },
       "Hakira": {
@@ -71,18 +77,27 @@ export const surviville = {
           "Plant": {level: 10, xp: 0},
           "Build": {level: 10, xp: 0},
           "Attack": {level: 5, xp: 0},
+          "Talk": {timeInMinutes: [5, 15]}
         }
       },
 
-      "Tomislov": {isPlayable: false, actions: {
-        "Forage": {level: 5, xp: 0},
-        "Build": {level: 3, xp: 0}
-      }},
-      "Luna": {isPlayable: false, actions: {
-        "Buy": {level: 5, xp: 0},
-        // "Attack": {level: 3, xp: 0},
-        "Craft": {level: 4, xp: 0}
-      }},
+      "Tomislov": {
+        isPlayable: false,
+        actions: {
+          "Forage": {level: 5, xp: 0},
+          "Build": {level: 3, xp: 0},
+          "Talk": {timeInMinutes: [5, 15]}
+        }
+      },
+      "Luna": {
+        isPlayable: false,
+        actions: {
+          "Buy": {level: 5, xp: 0},
+          // "Attack": {level: 3, xp: 0},
+          "Craft": {level: 4, xp: 0},
+          "Talk": {timeInMinutes: [5, 15]}
+        }
+      },
     },
     "Buildings": {
       "Basic Shelter": {color: "#D2691E", spriteId: "Basic Shelter", maxLevel: 3, actions: {

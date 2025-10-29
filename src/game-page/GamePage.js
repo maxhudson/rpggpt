@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import _ from 'lodash';
 import dynamic from 'next/dynamic';
@@ -25,6 +25,10 @@ export default function GamePage() {
   // Force update mechanism
   const [, setUpdateTrigger] = useState(0);
   const forceUpdate = () => setUpdateTrigger(prev => prev + 1);
+
+  // Loading overlay state
+  const [showOverlay, setShowOverlay] = useState(true);
+  const [overlayOpacity, setOverlayOpacity] = useState(1);
 
   // Use refs instead of state for game and history
   const gameRef = useRef(null);
@@ -70,6 +74,24 @@ export default function GamePage() {
       }
     }
   }
+
+  // Fade out overlay effect
+  React.useEffect(() => {
+    // After 1 second, start fade out
+    const fadeTimer = setTimeout(() => {
+      setOverlayOpacity(0);
+    }, 1000);
+
+    // After 1.3 seconds (1000ms + 300ms transition), remove from DOM
+    const removeTimer = setTimeout(() => {
+      setShowOverlay(false);
+    }, 1300);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
+    };
+  }, []);
 
   // Methods to update refs
   const updateGame = (newGame, {save=true}={}) => {
@@ -506,6 +528,15 @@ export default function GamePage() {
                 isGameOver={isGameOver}
                 selectedActionType={selectedActionType}
                 setSelectedActionType={setSelectedActionType}
+                onClearMessage={(index) => {
+                  // Mark the history item as cleared
+                  if (historyRef.current[index]) {
+                    historyRef.current[index].cleared = true;
+                    // Save to localStorage
+                    localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                    forceUpdate();
+                  }
+                }}
                 onActionClick={(actionType, isSingleOption, action) => {
                   if (isSingleOption) {
                     // If only one option, execute it directly
@@ -805,6 +836,21 @@ export default function GamePage() {
         </div>
       </div>
 
+      {/* Loading overlay that fades out */}
+      {showOverlay && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(68, 64, 61, 1)',
+          opacity: overlayOpacity,
+          transition: 'opacity 300ms ease-out',
+          pointerEvents: 'none',
+          zIndex: 10000
+        }} />
+      )}
     </div>
   );
 }

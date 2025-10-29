@@ -70,6 +70,9 @@ ${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => 
     case 'Travel':
       implementation = 'Valid on: Locations. (1) Set instance.activeLocation to new location';
       break;
+    case 'Talk':
+      implementation = 'Valid on: Characters. (1) Generate contextual dialogue between active character and target character based on their personalities, current situation, and game state, (2) Advance time by timeInMinutes (random range 5-15 minutes), (3) Include dialogue in storyText as a natural conversation';
+      break;
     default:
       implementation = `Valid on: ${validCollections.join(', ')}. Check element definition for specific action rules.`;
   }

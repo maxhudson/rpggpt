@@ -145,7 +145,7 @@ export default function Home() {
         alignItems: 'center',
         justifyContent: 'center'
       }}>
-        <div style={{ maxWidth: '600px', width: '100%' }}>
+        <div style={{ maxWidth: '600px' }}>
           {/* Initial Mode Selection */}
           {mode === null && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -280,12 +280,6 @@ export default function Home() {
                         cursor: 'pointer',
                         color: '#999',
                         padding: '4px 8px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = '#c33';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = '#999';
                       }}
                     >
                       ×

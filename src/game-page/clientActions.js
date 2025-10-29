@@ -30,6 +30,10 @@ export function handleClientAction(game, actionType, action) {
       result = handleSleep(game, action, location, activeLocation, activeCharacter);
       break;
 
+    case 'Craft':
+      result = handleCraft(game, action, location, activeLocation, activeCharacter);
+      break;
+
     default:
       return null; // Not a client-side action
   }
@@ -257,6 +261,113 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
       updates
     };
   }
+}
+
+function handleCraft(game, action, location, activeLocation, activeCharacter) {
+  const { targetElement } = action;
+  const itemDef = game.elements?.Items?.[targetElement];
+  const craftAction = itemDef?.actions?.Craft;
+
+  if (!craftAction) {
+    return {
+      success: false,
+      message: `Cannot craft ${targetElement}`,
+      updates: []
+    };
+  }
+
+  const characterData = game.instance.characters[activeCharacter];
+  const inventory = location.inventory || {};
+
+  // Check costs (Items and Stats)
+  const costItems = craftAction.cost?.Items || {};
+  const costStats = craftAction.cost?.Stats || {};
+
+  // Validate Items
+  for (const [itemName, amount] of Object.entries(costItems)) {
+    const available = inventory[itemName] || 0;
+    if (available < amount) {
+      return {
+        success: false,
+        message: `Not enough ${itemName} (have ${available}, need ${amount})`,
+        updates: []
+      };
+    }
+  }
+
+  // Validate Stats (like Energy)
+  for (const [statName, amount] of Object.entries(costStats)) {
+    const available = characterData.stats[statName] || 0;
+    if (available < amount) {
+      return {
+        success: false,
+        message: `Not enough ${statName} (have ${available}, need ${amount})`,
+        updates: []
+      };
+    }
+  }
+
+  const updates = [];
+
+  // Deduct Items from inventory
+  Object.entries(costItems).forEach(([itemName, amount]) => {
+    const currentAmount = inventory[itemName] || 0;
+    updates.push({
+      type: 'set',
+      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      value: currentAmount - amount
+    });
+  });
+
+  // Deduct Stats from character
+  Object.entries(costStats).forEach(([statName, amount]) => {
+    const currentAmount = characterData.stats[statName] || 0;
+    updates.push({
+      type: 'set',
+      path: `instance.characters.${activeCharacter}.stats.${statName}`,
+      value: currentAmount - amount
+    });
+  });
+
+  // Add output items to inventory
+  // If no explicit output, default to 1 of the item being crafted
+  let outputItems = craftAction.output?.Items || craftAction.output || {};
+  if (Object.keys(outputItems).length === 0) {
+    outputItems = { [targetElement]: 1 };
+  }
+
+  Object.entries(outputItems).forEach(([itemName, amount]) => {
+    const currentAmount = inventory[itemName] || 0;
+    updates.push({
+      type: 'set',
+      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      value: currentAmount + amount
+    });
+  });
+
+  // Update time (if specified) and apply energy depletion
+  let hoursElapsed = 0;
+  if (craftAction.timeInHours) {
+    hoursElapsed = craftAction.timeInHours;
+    const timeUpdate = calculateTimeUpdate(game.instance.clock, hoursElapsed);
+    if (timeUpdate) {
+      updates.push(timeUpdate);
+    }
+  }
+
+  // Apply energy depletion for time elapsed
+  const energyUpdates = applyEnergyDepletion(game, hoursElapsed);
+  updates.push(...energyUpdates);
+
+  const itemsGainedText = Object.entries(outputItems)
+    .map(([item, qty]) => `${qty} ${item}`)
+    .join(', ');
+
+  return {
+    success: true,
+    storyText: `${activeCharacter} crafts ${itemsGainedText}.`,
+    updates
+  };
 }
 
 export function calculateTimeUpdate(clock, hoursToAdd) {
@@ -533,10 +644,10 @@ export function validateInventory(game, actionType, action) {
 
 /**
  * Checks if an action can be handled client-side
- * Returns true for Harvest, Forage, Eat, Sleep, Attack to enable instant client-side updates
+ * Returns true for Harvest, Forage, Eat, Sleep, Attack, Craft to enable instant client-side updates
  */
 export function canHandleClientSide(actionType) {
-  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep' || actionType === 'Attack';
+  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep' || actionType === 'Attack' || actionType === 'Craft';
 }
 
 /**

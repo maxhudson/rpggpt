@@ -14,18 +14,9 @@ export default function HUD({
   selectedActionType,
   setSelectedActionType,
   onActionClick,
-  history
+  history,
+  onClearMessage
 }) {
-  const [lastClearedIndex, setLastClearedIndex] = React.useState(-1);
-  const [historyLength, setHistoryLength] = React.useState(0);
-
-  // Reset cleared index when new history items arrive
-  React.useEffect(() => {
-    if (history && history.length > historyLength) {
-      setLastClearedIndex(-1);
-      setHistoryLength(history.length);
-    }
-  }, [history, historyLength]);
 
   if (!game?.instance) return null;
 
@@ -65,9 +56,11 @@ export default function HUD({
   } else if (history && history.length > 0) {
     // Find the most recent story or error message that hasn't been cleared
     for (let i = history.length - 1; i >= 0; i--) {
-      if (i <= lastClearedIndex) break;
-
       const item = history[i];
+
+      // Skip cleared messages
+      if (item.cleared) continue;
+
       if (item.type === 'error' && item.content?.message) {
         lastMessage = item.content.message;
         lastMessageIndex = i;
@@ -81,8 +74,9 @@ export default function HUD({
   }
 
   const handleClearMessage = () => {
-    console.log('Clearing message at index:', lastMessageIndex);
-    setLastClearedIndex(lastMessageIndex);
+    if (onClearMessage && lastMessageIndex !== -1) {
+      onClearMessage(lastMessageIndex);
+    }
   };
 
   // Format quest display text with progress
@@ -128,12 +122,12 @@ export default function HUD({
 
         // Format the condition text
         if (quantity && quantity > 1) {
-          return `${action} (${current}/${quantity}) ${targetName}`;
+          return `${action} (${current}/${quantity}) ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
         } else if (quantity === 1) {
-          return `${action} ${targetName}`;
+          return `${action} ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
         } else {
           // No quantity specified
-          return `${action} ${targetName}`;
+          return `${action} ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
         }
       });
 
