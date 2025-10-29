@@ -1,7 +1,7 @@
 
 export const surviville = {
   title: "Survival Demo",
-  description: "Classic survival game with crafting, building, and exploration.",
+  description: "Classic survival game with crafting, building, and combat.",
   quests: [
     // Object-based quests with completion conditions (client-side tracking)
     {
