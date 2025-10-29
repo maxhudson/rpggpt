@@ -235,7 +235,7 @@ export default function HUD({
                   }} />
 
                   {/* Content layer */}
-                  <span style={{ color: 'white', position: 'relative', zIndex: 1 }}>
+                  <span style={{ color: 'white', position: 'relative', zIndex: 1, paddingRight: 10, paddingBottom: 7}}>
                     {item.name.charAt(0).toUpperCase()}
                   </span>
                   <span style={{

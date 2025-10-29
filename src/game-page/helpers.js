@@ -148,6 +148,21 @@ export const calculateAvailableActions = (game) => {
     }
   }
 
+  // Eat - always available, show all food items with actions.Eat
+  if (game.enabledActions?.Eat) {
+    const items = game.elements.Items || {};
+    const eatOptions = Object.entries(items)
+      .filter(([, def]) => def.actions?.Eat)
+      .map(([itemName, def]) => ({
+        targetElement: itemName,
+        targetCollection: "Items",
+        actionData: def.actions.Eat
+      }));
+
+    if (eatOptions.length > 0) {
+      alwaysAvailable.Eat = eatOptions;
+    }
+  }
 
   // Process only the nearest object for proximity-based actions
   if (nearestObject) {
@@ -155,23 +170,58 @@ export const calculateAvailableActions = (game) => {
 
     // Find the element definition using collection and element
     const elementCategory = game.elements[instance.collection];
+    console.log(instance)
     if (elementCategory) {
       const elementDef = elementCategory[instance.element];
       if (elementDef) {
         // Get actions for this element
         const actions = elementDef.actions || {};
-
+        console.log('Available actions for', instance.element, actions);
         Object.entries(actions).forEach(([actionName, actionData]) => {
           // Check if this action is enabled in the game
           const enabledAction = game.enabledActions?.[actionName];
           if (!enabledAction) return;
 
-          // Skip Harvest action on animals with health > 0
-          if (actionName === 'Harvest' && instance.collection === 'Animals' && instance.health && instance.health > 0) {
+          // Skip Harvest action on animals that are alive (health > 0 or not dead)
+          if (actionName === 'Harvest' && instance.collection === 'Animals' && !instance.isDead) {
+            return;
+          }
+
+          // Skip Attack action on dead animals
+          if (actionName === 'Attack' && instance.collection === 'Animals' && instance.isDead) {
             return;
           }
 
           if (actionName === 'Build' || actionName === 'Plant') return;
+          console.log(actionName, instance)
+          // Special handling for Attack action on Animals - show weapons as submenu
+          if (actionName === 'Attack' && instance.collection === 'Animals') {
+            // Find all items with Attack actions
+            const allItems = game.elements?.Items || {};
+            console.log('Checking items for Attack compatibility with animal:', instance.element, allItems);
+            Object.entries(allItems).forEach(([itemName, itemDef]) => {
+              if (itemDef?.actions?.Attack) {
+                const attackAction = itemDef.actions.Attack;
+                // Check if this weapon is compatible with this animal
+                const compatibility = attackAction.compatibility?.Animals || [];
+                console.log('Animal compatibility:', compatibility, instance.element);
+                if (compatibility.length === 0 || compatibility.includes(instance.element)) {
+                  if (!proximityBased.Attack) {
+                    proximityBased.Attack = [];
+                  }
+                  proximityBased.Attack.push({
+                    targetElement: itemName, // The weapon being used
+                    targetCollection: "Items",
+                    targetInstanceId: instanceId, // The animal being attacked
+                    targetAnimal: instance.element, // Store the animal type
+                    distance: distance,
+                    actionData: attackAction
+                  });
+                }
+              }
+            });
+            return; // Skip adding the animal itself
+          }
 
           // Special handling for Craft action on Buildings
           if (actionName === 'Craft' && instance.collection === 'Buildings') {

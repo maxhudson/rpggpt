@@ -2,23 +2,29 @@
  * Updates animal positions based on their patrol areas
  * @param {Object} game - Current game state
  * @param {Object} viewport - Viewport bounds {minX, maxX, minY, maxY} with buffer
- * @returns {Array} - Array of updates for animal positions
+ * @returns {Object} - {updates: Array, messages: Array} - updates for animal positions and messages to display
  */
 export function updateAnimalPositions(game, viewport) {
-  const { activeLocation } = game.instance;
+  const { activeLocation, activeCharacter } = game.instance;
   const location = game.instance.locations[activeLocation];
 
-  if (!location || !location.elementInstances) return [];
+  if (!location || !location.elementInstances) return { updates: [], messages: [] };
 
   const updates = [];
+  const messages = [];
   const moveSpeed = 0.008; // Slower speed (was 0.02)
+  const attackRange = 2; // Distance at which aggressive animals attack
+
+  // Get player position for attack calculations
+  const playerData = game.instance.characters[activeCharacter];
+  const playerPosition = { x: playerData.x, y: playerData.y };
 
   Object.entries(location.elementInstances).forEach(([instanceId, instance]) => {
     // Only process animals
     if (instance.collection !== 'Animals') return;
 
-    // Skip dead animals (health <= 0)
-    if (instance.health !== undefined && instance.health <= 0) return;
+    // Skip dead animals
+    if (instance.isDead) return;
 
     // Check if animal is within viewport buffer (skip if far off-screen)
     if (viewport) {
@@ -34,6 +40,109 @@ export function updateAnimalPositions(game, viewport) {
     // Get patrol area (required for movement)
     const patrol = instance.patrol;
     if (!patrol) return; // No patrol area defined
+
+    // Check if this animal has Attack action (aggressive animals like wolves)
+    const animalDef = game.elements?.Animals?.[instance.element];
+    const hasAttackAction = animalDef?.actions?.Attack;
+
+    if (hasAttackAction) {
+      const currentDay = game.instance.clock.day;
+      const currentTime = game.instance.clock.time;
+      const [hour, minute, period] = currentTime;
+
+      // Convert to minutes since day start
+      let currentMinutes = (period === 'pm' && hour !== 12 ? hour + 12 : (period === 'am' && hour === 12 ? 0 : hour)) * 60 + minute;
+      const currentTimestamp = currentDay * 24 * 60 + currentMinutes;
+
+      const lastAttackTime = instance.lastAttackTime || 0;
+      const attackCooldownMinutes = 0.033; // 2 seconds = ~0.033 minutes (in-game time)
+
+      // Check distance to player
+      const distanceToPlayer = Math.sqrt(
+        Math.pow(instance.x - playerPosition.x, 2) +
+        Math.pow(instance.y - playerPosition.y, 2)
+      );
+
+      // Attack player if within range and cooldown expired
+      if (distanceToPlayer <= attackRange && (currentTimestamp - lastAttackTime) >= attackCooldownMinutes) {
+        // Calculate damage
+        const attackStat = animalDef.stats?.base?.Attack || 1;
+        const damage = Array.isArray(attackStat)
+          ? Math.floor(Math.random() * (attackStat[1] - attackStat[0] + 1)) + attackStat[0]
+          : attackStat;
+
+        // Damage the player (reduce character health)
+        const currentHealth = playerData.stats?.Health || 10;
+        const newHealth = Math.max(0, currentHealth - damage);
+
+        updates.push({
+          type: 'set',
+          path: `instance.characters.${activeCharacter}.stats.Health`,
+          value: newHealth
+        });
+
+        // Update last attack timestamp
+        updates.push({
+          type: 'set',
+          path: `instance.locations.${activeLocation}.elementInstances.${instanceId}.lastAttackTime`,
+          value: currentTimestamp
+        });
+
+        // Add attack message
+        messages.push(`${instance.element} attacks ${activeCharacter} for ${damage} damage! Health: ${newHealth}`);
+      }
+
+      // Also check for nearby animals to attack
+      Object.entries(location.elementInstances).forEach(([targetId, targetInstance]) => {
+        if (targetId === instanceId) return; // Don't attack self
+        if (targetInstance.collection !== 'Animals') return;
+        if (targetInstance.isDead) return; // Don't attack dead animals
+
+        const distanceToTarget = Math.sqrt(
+          Math.pow(instance.x - targetInstance.x, 2) +
+          Math.pow(instance.y - targetInstance.y, 2)
+        );
+
+        if (distanceToTarget <= attackRange && (currentTimestamp - lastAttackTime) >= attackCooldownMinutes) {
+          const targetDef = game.elements?.Animals?.[targetInstance.element];
+          const attackStat = animalDef.stats?.base?.Attack || 1;
+          const damage = Array.isArray(attackStat)
+            ? Math.floor(Math.random() * (attackStat[1] - attackStat[0] + 1)) + attackStat[0]
+            : attackStat;
+
+          const currentHealth = targetInstance.health || targetDef?.stats?.base?.Health?.[0] || 10;
+          const newHealth = Math.max(0, currentHealth - damage);
+
+          if (newHealth <= 0) {
+            // Target killed
+            updates.push({
+              type: 'set',
+              path: `instance.locations.${activeLocation}.elementInstances.${targetId}.health`,
+              value: 0
+            });
+            updates.push({
+              type: 'set',
+              path: `instance.locations.${activeLocation}.elementInstances.${targetId}.isDead`,
+              value: true
+            });
+          } else {
+            // Target survives
+            updates.push({
+              type: 'set',
+              path: `instance.locations.${activeLocation}.elementInstances.${targetId}.health`,
+              value: newHealth
+            });
+          }
+
+          // Update last attack timestamp
+          updates.push({
+            type: 'set',
+            path: `instance.locations.${activeLocation}.elementInstances.${instanceId}.lastAttackTime`,
+            value: currentTimestamp
+          });
+        }
+      });
+    }
 
     // Initialize movement state if not present
     const isPaused = instance.isPaused !== undefined ? instance.isPaused : false;
@@ -153,7 +262,7 @@ export function updateAnimalPositions(game, viewport) {
     });
   });
 
-  return updates;
+  return { updates, messages };
 }
 
 /**

@@ -17,7 +17,9 @@ export default function MapSimple({
   game,
   gameRef,
   stageSize,
-  onPositionUpdate
+  onPositionUpdate,
+  onMessage,
+  onGameUpdate
 }) {
   const keysPressed = useRef({});
   const playerPositionRef = useRef(null);
@@ -120,7 +122,7 @@ export default function MapSimple({
       // Update animal positions (always, regardless of player movement)
       if (gameRef?.current && playerPositionRef.current && stageSize) {
         const viewport = calculateViewportBounds(playerPositionRef.current, stageSize, cellSize);
-        const animalUpdates = updateAnimalPositions(gameRef.current, viewport);
+        const { updates: animalUpdates, messages } = updateAnimalPositions(gameRef.current, viewport);
 
         if (animalUpdates.length > 0) {
           // Apply updates directly to gameRef (mutate in place for performance)
@@ -138,6 +140,16 @@ export default function MapSimple({
 
           // Force re-render to show animal movement
           forceUpdate(prev => prev + 1);
+
+          // Notify GamePage of state change (for game over checks)
+          if (onGameUpdate) {
+            onGameUpdate();
+          }
+        }
+
+        // Send attack messages to GamePage
+        if (messages.length > 0 && onMessage) {
+          messages.forEach(message => onMessage(message));
         }
       }
     };

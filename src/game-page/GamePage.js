@@ -149,6 +149,7 @@ export default function GamePage() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [gameOverMessage, setGameOverMessage] = useState('');
   const [selectedActionType, setSelectedActionType] = useState(null);
+  const [redFlash, setRedFlash] = useState(false);
 
   const resetGame = () => {
     if (confirm('Are you sure you want to reset the game? All progress will be lost.')) {
@@ -399,6 +400,32 @@ export default function GamePage() {
                   width: window.innerWidth,
                   height: window.innerHeight
                 }}
+                onMessage={(message) => {
+                  // Add attack messages to history
+                  addToHistory({
+                    type: 'response',
+                    content: { storyText: message }
+                  });
+
+                  // Trigger red flash effect
+                  setRedFlash(true);
+                  setTimeout(() => setRedFlash(false), 200);
+                }}
+                onGameUpdate={() => {
+                  // Check for game over after animal attacks
+                  const gameOverStatus = checkGameOver(gameRef.current);
+                  if (gameOverStatus.isGameOver) {
+                    // Add game over message to history
+                    addToHistory({
+                      type: 'response',
+                      content: { storyText: gameOverStatus.reason }
+                    });
+                    // Set game over flag
+                    gameRef.current.instance.isGameOver = true;
+                    setIsGameOver(true);
+                    forceUpdate();
+                  }
+                }}
                 onPositionUpdate={(newPosition, options = {}) => {
                   // Update character position in game state
                   const characterName = gameRef.current.instance.activeCharacter;
@@ -426,6 +453,19 @@ export default function GamePage() {
                 }}
               />
               <FilmNoise opacity={0.2} intensity={0.2} />
+              {/* Red flash overlay when attacked */}
+              {redFlash && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(255, 0, 0, 0.3)',
+                  pointerEvents: 'none',
+                  zIndex: 9999
+                }} />
+              )}
               <HUD
                 game={game}
                 history={history}

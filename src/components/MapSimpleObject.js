@@ -50,6 +50,10 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   // Animation and flipping for animals
   const isAnimal = instance.collection === 'Animals';
   const facingRight = instance.facingRight !== undefined ? instance.facingRight : false;
+  const isDead = instance.isDead || false;
+
+  // Dead animals have 0.5 opacity
+  const animalOpacity = isDead ? 0.5 : 1;
 
   if (image) {
     var spriteData = sprites[spriteId];
@@ -59,7 +63,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   var yScale = 0.75;
 
   return (
-    <Group x={x} y={y} opacity={characterIsBehind ? 1 : 1}>
+    <Group x={x} y={y} opacity={isAnimal ? animalOpacity : (characterIsBehind ? 1 : 1)}>
       {image ? (
         <>
           <Image
@@ -95,6 +99,8 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   );
 }, (prevProps, nextProps) => {
   // Only re-render if these specific props change
+  const isAnimal = prevProps.instance.collection === 'Animals';
+
   return (
     prevProps.x === nextProps.x &&
     prevProps.y === nextProps.y &&
@@ -103,9 +109,12 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     prevProps.instance.level === nextProps.instance.level &&
     prevProps.displayText === nextProps.displayText &&
     prevProps.characterIsBehind === nextProps.characterIsBehind &&
-    prevProps.instance.facingRight === nextProps.instance.facingRight &&
-    prevProps.instance.animationFrame === nextProps.instance.animationFrame &&
-    prevProps.instance.isPaused === nextProps.instance.isPaused
+    (!isAnimal || (
+      prevProps.instance.facingRight === nextProps.instance.facingRight &&
+      prevProps.instance.animationFrame === nextProps.instance.animationFrame &&
+      prevProps.instance.isPaused === nextProps.instance.isPaused &&
+      prevProps.instance.isDead === nextProps.instance.isDead
+    ))
   );
 });
 

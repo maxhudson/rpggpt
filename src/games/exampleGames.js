@@ -16,12 +16,10 @@ export const surviville = {
   enabledActions: {
     "Walk": {elementTypes: ["Objects", "Buildings", "Characters", "Plants"]},
 
-    "Harvest": {elementTypes: ["Plants", "Objects"]},
+    "Harvest": {elementTypes: ["Plants", "Objects", "Animals"]},
     "Forage": {elementTypes: ["Plants"]},
     "Plant": {elementTypes: ["Items"]},
-
-    // "Attack": {elementTypes: ["Animals", "Characters"]},
-    // "Flee": {elementTypes: ["Animals"], notes: "Escape when being attacked"},
+    "Attack": {elementTypes: ["Animals"]},
 
     "Build": {elementTypes: ["Buildings"]},
     "Upgrade": {elementTypes: ["Buildings", "Items"]},
@@ -432,7 +430,9 @@ export const surviville = {
           // Wolf in the dangerous northwest area
           80: {x: -22, y: -18, collection: "Animals", element: "Wolf", level: 1, health: 18, patrol: {minX: -25, maxX: -19, minY: -21, maxY: -15}, movementAngle: 270},
         },
-        inventory: {}
+        inventory: {
+          "Bow": {level: 1, xp: 0},
+        }
       },
       "The Cave": {
         elementInstances: {},

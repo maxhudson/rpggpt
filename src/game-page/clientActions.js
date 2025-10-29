@@ -166,61 +166,74 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
 }
 
 function handleAttack(game, action, location, activeLocation, activeCharacter) {
-  const { targetInstanceId, targetElement } = action;
+  const { targetInstanceId, targetElement, targetAnimal } = action;
   const instance = location.elementInstances[targetInstanceId];
 
   if (!instance) {
     return {
       success: false,
-      message: `${targetElement} not found`,
+      message: `Animal not found`,
       updates: []
     };
   }
 
-  const animalDef = game.elements.Animals?.[targetElement];
+  // targetElement is now the weapon, instance.element is the animal
+  const animalElement = targetAnimal || instance.element;
+  const animalDef = game.elements.Animals?.[animalElement];
   if (!animalDef) {
     return {
       success: false,
-      message: `Cannot attack ${targetElement}`,
+      message: `Cannot attack ${animalElement}`,
       updates: []
     };
   }
 
-  // Simple combat: reduce health by random damage (1-5)
-  const damage = Math.floor(Math.random() * 5) + 1;
+  // targetElement is the weapon being used
+  const weaponName = targetElement || 'fists';
+  const characterInventory = location.inventory;
+
+  // Check if player has the weapon (unless it's fists)
+  if (weaponName !== 'fists' && (!characterInventory[weaponName] || characterInventory[weaponName] <= 0)) {
+    return {
+      success: false,
+      message: `You don't have a ${weaponName}`,
+      updates: []
+    };
+  }
+
+  // Get weapon damage
+  let weaponDamage = [1, 3]; // Base unarmed damage
+  if (weaponName !== 'fists') {
+    const weaponDef = game.elements?.Items?.[weaponName];
+    const attackAction = weaponDef?.actions?.Attack;
+    if (attackAction?.damage) {
+      weaponDamage = attackAction.damage.base;
+    }
+  }
+
+  const [minDmg, maxDmg] = weaponDamage;
+  const damage = Math.floor(Math.random() * (maxDmg - minDmg + 1)) + minDmg;
   const newHealth = Math.max(0, (instance.health || animalDef.stats.base.Health[0]) - damage);
 
   const updates = [];
-  const isKilled = newHealth === 0;
+  const isDead = newHealth <= 0;
 
-  if (isKilled) {
-    // Animal killed - remove instance and add loot
-    const harvestAction = animalDef.actions?.Harvest;
-    if (harvestAction?.output) {
-      const outputItems = harvestAction.output?.Items || harvestAction.output || {};
-      Object.entries(outputItems).forEach(([itemName, amount]) => {
-        const currentAmount = location.inventory[itemName] || 0;
-        updates.push({
-          type: 'set',
-          path: `instance.locations.${activeLocation}.inventory.${itemName}`,
-          value: currentAmount + amount
-        });
-      });
-    }
-
+  if (isDead) {
+    // Animal killed - set health to 0 and mark as dead (don't remove)
     updates.push({
-      type: 'unset',
-      path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}`
+      type: 'set',
+      path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}.health`,
+      value: 0
     });
-
-    const outputItems = harvestAction?.output?.Items || harvestAction?.output || {};
-    const lootList = Object.keys(outputItems).length > 0
-      ? Object.entries(outputItems).map(([item, amt]) => `${amt} ${item}`).join(', ')
-      : 'nothing';
+    updates.push({
+      type: 'set',
+      path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}.isDead`,
+      value: true
+    });
 
     return {
       success: true,
-      storyText: `${activeCharacter} defeats the ${targetElement}! Collected: ${lootList}.`,
+      storyText: `${activeCharacter} defeats the ${animalElement} with ${weaponName}!`,
       updates
     };
   } else {
@@ -233,7 +246,7 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
 
     return {
       success: true,
-      storyText: `${activeCharacter} attacks the ${targetElement} for ${damage} damage. It has ${newHealth} health remaining.`,
+      storyText: `${activeCharacter} attacks the ${animalElement} with ${weaponName} for ${damage} damage. It has ${newHealth} health remaining.`,
       updates
     };
   }
@@ -513,10 +526,10 @@ export function validateInventory(game, actionType, action) {
 
 /**
  * Checks if an action can be handled client-side
- * Returns true for Harvest, Forage, Eat, Sleep to enable instant client-side updates
+ * Returns true for Harvest, Forage, Eat, Sleep, Attack to enable instant client-side updates
  */
 export function canHandleClientSide(actionType) {
-  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep';
+  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep' || actionType === 'Attack';
 }
 
 /**
