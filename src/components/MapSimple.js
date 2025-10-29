@@ -26,6 +26,7 @@ export default function MapSimple({
   const [, forceUpdate] = useState(0);
   const [isWalking, setIsWalking] = useState(false);
   const stageRef = useRef(null);
+  const containerRef = useRef(null);
   const joystickDirection = useRef({ x: 0, y: 0, speed: 0 });
 
   // Extract data from game
@@ -74,7 +75,7 @@ export default function MapSimple({
       // Joystick input (takes priority if active)
       if (joystickDirection.current.x !== 0 || joystickDirection.current.y !== 0) {
         // Use joystick speed multiplier (1 or 2)
-        const joystickSpeed = baseMoveSpeed * joystickDirection.current.speed;
+        const joystickSpeed = baseMoveSpeed * 2;
         deltaX = joystickDirection.current.x * joystickSpeed;
         deltaY = joystickDirection.current.y * joystickSpeed;
       } else {
@@ -209,7 +210,7 @@ export default function MapSimple({
   const yScale = 0.75; // 45-degree camera angle
 
   return (
-    <>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       <Stage
         ref={stageRef}
         width={stageSize.width}
@@ -336,6 +337,7 @@ export default function MapSimple({
               <MapSimpleCharacter
                 key={entity.id}
                 characterName={charName}
+                character={game.elements.Characters[charName]}
                 x={charData.x * cellSize}
                 y={charData.y * cellSize}
                 isWalking={isActiveChar && isWalking}
@@ -347,10 +349,11 @@ export default function MapSimple({
       </Layer>
       </Stage>
       <Joystick
+        containerRef={containerRef}
         onMove={(direction) => {
           joystickDirection.current = direction;
         }}
       />
-    </>
+    </div>
   );
 }

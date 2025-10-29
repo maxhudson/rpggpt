@@ -1,6 +1,32 @@
 // Client-side action handlers for deterministic actions that don't require AI
 
 /**
+ * Gets the inventory object based on game's inventory mode
+ * @param {Object} game - Current game state
+ * @returns {Object} - The inventory object
+ */
+function getInventory(game) {
+  if (game.useLocationBasedInventory) {
+    const { activeLocation } = game.instance;
+    return game.instance.locations[activeLocation]?.inventory || {};
+  }
+  return game.instance.inventory || {};
+}
+
+/**
+ * Gets the inventory path for updates based on game's inventory mode
+ * @param {Object} game - Current game state
+ * @returns {string} - The inventory path
+ */
+function getInventoryPath(game) {
+  if (game.useLocationBasedInventory) {
+    const { activeLocation } = game.instance;
+    return `instance.locations.${activeLocation}.inventory`;
+  }
+  return 'instance.inventory';
+}
+
+/**
  * Handles Harvest action client-side
  * @param {Object} game - Current game state
  * @param {string} actionType - Action type (e.g., "Harvest")
@@ -77,8 +103,9 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
   }
 
   // Check if required tool is present
+  const inventory = getInventory(game);
   if (harvestAction.requiredItem) {
-    const hasItem = location.inventory[harvestAction.requiredItem] > 0;
+    const hasItem = inventory[harvestAction.requiredItem] > 0;
     if (!hasItem) {
       return {
         success: false,
@@ -103,14 +130,15 @@ function handleHarvest(game, action, location, activeLocation, activeCharacter, 
 
   // Build updates
   const updates = [];
+  const inventoryPath = getInventoryPath(game);
 
   // Add items to inventory
   Object.entries(output).forEach(([itemName, amount]) => {
     if (amount > 0) {
-      const currentAmount = location.inventory[itemName] || 0;
+      const currentAmount = inventory[itemName] || 0;
       updates.push({
         type: 'set',
-        path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+        path: `${inventoryPath}.${itemName}`,
         value: currentAmount + amount
       });
     }
@@ -277,7 +305,8 @@ function handleCraft(game, action, location, activeLocation, activeCharacter) {
   }
 
   const characterData = game.instance.characters[activeCharacter];
-  const inventory = location.inventory || {};
+  const inventory = getInventory(game);
+  const inventoryPath = getInventoryPath(game);
 
   // Check costs (Items and Stats)
   const costItems = craftAction.cost?.Items || {};
@@ -314,7 +343,7 @@ function handleCraft(game, action, location, activeLocation, activeCharacter) {
     const currentAmount = inventory[itemName] || 0;
     updates.push({
       type: 'set',
-      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      path: `${inventoryPath}.${itemName}`,
       value: currentAmount - amount
     });
   });
@@ -340,7 +369,7 @@ function handleCraft(game, action, location, activeLocation, activeCharacter) {
     const currentAmount = inventory[itemName] || 0;
     updates.push({
       type: 'set',
-      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      path: `${inventoryPath}.${itemName}`,
       value: currentAmount + amount
     });
   });
@@ -409,6 +438,7 @@ export function calculateTimeUpdate(clock, hoursToAdd) {
 /**
  * Applies energy depletion based on time passed
  * Loses 1 energy per hour when not sleeping
+ * Only applies if Energy stat is defined in game.elements.Stats
  * @param {Object} game - Current game state
  * @param {number} hoursElapsed - Number of hours that passed
  * @param {string} activeCharacter - Active character name
@@ -417,6 +447,10 @@ export function calculateTimeUpdate(clock, hoursToAdd) {
  */
 export function applyEnergyDepletion(game, hoursElapsed, activeCharacter, isSleeping = false) {
   if (isSleeping || hoursElapsed <= 0) return [];
+
+  // Only apply energy depletion if Energy stat is defined in the game
+  const hasEnergyStat = game.elements?.Stats?.Energy;
+  if (!hasEnergyStat) return [];
 
   const characterData = game.instance.characters[activeCharacter];
   const currentEnergy = characterData?.stats?.Energy || 0;
@@ -460,9 +494,10 @@ function handleEat(game, action, location, activeLocation, activeCharacter) {
   }
 
   // Check if item is in inventory (from cost.Items)
+  const inventory = getInventory(game);
   const itemCost = eatAction.cost?.Items || {};
   for (const [itemName, amount] of Object.entries(itemCost)) {
-    const currentAmount = location.inventory[itemName] || 0;
+    const currentAmount = inventory[itemName] || 0;
     if (currentAmount < amount) {
       return {
         success: false,
@@ -473,13 +508,14 @@ function handleEat(game, action, location, activeLocation, activeCharacter) {
   }
 
   const updates = [];
+  const inventoryPath = getInventoryPath(game);
 
   // Consume items from inventory (cost.Items)
   Object.entries(itemCost).forEach(([itemName, amount]) => {
-    const currentAmount = location.inventory[itemName] || 0;
+    const currentAmount = inventory[itemName] || 0;
     updates.push({
       type: 'set',
-      path: `instance.locations.${activeLocation}.inventory.${itemName}`,
+      path: `${inventoryPath}.${itemName}`,
       value: currentAmount - amount
     });
   });
@@ -610,14 +646,21 @@ export function validateInventory(game, actionType, action) {
 
   const missingItems = [];
   const missingStats = [];
+  const missingMoney = [];
 
-  // Handle structured cost format {Items: {}, Stats: {}} or legacy flat format
-  const itemCosts = actionData.cost?.Items || (actionData.cost?.Stats ? {} : actionData.cost);
+  // Handle structured cost format {Items: {}, Stats: {}, money: X} or legacy flat format
+  const itemCosts = actionData.cost?.Items || (actionData.cost?.Stats || actionData.cost?.money ? {} : actionData.cost);
   const statCosts = actionData.cost?.Stats || {};
+  const moneyCost = actionData.cost?.money;
+
+  // Get inventory (universal or location-based)
+  const inventory = game.useLocationBasedInventory
+    ? location?.inventory || {}
+    : game.instance?.inventory || {};
 
   // Check each required item
   Object.entries(itemCosts).forEach(([itemName, requiredAmount]) => {
-    const currentAmount = location.inventory[itemName] || 0;
+    const currentAmount = inventory[itemName] || 0;
     if (currentAmount < requiredAmount) {
       missingItems.push(`${itemName} (have ${currentAmount}, need ${requiredAmount})`);
     }
@@ -631,7 +674,18 @@ export function validateInventory(game, actionType, action) {
     }
   });
 
-  const allMissing = [...missingItems, ...missingStats];
+  // Check money cost
+  if (moneyCost !== undefined && moneyCost > 0) {
+    const currentMoney = game.instance?.money || 0;
+    const minMoney = game.minMoney !== undefined ? game.minMoney : 0;
+    const affordableAmount = currentMoney - minMoney;
+
+    if (affordableAmount < moneyCost) {
+      missingMoney.push(`Money (have $${currentMoney.toLocaleString()}, need $${moneyCost.toLocaleString()}, min balance: $${minMoney.toLocaleString()})`);
+    }
+  }
+
+  const allMissing = [...missingItems, ...missingStats, ...missingMoney];
   if (allMissing.length > 0) {
     return {
       valid: false,
@@ -652,6 +706,7 @@ export function canHandleClientSide(actionType) {
 
 /**
  * Checks if game is over (Energy or Health reached 0)
+ * Only checks stats that are defined in game.elements.Stats
  * @param {Object} game - Current game state
  * @returns {Object} - { isGameOver: boolean, reason: string }
  */
@@ -659,21 +714,28 @@ export function checkGameOver(game) {
   const { activeCharacter } = game.instance;
   const characterData = game.instance.characters[activeCharacter];
 
-  const energy = characterData?.stats?.Energy || 0;
-  const health = characterData?.stats?.Health || 0;
-
-  if (energy <= 0) {
-    return {
-      isGameOver: true,
-      reason: 'You ran out of energy and collapsed. Game Over!'
-    };
+  // Only check Energy if it's defined in the game
+  const hasEnergyStat = game.elements?.Stats?.Energy;
+  if (hasEnergyStat) {
+    const energy = characterData?.stats?.Energy || 0;
+    if (energy <= 0) {
+      return {
+        isGameOver: true,
+        reason: 'You ran out of energy and collapsed. Game Over!'
+      };
+    }
   }
 
-  if (health <= 0) {
-    return {
-      isGameOver: true,
-      reason: 'Your health reached zero. Game Over!'
-    };
+  // Only check Health if it's defined in the game
+  const hasHealthStat = game.elements?.Stats?.Health;
+  if (hasHealthStat) {
+    const health = characterData?.stats?.Health || 0;
+    if (health <= 0) {
+      return {
+        isGameOver: true,
+        reason: 'Your health reached zero. Game Over!'
+      };
+    }
   }
 
   return { isGameOver: false };

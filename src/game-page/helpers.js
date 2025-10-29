@@ -130,8 +130,67 @@ export const calculateAvailableActions = (game) => {
   // Find the nearest object within interaction distance
   const nearestObject = findNearestObject(game);
 
-  // Add always-available actions (Build, Plant)
+  // Add always-available actions (Build, Plant, Investigate, Pass Time, Travel)
   // These show up even when not near specific elements
+
+  // Investigate - always available when no nearby object
+  if (game.enabledActions?.Investigate && !nearestObject) {
+    alwaysAvailable.Investigate = [{
+      targetElement: null,
+      targetCollection: null,
+      actionData: {}
+    }];
+  }
+
+  // Pass Time - always available when no nearby object
+  if (game.enabledActions?.['Pass Time'] && !nearestObject) {
+    alwaysAvailable['Pass Time'] = [{
+      targetElement: null,
+      targetCollection: null,
+      actionData: {}
+    }];
+  }
+
+  // Travel - show all available locations
+  if (game.enabledActions?.Travel && !nearestObject) {
+    const locations = game.elements.Locations || {};
+    const currentLocation = game.instance.activeLocation;
+    const travelOptions = Object.entries(locations)
+      .filter(([locationName]) => locationName !== currentLocation)
+      .map(([locationName, def]) => ({
+        targetElement: locationName,
+        targetCollection: "Locations",
+        actionData: def
+      }));
+
+    if (travelOptions.length > 0) {
+      alwaysAvailable.Travel = travelOptions;
+    }
+  }
+
+  // Rent - show current location if it has rental cost
+  if (game.enabledActions?.Rent && !nearestObject) {
+    const currentLocation = game.instance.activeLocation;
+    const locationDef = game.elements.Locations?.[currentLocation];
+    if (locationDef?.rentalCost && locationDef.rentalCost > 0) {
+      alwaysAvailable.Rent = [{
+        targetElement: currentLocation,
+        targetCollection: "Locations",
+        actionData: { cost: { money: locationDef.rentalCost } }
+      }];
+    }
+  }
+
+  // Hum, Sit, Hunt - custom game-specific actions (always available when no nearby object)
+  ['Hum', 'Sit', 'Hunt', 'Cast'].forEach(actionName => {
+    if (game.enabledActions?.[actionName] && !nearestObject) {
+      alwaysAvailable[actionName] = [{
+        targetElement: null,
+        targetCollection: null,
+        actionData: {}
+      }];
+    }
+  });
 
   // Build - only show when there's NO nearby object (need empty space to build)
   if (game.enabledActions?.Build && !nearestObject) {
@@ -275,6 +334,42 @@ export const calculateAvailableActions = (game) => {
                   actionData: itemDef.actions.Craft
                 });
               }
+            });
+            return; // Skip adding the building itself
+          }
+
+          // Special handling for Buy action on Buildings
+          if (actionName === 'Buy' && instance.collection === 'Buildings') {
+            const prices = actionData.prices || {};
+            Object.entries(prices).forEach(([itemName, price]) => {
+              if (!proximityBased.Buy) {
+                proximityBased.Buy = [];
+              }
+              proximityBased.Buy.push({
+                targetElement: itemName,
+                targetCollection: "Items",
+                targetInstanceId: instanceId,
+                distance: distance,
+                actionData: { cost: { money: price } }
+              });
+            });
+            return; // Skip adding the building itself
+          }
+
+          // Special handling for Sell action on Buildings
+          if (actionName === 'Sell' && instance.collection === 'Buildings') {
+            const prices = actionData.prices || {};
+            Object.entries(prices).forEach(([itemName, price]) => {
+              if (!proximityBased.Sell) {
+                proximityBased.Sell = [];
+              }
+              proximityBased.Sell.push({
+                targetElement: itemName,
+                targetCollection: "Items",
+                targetInstanceId: instanceId,
+                distance: distance,
+                actionData: { value: price }
+              });
             });
             return; // Skip adding the building itself
           }

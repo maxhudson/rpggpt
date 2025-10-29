@@ -20,10 +20,11 @@ const MapSimpleCharacter = React.memo(function MapSimpleCharacter({
   x,
   y,
   characterName,
+  character,
   isWalking = false,
   isActive = false
 }) {
-  const [sprite] = useImage(`/Characters/${characterName}.png`);
+  const [sprite] = useImage(`https://eutvpotvedkjrhptddjf.supabase.co/storage/v1/object/public/sprites/${character.spriteId}/image.png`);
   const imageRef = useRef(null);
   const [bounceOffset, setBounceOffset] = useState(0);
 

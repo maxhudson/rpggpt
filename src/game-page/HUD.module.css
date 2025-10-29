@@ -42,17 +42,19 @@
   flex-direction: row-reverse;
   align-items: flex-end;
   gap: 10px;
+  pointer-events: none;
+}
+
+.footerSpacer {
+  flex-grow: 1;
+}
+.bottomLeft {
+  width: calc(100vw - 40px);
 }
 
 @media (min-width: 769px) {
   .topCenter {
     width: 400px;
-  }
-  .bottomLeft {
-    width: calc(100vw - 40px);
-  }
-  .footerSpacer {
-    flex-grow: 1;
   }
 }
 

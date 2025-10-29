@@ -26,9 +26,18 @@ Generate a JSON response with the following structure:
   "gameOverMessage": null
 }
 
+Inventory System:
+${game.useLocationBasedInventory ?
+`- This game uses LOCATION-BASED inventory
+- Items are stored at instance.locations.[locationName].inventory
+- Actions affect inventory at the current location only` :
+`- This game uses UNIVERSAL inventory
+- Items are stored at instance.inventory (shared across all locations)
+- Actions affect the universal inventory regardless of location`}
+
 Cost and Output Format:
 - Actions use structured format: cost: {Items: {Wood: 5, Stone: 2}, Stats: {Energy: 10}}
-- Items are from location inventory (Wood, Stone, etc.)
+- Items are from ${game.useLocationBasedInventory ? 'location inventory' : 'universal inventory'} (Wood, Stone, etc.)
 - Stats are from character stats (Energy, Health, etc.)
 - Both Items and Stats must be verified before allowing action
 - Output follows same format: output: {Items: {Wood: 5}, Stats: {Energy: 25}}
@@ -40,38 +49,35 @@ ${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => 
 
   let implementation = '';
   switch(actionName) {
-    case 'Harvest':
-      implementation = 'Valid on: Plants, Objects. (1) Check requiredTool in inventory, (2) Set inventory with harvested items from output.Items, (3) UNSET the harvested elementInstance';
-      break;
-    case 'Forage':
-      implementation = 'Valid on: Plants. Add items from output.Items to inventory. Keep plant instance unchanged other than setting a "lastForaged" clock value on it so we can keep the user from foraging too often.';
-      break;
     case 'Build':
-      implementation = 'Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in cost.Items exist in inventory AND cost.Stats (e.g., Energy) exist in character stats - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory AND stats from character';
-      break;
-    case 'Craft':
-      implementation = 'Valid on: Items. (1) VERIFY all materials in cost.Items exist in inventory AND cost.Stats (e.g., Energy) exist in character stats - reject if insufficient, (2) Increase crafted item in inventory, (3) Decrease materials from inventory AND stats from character';
+      implementation = `Valid on: Buildings. User prompt includes "at position (x, y)". (1) VERIFY all materials in cost.Items exist in ${game.useLocationBasedInventory ? 'instance.locations.[activeLocation].inventory' : 'instance.inventory'} AND cost.Stats exist in character stats - reject if insufficient, (2) If new: create elementInstance with unique ID at level 1 at x,y coordinates; If upgrade: increase level, (3) Decrease materials from inventory AND stats from character`;
       break;
     case 'Plant':
-      implementation = 'Valid on: Plants. User prompt includes "at position (x, y)". Plant action has costs like {Items: {"Tree Seed": 1}, Stats: {Energy: 1}}. (1) VERIFY all costs.Items are met in inventory AND costs.Stats are met in character stats - reject if not, (2) Create new elementInstance (Plant) at specified x,y coordinates, (3) Decrease Items from inventory AND Stats from character';
+      implementation = `Valid on: Plants. User prompt includes "at position (x, y)". Plant action has costs like {Items: {"Tree Seed": 1}, Stats: {Energy: 1}}. (1) VERIFY all costs.Items are met in ${game.useLocationBasedInventory ? 'instance.locations.[activeLocation].inventory' : 'instance.inventory'} AND costs.Stats are met in character stats - reject if not, (2) Create new elementInstance (Plant) at specified x,y coordinates, (3) Decrease Items from inventory AND Stats from character`;
       break;
     case 'Deconstruct':
-      implementation = 'Valid on: Buildings. (1) UNSET the building elementInstance, (2) Return partial materials to inventory based on level';
-      break;
-    case 'Attack':
-      implementation = 'Valid on: Animals. (1) Calculate combat (Health, Attack, Evasiveness), (2) Reduce animal Health or kill, (3) Add loot from output.Items to inventory if killed';
-      break;
-    case 'Buy':
-      implementation = 'Valid on: Buildings (Trading Post). (1) Check building.actions.Buy.prices for item cost, (2) VERIFY player has sufficient money - reject if not, (3) Add item to inventory, (4) Decrease money';
-      break;
-    case 'Sell':
-      implementation = 'Valid on: Buildings (Trading Post). (1) Check building.actions.Sell.prices for item value, (2) VERIFY item exists in inventory - reject if not, (3) Remove item from inventory, (4) Increase money';
+      implementation = `Valid on: Buildings. (1) UNSET the building elementInstance, (2) Return partial materials to ${game.useLocationBasedInventory ? 'instance.locations.[activeLocation].inventory' : 'instance.inventory'} based on level`;
       break;
     case 'Travel':
-      implementation = 'Valid on: Locations. (1) Set instance.activeLocation to new location';
+      implementation = 'Valid on: Locations. (1) Set instance.activeLocation to new location name, (2) Set instance.characters.[activeCharacter].location to new location, (3) Set instance.characters.[activeCharacter].x to 0 and y to 0';
       break;
     case 'Talk':
       implementation = 'Valid on: Characters. (1) Generate contextual dialogue between active character and target character based on their personalities, current situation, and game state, (2) Advance time by timeInMinutes (random range 5-15 minutes), (3) Include dialogue in storyText as a natural conversation';
+      break;
+    case 'Investigate':
+      implementation = 'AI-driven action. Always available when no nearby objects. (1) Allow player to look around, search, or examine the environment, (2) Provide contextual information based on current location, quests, and story state, (3) May reveal hidden items, clues, or locations based on context';
+      break;
+    case 'Pass Time':
+      implementation = 'AI-driven action. (1) User specifies duration (e.g., "1 hour", "until evening"), (2) Advance clock accordingly, (3) Apply energy depletion (1 per hour), (4) Describe what happens during that time period';
+      break;
+    case 'Hunt':
+      implementation = 'AI-driven action. General hunting without targeting specific animal. (1) Roll for encounter based on location and time, (2) If successful, describe encounter and transition to combat or tracking, (3) Advance time by 30-60 minutes';
+      break;
+    case 'Use':
+      implementation = 'Valid on: Items. (1) Check item.actions.Use for effects, (2) Apply effects from output (Stats changes, special effects), (3) Consume or decrease item from inventory if cost defined, (4) Describe the result in storyText';
+      break;
+    case 'Cast':
+      implementation = 'Valid on: Items (spells/magic). (1) Check if player has required items/ingredients in inventory, (2) Apply cost (consume ingredients, deplete mana/energy if defined), (3) Apply spell effects from output, (4) Describe magical result';
       break;
     default:
       implementation = `Valid on: ${validCollections.join(', ')}. Check element definition for specific action rules.`;
@@ -89,13 +95,13 @@ General update rules:
 CRITICAL INVENTORY AND STATS RULES:
 - NEVER allow negative inventory values or character stats
 - Before any action with costs (Build, Craft, Plant, Buy), check that ALL required resources exist:
-  * Check cost.Items against location inventory
-  * Check cost.Stats (e.g., Energy) against character stats
+  * Check cost.Items against ${game.useLocationBasedInventory ? 'instance.locations.[activeLocation].inventory' : 'instance.inventory'}
+  * Check cost.Stats (e.g., Energy) against instance.characters.[activeCharacter].stats
 - If ANY required resource is missing or insufficient, set success: false with a message explaining what's missing
 - Example 1: Building Workbench costs {Items: {Wood: 5}, Stats: {Energy: 3}}. If inventory has Wood: 3 OR character Energy: 2, reject with message "Not enough Wood (have 3, need 5)" or "Not enough Energy (have 2, need 3)"
 - Example 2: Planting Tree costs {Items: {"Tree Seed": 1}, Stats: {Energy: 1}}. Verify both before allowing action.
 - Only decrease inventory AND stats AFTER verifying all costs can be paid
-- Energy depletes 1 per hour during time-based actions (handled by client, but you should still account for it)
+${game.elements?.Stats?.Energy ? '- Energy depletes 1 per hour during time-based actions (handled by client, but you should still account for it)' : ''}
 
 Time rules:
 - Time format is [hour, minute, period] where period is "am" or "pm"

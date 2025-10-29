@@ -90,6 +90,7 @@ export default function GenerateSprite() {
             placeholder="e.g., a wooden treasure chest, a red apple, an oak tree"
             style={{
               width: '100%',
+              color: 'black',
               height: '120px',
               padding: '12px',
               fontSize: '16px',

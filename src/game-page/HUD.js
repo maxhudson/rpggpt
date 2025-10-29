@@ -29,24 +29,38 @@ export default function HUD({
   const characterStats = characterData?.stats || {};
   const statsDefinitions = game.elements?.Stats || {};
 
-  // Calculate inventory items
-  const inventory = game.instance?.locations?.[activeLocation]?.inventory || {};
+  // Get money from instance if defined
+  const instanceMoney = game.instance?.money;
+
+  // Calculate inventory items (universal or location-based)
+  const inventory = game.useLocationBasedInventory
+    ? game.instance?.locations?.[activeLocation]?.inventory || {}
+    : game.instance?.inventory || {};
   const relevantInventoryItems = Object.entries(inventory).filter(([, qty]) => qty > 0);
 
-  // Combine stats and inventory items
+  // Combine stats, money, and inventory items
   const statsEntries = Object.entries(characterStats).map(([name, value]) => ({
     name,
     value,
     type: 'stat',
     def: statsDefinitions[name]
   }));
+
+  // Add money display if defined on instance
+  const moneyEntry = instanceMoney !== undefined ? [{
+    name: 'Money',
+    value: instanceMoney,
+    type: 'money',
+    def: { color: '#4CAF50' }
+  }] : [];
+
   const inventoryEntries = relevantInventoryItems.map(([name, value]) => ({
     name,
     value,
     type: 'item',
     def: game.elements?.Items?.[name]
   }));
-  const allItems = [...statsEntries, ...inventoryEntries];
+  const allItems = [...statsEntries, ...moneyEntry, ...inventoryEntries];
 
   // Get last story text or error message from history
   let lastMessage = '';
@@ -184,7 +198,7 @@ export default function HUD({
       {/* Bottom Left - Action Buttons */}
       <div className={styles.bottomLeft}>
         {!isProcessing && !isGameOver && actionsByType && Object.keys(actionsByType).length > 0 && (
-          <div>
+          <div style={{pointerEvents: 'auto'}}>
             {selectedActionType && actionsByType[selectedActionType] && actionsByType[selectedActionType].length > 1 ? (
               /* Submenu view - show only sub-actions for selected action type */
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -251,11 +265,13 @@ export default function HUD({
 
         {/* Stats and Inventory */}
         {allItems.length > 0 && (
-          <div style={{display: 'flex', flexDirection: 'column-reverse', flexWrap: 'wrap', gap: 2, zIndex: 2000}}>
+          <div style={{display: 'flex', pointerEvents: 'auto', flexDirection: 'column-reverse', flexWrap: 'wrap', gap: 2, zIndex: 2000}}>
             {allItems.map((item) => {
               const itemColor = item.def?.color || 'rgba(0, 0, 0, 0.3)';
               const tooltipContent = item.type === 'stat'
                 ? `${item.name.toUpperCase()}: ${item.value}/${item.def?.maxAmount || 10}`
+                : item.type === 'money'
+                ? `MONEY: ${item.value < 0 ? '-' : ''}$${Math.abs(item.value).toLocaleString()}`
                 : item.name.toUpperCase();
 
               return (
@@ -288,7 +304,7 @@ export default function HUD({
 
                   {/* Content layer */}
                   <span style={{ color: 'white', position: 'relative', zIndex: 1, paddingRight: 10, paddingBottom: 7}}>
-                    {item.name.charAt(0).toUpperCase()}
+                    {item.type === 'money' ? '$' : item.name.charAt(0).toUpperCase()}
                   </span>
                   <span style={{
                     fontSize: '9px',
@@ -298,7 +314,7 @@ export default function HUD({
                     color: 'white',
                     zIndex: 1
                   }}>
-                    {item.value}
+                    {item.type === 'money' ? (item.value < 0 ? '-' : '') + Math.abs(item.value) : item.value}
                   </span>
                 </div>
               );

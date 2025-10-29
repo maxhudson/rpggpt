@@ -230,7 +230,7 @@ export default function Home() {
                           </div>
                         )}
                       </div>
-                      <Image src={`/Characters/${charName}.png`} alt={charName} width={50} height={50}/>
+                      <Image src={`https://eutvpotvedkjrhptddjf.supabase.co/storage/v1/object/public/sprites/${charDef.spriteId}/image.png`} alt={charName} width={50} height={50}/>
                     </Button>
                   ))}
 
