@@ -27,10 +27,11 @@ var game = {
     },
     { id: "harvest_shelter_costs", to: "Build a Tent", conditions: [{action: "Harvest", item: "Wood", quantity: 10}, {action: 'Harvest', item: "Fiber", quantity: 5}] },
     { "id": "build_shelter", to: "Sleep and gain Energy", conditions: [{action: "Build", element: "Basic Shelter", quantity: 1}] },
-    { "id": "forage_berries", to: "gain energy", conditions: [{action: "Forage", element: "Berry Bush", quantity: 3}] },
+    { "id": "forage_berries", to: "gain energy", conditions: [{action: "Forage", item: "Berry", quantity: 3}] },
     { id: "plant_bush", to: "increase Berry availability", conditions: [{action: "Plant", element: "Berry Bush", quantity: 1}] },
     { id: "plant_tree", conditions: [{action: "Plant", element: "Tree", quantity: 1}] },
-    { id: "hunt_deer", conditions: [{action: "Attack", element: "Deer", quantity: 1}] },
+    { id: "craft_bow", to: "Hunt", conditions: [{action: "Craft", item: "Bow", quantity: 1}] },
+    { id: "hunt_deer", to: "try out basic combat", conditions: [{action: "Attack", actionAlias: "Hunt", element: "Deer", quantity: 1}] },
 
   ],
   enabledActions: {
@@ -104,19 +105,19 @@ var game = {
     "Buildings": {
       "Basic Shelter": {color: "#D2691E", spriteId: "Basic Shelter", maxLevel: 3, actions: {
         "Build": {requiredScore: 20, costs: {Items: {"Wood": 10, "Fiber": 5}, Stats: {"Energy": 5}}},
-        "Upgrade": {requiredScore: 40, costs: {Items: {"Wood": 20, "Fiber": 10, "Stone": 2}, Stats: {"Energy": 10}}},
+        "Upgrade": {requiredScore: 40, costs: {Items: {"Wood": 20, "Fiber": 10, "Rock": 2}, Stats: {"Energy": 10}}},
         "Deconstruct": {},
         "Sleep": {output: {Items: {}, Stats: {"Energy": 25}}, capacity: {base: 1, addPerLevel: 1}}
       }},
       "Cabin": {color: "#A0522D", maxLevel: 3, actions: {
-        "Build": {requiredScore: 100, costs: {Items: {"Wood": 100, "Stone": 50}, Stats: {"Energy": 30}}},
-        "Upgrade": {requiredScore: 200, costs: {Items: {"Wood": 50, "Stone": 25}, Stats: {"Energy": 20}}},
+        "Build": {requiredScore: 100, costs: {Items: {"Wood": 100, "Rock": 50}, Stats: {"Energy": 30}}},
+        "Upgrade": {requiredScore: 200, costs: {Items: {"Wood": 50, "Rock": 25}, Stats: {"Energy": 20}}},
         "Deconstruct": {},
         "Sleep": {output: {Items: {}, Stats: {"Energy": 25}}, capacity: {base: 2, addPerLevel: 1}}
       }},
       "Smelter": {color: "#DC143C", maxLevel: 5, actions: {
-        "Build": {requiredScore: 30, costs: {Items: {"Stone": 30, "Clay": 20}, Stats: {"Energy": 20}}},
-        "Upgrade": {requiredScore: 60, costs: {Items: {"Stone": 15, "Clay": 10}, Stats: {"Energy": 15}}},
+        "Build": {requiredScore: 30, costs: {Items: {"Rock": 30, "Clay": 20}, Stats: {"Energy": 20}}},
+        "Upgrade": {requiredScore: 60, costs: {Items: {"Rock": 15, "Clay": 10}, Stats: {"Energy": 15}}},
         "Deconstruct": {},
         "Craft": {compatibleItems: ["Iron"]}
       }},
@@ -127,10 +128,10 @@ var game = {
         "Craft": {compatibleItems: ["Axe", "Pickaxe", "Bow"]}
       }},
       "Trading Post": {color: "#DAA520", maxLevel: 1, actions: {
-        "Build": {requiredScore: 60, costs: {Items: {"Wood": 50, "Stone": 30, "Animal Hide": 10}, Stats: {"Energy": 25}}},
+        "Build": {requiredScore: 60, costs: {Items: {"Wood": 50, "Rock": 30, "Animal Hide": 10}, Stats: {"Energy": 25}}},
         "Deconstruct": {},
-        "Buy": {prices: {"Berry": 5, "Wood": 2, "Stone": 3, "Animal Hide": 8, "Meat Cutlet": 12, "Mushroom": 4, "Fiber": 3, "Clay": 2, "Iron Ore": 10, "Iron": 20}},
-        "Sell": {prices: {"Berry": 3, "Wood": 1, "Stone": 2, "Animal Hide": 5, "Meat Cutlet": 8, "Mushroom": 2, "Fiber": 2, "Clay": 1, "Iron Ore": 6, "Iron": 15}}
+        "Buy": {prices: {"Berry": 5, "Wood": 2, "Rock": 3, "Animal Hide": 8, "Meat Cutlet": 12, "Mushroom": 4, "Fiber": 3, "Clay": 2, "Iron Ore": 10, "Iron": 20}},
+        "Sell": {prices: {"Berry": 3, "Wood": 1, "Rock": 2, "Animal Hide": 5, "Meat Cutlet": 8, "Mushroom": 2, "Fiber": 2, "Clay": 1, "Iron Ore": 6, "Iron": 15}}
       }},
     },
     "Plants": {
@@ -178,62 +179,53 @@ var game = {
       "Rock": {
         color: "#808080",
         spriteId: "Rock",
-        actions: {"Harvest": {output: {"Stone": 1}}}
+        actions: {"Harvest": {output: {"Rock": 1}}}
       },
       "Boulder": {
         color: "#696969",
         spriteId: "Boulder",
         capacity: [20, 30],
-        actions: {"Harvest": {output: {"Stone": [5, 15]}, requiredItem: "Pickaxe"}}
-      },
-      "Clay Deposit": {
-        color: "#CD853F",
-        capacity: [500, 1000],
-        actions: {"Harvest": {output: {"Clay": [5, 15]}, requiredItem: "Pickaxe"}}
-      },
-      "Iron Ore Deposit": {
-        color: "#B87333",
-        capacity: [50, 100],
-        actions: {"Harvest": {output: {"Iron Ore": [1, 3]}, requiredItem: "Pickaxe"}}
+        actions: {"Harvest": {output: {"Rock": [5, 15], "Iron Ore": [1, 3]}, requiredItem: "Pickaxe"}}
       },
     },
     "Items": {
-      "Animal Hide": {color: "#8B4513"},
-      "Wood": {color: "#8B4513"},
-      "Stone": {color: "#808080"},
-      "Clay": {color: "#CD853F"},
+      "Animal Hide": {color: "#8B4513", spriteId: "Animal Hide"},
+      "Wood": {color: "#8B4513", spriteId: "Wood"},
       "Iron Ore": {color: "#B87333"},
-      "Fiber": {color: "#F5DEB3"},
-      "Mushroom": {color: "#A0522D", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 2, health: 2}}, costs: {Items: {"Mushroom": 1}, Stats: {}}}}},
-      "Berry": {color: "#8B008B", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 1, health: 1}}, costs: {Items: {"Berry": 1}, Stats: {}}}}},
-      "Meat": {color: "#DC143C", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 5, health: 5}}, costs: {Items: {"Meat": 1}, Stats: {}}}}},
+      "Rock": {
+        color: "#808080",
+        spriteId: "Rock",
+      },
+      "Fiber": {color: "#F5DEB3", spriteId: "Fiber"},
+      "Mushroom": {color: "#A0522D", spriteId: "Mushroom", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 2, health: 2}}, costs: {Items: {"Mushroom": 1}, Stats: {}}}}},
+      "Berry": {color: "#8B008B", spriteId: "Berry", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 1, health: 1}}, costs: {Items: {"Berry": 1}, Stats: {}}}}},
+      "Meat": {color: "#DC143C", spriteId: "Meat", actions: {"Eat": {output: {Items: {}, Stats: {"Energy": 10, health: 5}}, costs: {Items: {"Meat": 1}, Stats: {}}}}},
 
-      "Iron": {color: "#708090", actions: {
-        "Craft": {requiredScore: 5, costs: {Items: {"Iron Ore": 2, "Wood": 1}, Stats: {"Energy": 3}}}
-      }},
+      // "Iron": {color: "#708090", actions: {
+      //   "Craft": {requiredScore: 5, costs: {Items: {"Iron Ore": 2, "Wood": 1}, Stats: {"Energy": 3}}}
+      // }},
 
-      "Tree Seed": {color: "#8B4513"},
-      "Berry Bush Seed": {color: "#8B008B"},
+      "Tree Seed": {color: "#8B4513", spriteId: "Tree"},
 
-      "Axe": {color: "#696969", maxLevel: 5, actions: {
-        "Craft": {requiredScore: 10, costs: {Items: {"Wood": 2, "Stone": 1}, Stats: {"Energy": 4}}},
-        "Upgrade": {requiredScore: 10, costs: {Items: {"Wood": 2, "Stone": 1}, Stats: {"Energy": 4}}},
+      "Axe": {color: "#696969", spriteId: "Axe", maxLevel: 5, actions: {
+        "Craft": {requiredScore: 10, costs: {Items: {"Wood": 2, "Rock": 1}, Stats: {"Energy": 4}}},
+        "Upgrade": {requiredScore: 10, costs: {Items: {"Wood": 2, "Rock": 1}, Stats: {"Energy": 4}}},
         "Harvest": {compatibility: {"Plants": ["Tree"]}}
       }},
-      "Pickaxe": {color: "#696969", maxLevel: 5, actions: {
-        "Craft": {requiredScore: 10, costs: {Items: {"Wood": 4, "Stone": 2}, Stats: {"Energy": 5}}},
-        "Upgrade": {requiredScore: 10, costs: {Items: {"Wood": 4, "Stone": 2}, Stats: {"Energy": 5}}},
-        "Harvest": {compatibility: {"Objects": ["Boulder", "Clay Deposit", "Iron Ore Deposit"]}}
+      "Pickaxe": {color: "#696969", spriteId: "Bow", maxLevel: 5, actions: {
+        "Craft": {requiredScore: 10, costs: {Items: {"Wood": 4, "Rock": 2}, Stats: {"Energy": 5}}},
+        "Upgrade": {requiredScore: 10, costs: {Items: {"Wood": 4, "Rock": 2}, Stats: {"Energy": 5}}},
+        "Harvest": {compatibility: {"Objects": ["Boulder", "Iron Ore Deposit"]}}
       }},
-      "Bow": {color: "#8B4513", maxLevel: 10, actions: {
+      "Bow": {color: "#8B4513", spriteId: "Bow", maxLevel: 10, actions: {
         "Craft": {requiredScore: 15, costs: {Items: {"Wood": 3, "Fiber": 2}, Stats: {"Energy": 5}}},
         "Upgrade": {requiredScore: 10, costs: {Items: {"Wood": 3, "Fiber": 2}, Stats: {"Energy": 3}}},
         "Attack": {compatibility: {"Animals": ["Deer", "Wolf"]}, damage: {base: [5, 10], addPerLevel: [2, 3]}}
-      }},
+      }}
     },
     "Stats": {
-      "Energy": {maxAmount: 100, startingAmount: 100, color: "#ebb94cff"},
-      "Health": {maxAmount: 10, startingAmount: 10, color: "#b8485eff"}
+      "Energy": {maxAmount: 100, spriteId: 'Energy', startingAmount: 100, color: "#ebb94cff"},
+      "Health": {maxAmount: 100, spriteId: 'Health', startingAmount: 100, color: "#b8485eff"},
     },
     "Locations": {
       "The Forest": {},
@@ -480,7 +472,7 @@ var game = {
           80: {x: -22, y: -18, collection: "Animals", element: "Wolf", level: 1, health: 18, patrol: {minX: -25, maxX: -19, minY: -21, maxY: -15}, movementAngle: 270},
         },
         inventory: {
-          "Bow": {level: 1, xp: 0},
+
         }
       },
       "The Cave": {

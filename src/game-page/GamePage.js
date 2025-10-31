@@ -464,6 +464,98 @@ export default function GamePage() {
     }
   };
 
+  // Unified completion handler for Build/Craft/Upgrade actions
+  const handleActionCompletion = ({ actionType, targetElement, instanceId, craftedItem }) => {
+    const { activeLocation } = gameRef.current.instance;
+    const updates = [];
+
+    // Clear progress and activeAction if they exist (for minigame completion)
+    if (instanceId) {
+      updates.push({
+        type: 'unset',
+        path: `instance.locations.${activeLocation}.elementInstances.${instanceId}.progress`
+      });
+      updates.push({
+        type: 'unset',
+        path: `instance.locations.${activeLocation}.elementInstances.${instanceId}.activeAction`
+      });
+    }
+
+    // Add crafted item to inventory
+    if (actionType === 'Craft' && craftedItem) {
+      const inventoryPath = gameRef.current.useLocationBasedInventory
+        ? `instance.locations.${activeLocation}.inventory`
+        : 'instance.inventory';
+
+      const inventory = gameRef.current.useLocationBasedInventory
+        ? gameRef.current.instance.locations[activeLocation]?.inventory || {}
+        : gameRef.current.instance.inventory || {};
+      console.log(' ----', inventoryPath, craftedItem, inventory);
+      const currentAmount = inventory[craftedItem] || 0;
+      updates.push({
+        type: 'set',
+        path: `${inventoryPath}.${craftedItem}`,
+        value: currentAmount + 1
+      });
+    }
+
+    // Apply updates
+    let newGame = applyUpdates(gameRef.current, updates);
+
+    // Check for newly completed quests
+    const { updates: questUpdates, newlyCompleted } = updateCompletedQuests(newGame);
+    let questCompletionText = '';
+
+    if (questUpdates.length > 0) {
+      newGame = applyUpdates(newGame, questUpdates);
+
+      const completionMessages = newlyCompleted.map(quest => {
+        let questDisplayText = quest.id;
+        if (quest.conditions) {
+          const condition = quest.conditions[0];
+          const targetName = condition.item || condition.element;
+          if (condition.quantity && condition.quantity > 1) {
+            questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
+          } else {
+            questDisplayText = `${condition.action} ${targetName}`;
+          }
+        }
+        return `Quest complete: ${questDisplayText}`;
+      }).join('\n');
+
+      questCompletionText = `\n\n${completionMessages}`;
+    }
+
+    updateGame(newGame, { save: true });
+
+    // Generate story text
+    let storyText;
+    if (actionType === 'Craft') {
+      storyText = `You crafted ${craftedItem}.`;
+    } else if (actionType === 'Upgrade') {
+      storyText = `You upgraded the ${targetElement}.`;
+    } else if (actionType === 'Build') {
+      storyText = `You built a ${targetElement}.`;
+    } else if (actionType === 'Plant') {
+      storyText = `You plant ${targetElement}.`;
+    } else {
+      storyText = `You completed ${actionType}.`;
+    }
+
+    storyText = storyText + questCompletionText;
+
+    const newHistoryItem = {
+      content: {
+        storyText,
+        updates: []
+      },
+      type: 'response'
+    };
+    historyRef.current.push(newHistoryItem);
+    localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+    forceUpdate();
+  };
+
   const game = gameRef.current;
   const history = historyRef.current;
 
@@ -585,94 +677,16 @@ export default function GamePage() {
                 onMinigameComplete={(result) => {
                   const currentNearestObject = findNearestObject(gameRef.current);
                   if (currentNearestObject?.instanceId && currentNearestObject?.instance?.activeAction) {
-                    const { activeLocation } = gameRef.current.instance;
                     const activeAction = currentNearestObject.instance.activeAction;
 
-                    // Wait 1 second before clearing action state
+                    // Wait 1 second before completing
                     setTimeout(() => {
-                      const updates = [
-                        {
-                          type: 'unset',
-                          path: `instance.locations.${activeLocation}.elementInstances.${currentNearestObject.instanceId}.progress`
-                        },
-                        {
-                          type: 'unset',
-                          path: `instance.locations.${activeLocation}.elementInstances.${currentNearestObject.instanceId}.activeAction`
-                        }
-                      ];
-
-                      // Add crafted item to inventory
-                      if (activeAction.actionType === 'Craft') {
-                        const itemName = activeAction.craftedItem;
-                        const inventoryPath = gameRef.current.useLocationBasedInventory
-                          ? `instance.locations.${activeLocation}.inventory`
-                          : 'instance.inventory';
-
-                        const inventory = gameRef.current.useLocationBasedInventory
-                          ? gameRef.current.instance.locations[activeLocation]?.inventory || {}
-                          : gameRef.current.instance.inventory || {};
-
-                        const currentAmount = inventory[itemName] || 0;
-                        updates.push({
-                          type: 'set',
-                          path: `${inventoryPath}.${itemName}`,
-                          value: currentAmount + 1
-                        });
-                      }
-
-                      let newGame = applyUpdates(gameRef.current, updates);
-
-                      // Check for newly completed quests
-                      const { updates: questUpdates, newlyCompleted } = updateCompletedQuests(newGame);
-                      let questCompletionText = '';
-
-                      if (questUpdates.length > 0) {
-                        // Apply quest completion updates
-                        newGame = applyUpdates(newGame, questUpdates);
-
-                        // Generate completion messages for all newly completed quests
-                        const completionMessages = newlyCompleted.map(quest => {
-                          let questDisplayText = quest.id;
-                          if (quest.conditions) {
-                            const condition = quest.conditions[0];
-                            const targetName = condition.item || condition.element;
-                            if (condition.quantity && condition.quantity > 1) {
-                              questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
-                            } else {
-                              questDisplayText = `${condition.action} ${targetName}`;
-                            }
-                          }
-                          return `Quest complete: ${questDisplayText}`;
-                        }).join('\n');
-
-                        questCompletionText = `\n\n${completionMessages}`;
-                      }
-
-                      updateGame(newGame, { save: true });
-
-                      // Generate appropriate message based on action type
-                      let storyText;
-                      if (activeAction.actionType === 'Craft') {
-                        storyText = `You crafted ${activeAction.craftedItem}.`;
-                      } else if (activeAction.actionType === 'Upgrade') {
-                        storyText = `You upgraded the ${currentNearestObject.instance.element}.`;
-                      } else {
-                        storyText = `You built a ${currentNearestObject.instance.element}.`;
-                      }
-
-                      // Add quest completion message if applicable
-                      storyText = storyText + questCompletionText;
-
-                      const newHistoryItem = {
-                        content: {
-                          storyText,
-                          updates: []
-                        },
-                        type: 'response'
-                      };
-                      historyRef.current.push(newHistoryItem);
-                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
-                      forceUpdate();
+                      handleActionCompletion({
+                        actionType: activeAction.actionType,
+                        targetElement: currentNearestObject.instance.element,
+                        instanceId: currentNearestObject.instanceId,
+                        craftedItem: activeAction.craftedItem
+                      });
                     }, 1000);
                   }
                 }}
@@ -692,8 +706,9 @@ export default function GamePage() {
                     const actionData = action.actionData || {};
                     const requiredScore = actionData.requiredScore;
 
-                    // Check if minigames are disabled (debug mode)
-                    const disableMinigames = typeof window !== 'undefined' && localStorage.getItem('debug-disable-minigames') === 'true';
+                    // Check if minigames are enabled (defaults to false/disabled)
+                    const enableMinigames = typeof window !== 'undefined' && localStorage.getItem('enable-minigames') === 'true';
+                    const disableMinigames = !enableMinigames;
 
                     // Determine which client action handler to use
                     const handlerActionType = (actionType === 'Build' || actionType === 'Upgrade') ? 'Build' : actionType;
@@ -756,29 +771,24 @@ export default function GamePage() {
                       updateGame(newGame, { save: true });
                     } else {
                       // Complete immediately if minigames are disabled
-                      const completionResult = completeMinigameAction(gameRef.current, actionType, action.targetElement, instanceId);
+                      // Apply the building/item creation updates first
+                      const newGame = applyUpdates(gameRef.current, result.updates);
+                      updateGame(newGame, { save: false });
 
-                      const allUpdates = [...result.updates, ...completionResult.updates];
-                      const newGame = applyUpdates(gameRef.current, allUpdates);
-                      updateGame(newGame, { save: true });
-
-                      const newHistoryItem = {
-                        content: {
-                          storyText: completionResult.storyText,
-                          updates: []
-                        },
-                        type: 'response'
-                      };
-                      historyRef.current.push(newHistoryItem);
-                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
-                      forceUpdate();
+                      // Then complete the action using unified handler
+                      handleActionCompletion({
+                        actionType,
+                        targetElement: action.targetElement,
+                        instanceId: instanceId,
+                        craftedItem: action.targetElement
+                      });
                     }
 
                     setSelectedActionType(null);
                     return;
                   }
 
-                  // Handle Plant action client-side
+                  // Handle Plant action client-side (similar to Build)
                   if (actionType === 'Plant' && action && action.targetElement) {
                     const result = handleClientAction(gameRef.current, 'Plant', action);
 
@@ -794,12 +804,70 @@ export default function GamePage() {
                       return;
                     }
 
+                    // Apply the plant creation updates first
                     const newGame = applyUpdates(gameRef.current, result.updates);
+                    updateGame(newGame, { save: false });
+
+                    // Complete the Plant action using unified handler (includes quest checking)
+                    handleActionCompletion({
+                      actionType: 'Plant',
+                      targetElement: action.targetElement,
+                      instanceId: null,
+                      craftedItem: null
+                    });
+
+                    setSelectedActionType(null);
+                    return;
+                  }
+
+                  // Handle weapon attack actions client-side
+                  if (action?.isAttackAction) {
+                    const result = handleClientAction(gameRef.current, 'Attack', action);
+
+                    if (!result?.success) {
+                      const newHistoryItem = {
+                        content: { error: true, message: result?.message || 'Cannot attack' },
+                        type: 'error'
+                      };
+                      historyRef.current.push(newHistoryItem);
+                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                      forceUpdate();
+                      setSelectedActionType(null);
+                      return;
+                    }
+
+                    // Apply the attack updates
+                    let newGame = applyUpdates(gameRef.current, result.updates);
+
+                    // Check for newly completed quests
+                    const { updates: questUpdates, newlyCompleted } = updateCompletedQuests(newGame);
+                    let storyText = result.storyText;
+
+                    if (questUpdates.length > 0) {
+                      newGame = applyUpdates(newGame, questUpdates);
+
+                      const completionMessages = newlyCompleted.map(quest => {
+                        let questDisplayText = quest.id;
+                        if (quest.conditions) {
+                          const condition = quest.conditions[0];
+                          const targetName = condition.item || condition.element;
+                          if (condition.quantity && condition.quantity > 1) {
+                            questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
+                          } else {
+                            questDisplayText = `${condition.action} ${targetName}`;
+                          }
+                        }
+                        return `Quest complete: ${questDisplayText}`;
+                      }).join('\n');
+
+                      storyText = `${storyText}\n\n${completionMessages}`;
+                    }
+
                     updateGame(newGame, { save: true });
 
                     const newHistoryItem = {
                       content: {
-                        storyText: result.storyText,
+                        storyText: storyText,
                         updates: []
                       },
                       type: 'response'

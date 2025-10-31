@@ -23,9 +23,10 @@ export function handlePlant(game, plantName) {
   const inventory = game.useLocationBasedInventory
     ? location?.inventory || {}
     : game.instance.inventory || {};
-  console.log(inventory)
-  const charX = characterData.x || 0;
-  const charY = characterData.y || 0;
+
+  // Round character position to nearest integer for grid-aligned planting
+  const charX = Math.round(characterData.x || 0);
+  const charY = Math.round(characterData.y || 0);
 
   const costs = plantDef.actions?.Plant?.costs || {};
 
@@ -89,13 +90,14 @@ export function handlePlant(game, plantName) {
       y: charY,
       collection: 'Plants',
       element: plantName,
-      plantedAt: Date.now()
+      plantedAt: Date.now(),
+      wasPlanted: true
     }
   });
 
   return {
     success: true,
     updates,
-    storyText: `You plant ${plantName}.`
+    storyText: `You planted a ${plantName}.`
   };
 }

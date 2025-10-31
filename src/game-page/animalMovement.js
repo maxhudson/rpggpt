@@ -13,7 +13,7 @@ export function updateAnimalPositions(game, viewport) {
   const updates = [];
   const messages = [];
   const moveSpeed = 0.008; // Slower speed (was 0.02)
-  const attackRange = 2; // Distance at which aggressive animals attack
+  const attackRange = 0.25; // Distance at which aggressive animals attack (matches player interaction range)
 
   // Get player position for attack calculations
   const playerData = game.instance.characters[activeCharacter];

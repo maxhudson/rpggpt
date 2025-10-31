@@ -49,13 +49,16 @@ const ObjectShadow = memo(function ObjectShadow({ instance, instanceId, isNeares
     </>
   );
 }, (prev, next) => {
-  // Only re-render if position, element, or nearest status changes
-  return (
+  // Return true to SKIP re-render (when props are equal)
+  // Return false to allow re-render (when props changed)
+  const positionUnchanged =
     prev.instance.x === next.instance.x &&
-    prev.instance.y === next.instance.y &&
-    prev.instance.element === next.instance.element &&
-    prev.isNearest === next.isNearest
-  );
+    prev.instance.y === next.instance.y;
+  const elementUnchanged = prev.instance.element === next.instance.element;
+  const nearestUnchanged = prev.isNearest === next.isNearest;
+
+  // Skip re-render only if ALL are unchanged
+  return next.instance.collection !== 'Animals' && positionUnchanged && elementUnchanged && nearestUnchanged;
 });
 
 const CharacterShadow = memo(function CharacterShadow({ charData, entityId }) {
@@ -93,11 +96,12 @@ export default function MapSimple({
   const containerRef = useRef(null);
   const joystickDirection = useRef({ x: 0, y: 0, speed: 0 });
 
-  // Extract data from game
+  // Extract data from game (use gameRef for live updates, game prop for static data)
   const activeCharacterName = game?.instance?.activeCharacter;
   const activeLocationName = game?.instance?.activeLocation;
   const characterData = game?.instance?.characters?.[activeCharacterName];
-  const activeLocation = game?.instance?.locations?.[activeLocationName];
+  // Use gameRef.current for activeLocation to get real-time animal position updates
+  const activeLocation = gameRef?.current?.instance?.locations?.[activeLocationName] || game?.instance?.locations?.[activeLocationName];
   const gameElements = game?.elements;
 
   // Initialize player position from character's data
@@ -167,18 +171,130 @@ export default function MapSimple({
           y: playerPositionRef.current.y + deltaY
         };
 
-        // Check if we crossed an integer boundary (moved to a new cell)
-        const crossedXBoundary = Math.floor(oldPosition.x) !== Math.floor(newPosition.x);
-        const crossedYBoundary = Math.floor(oldPosition.y) !== Math.floor(newPosition.y);
-        const crossedBoundary = crossedXBoundary || crossedYBoundary;
+        // Check collision and apply sliding physics
+        let finalPosition = { ...newPosition };
 
-        playerPositionRef.current = newPosition;
-        setIsWalking(true);
+        // Helper function to check if a position collides
+        // Returns collision info: { collides: boolean, elementCenter: {x, y}, collisionRadius: number }
+        const checkCollision = (testPosition) => {
+          // Get fresh location data from gameRef.current to avoid stale references
+          const currentLocation = gameRef?.current?.instance?.locations?.[activeLocationName];
 
-        // Notify parent component of position change if callback provided
-        // Pass timeProgression flag when crossing cell boundaries
-        if (onPositionUpdate) {
-          onPositionUpdate(newPosition, { timeProgression: crossedBoundary });
+          // Check collision with element instances
+          if (currentLocation?.elementInstances) {
+            for (const instance of Object.values(currentLocation.elementInstances)) {
+              const spriteConfig = sprites[instance.element] || {};
+              const collisionRadius = (spriteConfig.width || 1) * (spriteConfig.shadowScale || 0.5) / 2;
+
+              // Calculate center of the element
+              const elementCenterX = instance.x + (spriteConfig.width || 1) / 2;
+              const elementCenterY = instance.y + (spriteConfig.width || 1) / 2;
+
+              // Calculate distance from player to element center
+              const distance = Math.sqrt(
+                Math.pow(testPosition.x - elementCenterX, 2) +
+                Math.pow(testPosition.y - elementCenterY, 2)
+              );
+
+              // Check if player would be within the collision radius
+              if (distance < collisionRadius) {
+                return {
+                  collides: true,
+                  elementCenter: { x: elementCenterX, y: elementCenterY },
+                  collisionRadius,
+                  distance
+                };
+              }
+            }
+          }
+
+          // Check collision with other characters
+          const currentCharacters = gameRef?.current?.instance?.characters;
+          if (currentCharacters) {
+            for (const [charName, charData] of Object.entries(currentCharacters)) {
+              if (charName === activeCharacterName) continue; // Skip self
+              if (charData.location !== activeLocationName) continue; // Skip characters in other locations
+
+              // Characters have a fixed collision radius
+              const collisionRadius = 0.4;
+
+              const distance = Math.sqrt(
+                Math.pow(testPosition.x - charData.x, 2) +
+                Math.pow(testPosition.y - charData.y, 2)
+              );
+
+              if (distance < collisionRadius) {
+                return {
+                  collides: true,
+                  elementCenter: { x: charData.x, y: charData.y },
+                  collisionRadius,
+                  distance
+                };
+              }
+            }
+          }
+
+          return { collides: false };
+        };
+
+        // Check if current position is inside a collision zone (bug recovery)
+        const currentCollision = checkCollision(oldPosition);
+        if (currentCollision.collides) {
+          // Player is stuck inside an object! Push them out
+          const dx = oldPosition.x - currentCollision.elementCenter.x;
+          const dy = oldPosition.y - currentCollision.elementCenter.y;
+          const angle = Math.atan2(dy, dx);
+
+          // Push player to just outside the collision radius
+          const safeDistance = currentCollision.collisionRadius + 0.05;
+          finalPosition = {
+            x: currentCollision.elementCenter.x + Math.cos(angle) * safeDistance,
+            y: currentCollision.elementCenter.y + Math.sin(angle) * safeDistance
+          };
+        }
+        // Normal movement with sliding collision
+        else {
+          const newCollision = checkCollision(finalPosition);
+          if (newCollision.collides) {
+            // Try moving only along X axis (slide horizontally)
+            const xOnlyPosition = { x: newPosition.x, y: oldPosition.y };
+            const xCollision = checkCollision(xOnlyPosition);
+            if (!xCollision.collides) {
+              finalPosition = xOnlyPosition;
+            }
+            // Try moving only along Y axis (slide vertically)
+            else {
+              const yOnlyPosition = { x: oldPosition.x, y: newPosition.y };
+              const yCollision = checkCollision(yOnlyPosition);
+              if (!yCollision.collides) {
+                finalPosition = yOnlyPosition;
+              }
+              // Both axes blocked, don't move at all
+              else {
+                finalPosition = oldPosition;
+              }
+            }
+          }
+        }
+
+        // Update position if it changed
+        if (finalPosition.x !== oldPosition.x || finalPosition.y !== oldPosition.y) {
+          // Check if we crossed an integer boundary (moved to a new cell)
+          const crossedXBoundary = Math.floor(oldPosition.x) !== Math.floor(finalPosition.x);
+          const crossedYBoundary = Math.floor(oldPosition.y) !== Math.floor(finalPosition.y);
+          const crossedBoundary = crossedXBoundary || crossedYBoundary;
+
+          playerPositionRef.current = finalPosition;
+          setIsWalking(true);
+
+          // Notify parent component of position change if callback provided
+          // Pass timeProgression flag when crossing cell boundaries
+          if (onPositionUpdate) {
+            onPositionUpdate(finalPosition, { timeProgression: crossedBoundary });
+          }
+        } else {
+          // Fully blocked, stop walking animation
+          setIsWalking(false);
         }
       } else {
         setIsWalking(false);

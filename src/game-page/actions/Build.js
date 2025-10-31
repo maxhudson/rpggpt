@@ -219,8 +219,9 @@ export function handleBuild(game, targetElement, existingInstanceId = null) {
     });
   } else {
     instanceId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-    const charX = characterData.x || 0;
-    const charY = characterData.y || 0;
+    // Round character position to nearest integer for grid-aligned building
+    const charX = Math.round(characterData.x || 0);
+    const charY = Math.round(characterData.y || 0);
 
     updates.push({
       type: 'set',

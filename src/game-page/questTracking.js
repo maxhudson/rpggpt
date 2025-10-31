@@ -24,8 +24,7 @@ export function checkQuestCondition(condition, game) {
       return itemAmount >= quantity;
     }
 
-    case 'Build':
-    case 'Plant': {
+    case 'Build': {
       // Check if element exists in location
       const elementInstances = location?.elementInstances || {};
       const elementName = element || item;
@@ -35,9 +34,28 @@ export function checkQuestCondition(condition, game) {
       return count >= quantity;
     }
 
-    case 'Eat':
-    case 'Sleep':
+    case 'Plant': {
+      // Check if player-planted elements exist in location
+      const elementInstances = location?.elementInstances || {};
+      const elementName = element || item;
+      const count = Object.values(elementInstances).filter(
+        instance => instance.element === elementName && instance.wasPlanted === true
+      ).length;
+      return count >= quantity;
+    }
+
     case 'Attack': {
+      // Check if animal has been attacked (wasAttacked flag)
+      const elementInstances = location?.elementInstances || {};
+      const elementName = element || item;
+      const attackedAnimals = Object.values(elementInstances).filter(
+        instance => instance.collection === 'Animals' && instance.element === elementName && instance.wasAttacked === true
+      );
+      return attackedAnimals.length >= quantity;
+    }
+
+    case 'Eat':
+    case 'Sleep': {
       // These are tracked via character stats or action counts
       // For now, we can't easily track these client-side
       // Could be extended with action counters in the future

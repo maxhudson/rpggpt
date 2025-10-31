@@ -60,7 +60,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
   const progressPercent = hasProgress ? instance.progress : 0;
   const requiredScore = instance.activeAction?.requiredScore || 100;
   const progressRatio = hasProgress ? Math.min(1, progressPercent / requiredScore) : 0;
-  console.log(imageSize, spriteId);
+
   return (
     <Group x={x} y={y} opacity={isAnimal ? animalOpacity : (characterIsBehind ? 1 : 1)}>
       {image ? (
@@ -74,7 +74,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
             y={(spriteData.yOffset || 0) * cellSize / yScale - imageSize / yScale + spriteData.width * cellSize / 2 * (spriteData.imageScale || 1)}
             scaleX={isAnimal && facingRight ? -1 : 1}
             offsetX={isAnimal && facingRight ? imageSize : 0}
-            opacity={hasProgress ? 0.5 : 1}
+            opacity={instance.lastForaged || hasProgress ? 0.5 : 1}
           />
           {hasProgress && (
             <>
@@ -125,6 +125,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     prevProps.instance.level === nextProps.instance.level &&
     prevProps.instance.progress === nextProps.instance.progress &&
     prevProps.displayText === nextProps.displayText &&
+    prevProps.instance.lastForaged === nextProps.instance.lastForaged &&
     prevProps.characterIsBehind === nextProps.characterIsBehind &&
     (!isAnimal || (
       prevProps.instance.facingRight === nextProps.instance.facingRight &&

@@ -12,7 +12,6 @@ export function Button({ children, onClick, variant = 'filled', disabled = false
     transition: 'all 0.2s',
     fontFamily: 'inherit',
     transform: 'translateY(0)',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
     borderRadius: '5px',
     opacity: 1,
     position: 'relative',

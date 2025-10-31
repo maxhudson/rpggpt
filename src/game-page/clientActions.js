@@ -269,6 +269,13 @@ function handleAttack(game, action, location, activeLocation, activeCharacter) {
   const updates = [];
   const isDead = newHealth <= 0;
 
+  // Mark animal as attacked (for quest tracking)
+  updates.push({
+    type: 'set',
+    path: `instance.locations.${activeLocation}.elementInstances.${targetInstanceId}.wasAttacked`,
+    value: true
+  });
+
   if (isDead) {
     // Animal killed - set health to 0 and mark as dead (don't remove)
     updates.push({

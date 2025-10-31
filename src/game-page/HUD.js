@@ -147,27 +147,39 @@ export default function HUD({
         if (action === 'Harvest' || action === 'Forage' || action === 'Craft') {
           // Check inventory
           current = inventory[targetName] || 0;
-        } else if (action === 'Build' || action === 'Plant') {
+        } else if (action === 'Build') {
           // Check built structures
           const elementInstances = location?.elementInstances || {};
           current = Object.values(elementInstances).filter(
             instance => instance.element === targetName
           ).length;
+        } else if (action === 'Plant') {
+          // Check player-planted elements only
+          const elementInstances = location?.elementInstances || {};
+          current = Object.values(elementInstances).filter(
+            instance => instance.element === targetName && instance.wasPlanted === true
+          ).length;
+        } else if (action === 'Attack') {
+          // Check attacked animals
+          const elementInstances = location?.elementInstances || {};
+          current = Object.values(elementInstances).filter(
+            instance => instance.collection === 'Animals' && instance.element === targetName && instance.wasAttacked === true
+          ).length;
         }
 
         // Format the condition text
         if (quantity && quantity > 1) {
-          return `${action} (${current}/${quantity}) ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
+          return `${action} (${current}/${quantity}) ${targetName}`;
         } else if (quantity === 1) {
-          return `${action} ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
+          return `${action} ${targetName}`;
         } else {
           // No quantity specified
-          return `${action} ${targetName}${quest.to ? ` to ${quest.to}` : ''}`;
+          return `${action} ${targetName}`;
         }
       });
 
       // Combine all condition texts
-      return conditionTexts.join(' and ');
+      return conditionTexts.join(' and ') + (quest.to ? ` to ${quest.to}` : '');
     }
     return '';
   };
@@ -211,16 +223,11 @@ export default function HUD({
                 </div>
               )}
             </div>
-          ) : incompleteQuests.length > 0 ? (
+          ) : (
             <div className={styles.questDisplay}>
-              <TypingText text={getQuestDisplayText(incompleteQuests[0])} speed={16} />
-              {incompleteQuests.length > 1 && (
-                <span style={{fontSize: '0.8em', opacity: 0.6, marginLeft: '8px'}}>
-                  (+{incompleteQuests.length - 1} more)
-                </span>
-              )}
+              <TypingText text={incompleteQuests.length > 0 ? getQuestDisplayText(incompleteQuests[0]) : 'All quests complete!'} speed={16} />
             </div>
-          ) : null}
+          )}
         </div>
 
         {/* Settings Button */}
@@ -228,14 +235,14 @@ export default function HUD({
           onClick={() => setIsSettingsOpen(true)}
           style={{
             position: 'absolute',
-            top: '4px',
-            right: '15px',
+            top: '5px',
+            right: '10px',
             border: 'none',
             color: '#fff',
             cursor: 'pointer',
             fontSize: '20px',
+            opacity: 0.3,
             pointerEvents: 'auto',
-            opacity: 0.7,
             transition: 'opacity 0.2s'
           }}
           onMouseEnter={(e) => e.target.style.opacity = '1'}
@@ -272,7 +279,9 @@ export default function HUD({
                     <Button
                       key={`${selectedActionType}-${index}`}
                       style={{
-                        color: 'white'
+                        color: 'white',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                        borderBottom: '2px solid rgba(0,0,0,0.4)',
                       }}
                       onClick={() => onActionClick(selectedActionType, false, action)}
                     >
@@ -284,7 +293,9 @@ export default function HUD({
                 <Button
                   onClick={() => setSelectedActionType(null)}
                   style={{
-                    color: 'white'
+                    color: 'white',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    borderBottom: '2px solid rgba(0,0,0,0.4)',
                   }}
                 >
                   ← {selectedActionType}
@@ -322,6 +333,12 @@ export default function HUD({
         )}
 
         <div className={styles.footerSpacer} />
+        {/* {nearestObject && (
+          <div style={{color: "#000", textShadow: '0 1px 3px rgba(0,0,0,0.3)',}}>
+            {nearestObject.instance?.element}
+          </div>
+        )}
+        <div className={styles.footerSpacer} /> */}
 
         {/* Stats and Inventory */}
         {allItems.length > 0 && (
@@ -358,22 +375,44 @@ export default function HUD({
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    backgroundColor: itemColor,
+                    zIndex: -1,
+                    // backgroundColor: itemColor,
+                    backgroundColor: 'rgba(239, 235, 226, 1)',
                     pointerEvents: 'none',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     borderRadius: '5px',
+                    // borderBottom: '2px solid rgba(0,0,0,0.4)',
                   }} />
 
                   {/* Content layer */}
-                  <span style={{ color: 'white', position: 'relative', zIndex: 1, paddingRight: 10, paddingBottom: 7}}>
-                    {item.type === 'money' ? '$' : item.name.charAt(0).toUpperCase()}
-                  </span>
+                  {item.def?.spriteId ? (
+                    <img
+                        src={`/${item.type === 'stat' ? 'Stats' : 'Items'}/${item.def.spriteId}.png`}
+                        alt={item.name}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          objectFit: 'contain',
+                          verticalAlign: 'middle'
+                        }}
+                      />
+                    ) : (
+                      <span style={{ color: '#000', position: 'relative', zIndex: 1, paddingRight: 10, paddingBottom: 7}}>
+                        {item.type === 'money' ? '$' : item.name.charAt(0).toUpperCase()}
+                      </span>
+                    )
+                  }
                   <span style={{
                     fontSize: '9px',
                     position: 'absolute',
                     bottom: '2px',
-                    right: '5px',
-                    color: 'white',
+                    zIndex: 1,
+                    right: 2,
+                    color: '#000',
+                    padding: '0 4px',
+                    backgroundColor: 'rgba(239, 235, 226, 0.8)',
+                    // boxShadow: '0 0px 5px rgba(239, 235, 226, 0.6)',
+                    borderTopLeftRadius: '5px',
                     zIndex: 1
                   }}>
                     {item.type === 'money' ? (item.value < 0 ? '-' : '') + Math.abs(item.value) : item.value}

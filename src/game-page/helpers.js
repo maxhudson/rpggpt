@@ -127,6 +127,11 @@ export const calculateAvailableActions = (game) => {
   const alwaysAvailable = {}; // Actions without proximity requirements
   const proximityBased = {}; // Actions that require being near elements
 
+  // Get inventory based on game mode
+  const inventory = game.useLocationBasedInventory
+    ? location?.inventory || {}
+    : game.instance.inventory || {};
+
   // Find the nearest object within interaction distance
   const nearestObject = findNearestObject(game);
 
@@ -249,7 +254,7 @@ export const calculateAvailableActions = (game) => {
 
     // Find the element definition using collection and element
     const elementCategory = game.elements[instance.collection];
-    console.log(instance)
+
     if (elementCategory) {
       const elementDef = elementCategory[instance.element];
       if (elementDef) {
@@ -268,14 +273,14 @@ export const calculateAvailableActions = (game) => {
 
           // Skip Harvest action on plants that are not mature yet
           if (actionName === 'Harvest' && instance.collection === 'Plants') {
-            const plantDef = game.elements?.Plants?.[instance.element];
-            const matureTimeHours = plantDef?.matureTimeHours || 1;
-            const plantedAt = instance.plantedAt || 0;
-            const now = Date.now();
-            const hoursElapsed = (now - plantedAt) / (1000 * 60 * 60);
-            if (hoursElapsed < matureTimeHours) {
-              return;
-            }
+            // const plantDef = game.elements?.Plants?.[instance.element];
+            // const matureTimeHours = plantDef?.matureTimeHours || 1;
+            // const plantedAt = instance.plantedAt || 0;
+            // const now = Date.now();
+            // const hoursElapsed = (now - plantedAt) / (1000 * 60 * 60);
+            // if (hoursElapsed < matureTimeHours) {
+            //   return;
+            // }
           }
 
           // Skip Attack action on dead animals
@@ -291,40 +296,25 @@ export const calculateAvailableActions = (game) => {
           if (actionName === 'Build') return;
 
           // Special handling for Plant action - show plantable items as submenu
-          if (actionName === 'Plant') {
-            // Get all plants that have Plant actions
-            const allPlants = game.elements?.Plants || {};
-            Object.entries(allPlants).forEach(([plantName, plantDef]) => {
-              if (plantDef?.actions?.Plant) {
-                const plantAction = plantDef.actions.Plant;
-                // Check if player has the required seeds/items to plant
-                const costItems = plantAction.costs?.Items || {};
-                const hasRequiredItems = true || Object.entries(costItems).every(([itemName, amount]) => {
-                  const available = inventory[itemName] || 0;
-                  return available >= amount;
-                });
+          if (actionName === 'Plant') return;
 
-                if (hasRequiredItems) {
-                  if (!proximityBased.Plant) {
-                    proximityBased.Plant = [];
-                  }
-                  proximityBased.Plant.push({
-                    targetElement: plantName,
-                    targetCollection: "Plants",
-                    targetInstanceId: null,
-                    distance: 0, // Plant at player position
-                    actionData: plantAction,
-                    items: [plantName] // Pass the plant to be planted
-                  });
-                }
-              }
-            });
-            return; // Don't add the instance itself
-          }
-
-          console.log(actionName, instance)
-          // Special handling for Attack action on Animals - show weapons as submenu
+          // Special handling for Attack action on Animals - show each weapon as individual action
           if (actionName === 'Attack' && instance.collection === 'Animals') {
+            // Always add "Bare Hands" option
+            const bareHandsActionName = 'Bare Hands';
+            if (!proximityBased[bareHandsActionName]) {
+              proximityBased[bareHandsActionName] = [];
+            }
+            proximityBased[bareHandsActionName].push({
+              targetElement: 'fists', // Special identifier for bare hands
+              targetCollection: "Items",
+              targetInstanceId: instanceId, // The animal being attacked
+              targetAnimal: instance.element, // Store the animal type
+              distance: distance,
+              actionData: { damage: { base: [1, 3] } }, // Base unarmed damage
+              isAttackAction: true
+            });
+
             // Find all items with Attack actions
             const allItems = game.elements?.Items || {};
             console.log('Checking items for Attack compatibility with animal:', instance.element, allItems);
@@ -334,17 +324,24 @@ export const calculateAvailableActions = (game) => {
                 // Check if this weapon is compatible with this animal
                 const compatibility = attackAction.compatibility?.Animals || [];
                 console.log('Animal compatibility:', compatibility, instance.element);
-                if (compatibility.length === 0 || compatibility.includes(instance.element)) {
-                  if (!proximityBased.Attack) {
-                    proximityBased.Attack = [];
+
+                // Check if player has this weapon in inventory
+                const hasWeapon = (inventory[itemName] || 0) > 0;
+
+                if ((compatibility.length === 0 || compatibility.includes(instance.element)) && hasWeapon) {
+                  // Create a unique action name for each weapon
+                  const weaponActionName = itemName; // e.g., "Bow"
+                  if (!proximityBased[weaponActionName]) {
+                    proximityBased[weaponActionName] = [];
                   }
-                  proximityBased.Attack.push({
+                  proximityBased[weaponActionName].push({
                     targetElement: itemName, // The weapon being used
                     targetCollection: "Items",
                     targetInstanceId: instanceId, // The animal being attacked
                     targetAnimal: instance.element, // Store the animal type
                     distance: distance,
-                    actionData: attackAction
+                    actionData: attackAction,
+                    isAttackAction: true
                   });
                 }
               }

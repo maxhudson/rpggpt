@@ -4,16 +4,16 @@ import styles from './SettingsModal.module.css';
 
 export function SettingsModal({ isOpen, onClose, gameId, onTriggerEvent }) {
   const [disableCosts, setDisableCosts] = useState(false);
-  const [disableMinigames, setDisableMinigames] = useState(false);
+  const [enableMinigames, setEnableMinigames] = useState(false); // Default to disabled
   const [isGeneratingEvent, setIsGeneratingEvent] = useState(false);
 
   // Load settings from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDisableCosts = localStorage.getItem('debug-disable-costs') === 'true';
-      const savedDisableMinigames = localStorage.getItem('debug-disable-minigames') === 'true';
+      const savedEnableMinigames = localStorage.getItem('enable-minigames') === 'true';
       setDisableCosts(savedDisableCosts);
-      setDisableMinigames(savedDisableMinigames);
+      setEnableMinigames(savedEnableMinigames);
     }
   }, []);
 
@@ -23,10 +23,10 @@ export function SettingsModal({ isOpen, onClose, gameId, onTriggerEvent }) {
     localStorage.setItem('debug-disable-costs', checked.toString());
   };
 
-  const handleDisableMinigamesChange = (e) => {
+  const handleEnableMinigamesChange = (e) => {
     const checked = e.target.checked;
-    setDisableMinigames(checked);
-    localStorage.setItem('debug-disable-minigames', checked.toString());
+    setEnableMinigames(checked);
+    localStorage.setItem('enable-minigames', checked.toString());
   };
 
   const handleTriggerEvent = async () => {
@@ -54,6 +54,19 @@ export function SettingsModal({ isOpen, onClose, gameId, onTriggerEvent }) {
 
         <div className={styles.content}>
           <div className={styles.section}>
+            <h3>Game Settings</h3>
+
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={enableMinigames}
+                onChange={handleEnableMinigamesChange}
+              />
+              <span>Enable Minigames</span>
+            </label>
+          </div>
+
+          <div className={styles.section}>
             <h3>Debug Options</h3>
 
             <label className={styles.checkboxLabel}>
@@ -63,15 +76,6 @@ export function SettingsModal({ isOpen, onClose, gameId, onTriggerEvent }) {
                 onChange={handleDisableCostsChange}
               />
               <span>Disable Costs (Testing)</span>
-            </label>
-
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={disableMinigames}
-                onChange={handleDisableMinigamesChange}
-              />
-              <span>Disable Minigames (Testing)</span>
             </label>
           </div>
 

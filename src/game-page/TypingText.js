@@ -28,7 +28,7 @@ export function TypingText({ text, speed = 30, onComplete }) {
       {/* Hidden full text to reserve space */}
       {/* <span style={{ visibility: 'hidden', whiteSpace: 'normal', wordWrap: 'break-word' }}>{text}</span> */}
       {/* Typing text positioned absolutely */}
-      <span style={{color: '#fff', top: 0, left: 0, right: 0, whiteSpace: 'normal', wordWrap: 'break-word' }}>
+      <span style={{color: '#fff', whiteSpace: 'pre-line', top: 0, left: 0, right: 0, whiteSpace: 'normal', wordWrap: 'break-word' }}>
         {displayedText}
       </span>
     </span>

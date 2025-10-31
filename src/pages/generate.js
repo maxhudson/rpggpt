@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 
 export default function GenerateSprite() {
   const [description, setDescription] = useState('');
+  const [type, setType] = useState('object');
   const [generating, setGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState(null);
@@ -26,7 +27,7 @@ export default function GenerateSprite() {
         },
         body: JSON.stringify({
           description: description,
-          type: 'object',
+          type: type,
           count: 1,
           skipCredits: true // Skip credit check for one-off generation
         }),
@@ -82,12 +83,47 @@ export default function GenerateSprite() {
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+            Sprite Type:
+          </label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            style={{
+              width: '100%',
+              color: 'black',
+              padding: '12px',
+              fontSize: '16px',
+              border: '2px solid #ddd',
+              borderRadius: '8px',
+              fontFamily: 'inherit',
+              backgroundColor: 'white',
+              cursor: 'pointer'
+            }}
+            disabled={generating}
+          >
+            <option value="object">Object (Trees, Buildings, Furniture)</option>
+            <option value="item">Item (Collectibles, Tools, Consumables)</option>
+            <option value="character">Character (People, Animals)</option>
+            <option value="material">Material (Tileable Textures)</option>
+            <option value="stat">Stat Icon (UI Icons for Health, Energy, etc.)</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
             Description:
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g., a wooden treasure chest, a red apple, an oak tree"
+            placeholder={
+              type === 'object' ? "e.g., oak tree, wooden cabin, workbench" :
+              type === 'item' ? "e.g., red apple, iron sword, health potion" :
+              type === 'character' ? "e.g., medieval knight, forest deer, village farmer" :
+              type === 'material' ? "e.g., grass texture, stone path, wooden floor" :
+              type === 'stat' ? "e.g., heart icon for health, lightning bolt for energy" :
+              "Describe what you want to generate"
+            }
             style={{
               width: '100%',
               color: 'black',
