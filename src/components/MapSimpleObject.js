@@ -9,12 +9,6 @@ const Group = dynamic(() => import('react-konva').then(mod => ({ default: mod.Gr
 const Text = dynamic(() => import('react-konva').then(mod => ({ default: mod.Text })), { ssr: false });
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
 
-// Konva is only available on client-side
-let Konva;
-if (typeof window !== 'undefined') {
-  Konva = require('konva');
-}
-
 const MapSimpleObject = React.memo(function MapSimpleObject({
   instance,
   instanceId,
@@ -62,6 +56,11 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
 
   var yScale = 0.75;
 
+  const hasProgress = instance.progress !== undefined;
+  const progressPercent = hasProgress ? instance.progress : 0;
+  const requiredScore = instance.activeAction?.requiredScore || 100;
+  const progressRatio = hasProgress ? Math.min(1, progressPercent / requiredScore) : 0;
+  console.log(imageSize, spriteId);
   return (
     <Group x={x} y={y} opacity={isAnimal ? animalOpacity : (characterIsBehind ? 1 : 1)}>
       {image ? (
@@ -73,15 +72,33 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
             height={imageSize / yScale}
             x={-imageSize / 2 + spriteData.width * cellSize / 2}
             y={(spriteData.yOffset || 0) * cellSize / yScale - imageSize / yScale + spriteData.width * cellSize / 2 * (spriteData.imageScale || 1)}
-            scaleX={isAnimal && facingRight ? -1 : 1} // Flip horizontally when facing right
-            offsetX={isAnimal && facingRight ? imageSize : 0} // Adjust offset for flip
-            // filters={Konva ? [Konva.Filters.Pixelate] : []}
-            // pixelSize={8}
+            scaleX={isAnimal && facingRight ? -1 : 1}
+            offsetX={isAnimal && facingRight ? imageSize : 0}
+            opacity={hasProgress ? 0.5 : 1}
           />
+          {hasProgress && (
+            <>
+              <Rect
+                x={(cellSize * 0.4) / 2}
+                y={cellSize / 2 - 3}
+                width={(cellSize * 0.6)}
+                height={6}
+                fill="rgba(0, 0, 0, 0.5)"
+                cornerRadius={5}
+              />
+              <Rect
+                x={(cellSize * 0.4) / 2}
+                y={cellSize / 2 - 3}
+                width={(cellSize * 0.6) * progressRatio}
+                height={6}
+                fill="#fff"
+                cornerRadius={5}
+              />
+            </>
+          )}
         </>
       ) : (
         <>
-          {/* Text label above */}
           <Text
             x={0}
             width={cellSize}
@@ -98,7 +115,6 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     </Group>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if these specific props change
   const isAnimal = prevProps.instance.collection === 'Animals';
 
   return (
@@ -107,6 +123,7 @@ const MapSimpleObject = React.memo(function MapSimpleObject({
     prevProps.opacity === nextProps.opacity &&
     prevProps.instanceId === nextProps.instanceId &&
     prevProps.instance.level === nextProps.instance.level &&
+    prevProps.instance.progress === nextProps.instance.progress &&
     prevProps.displayText === nextProps.displayText &&
     prevProps.characterIsBehind === nextProps.characterIsBehind &&
     (!isAnimal || (

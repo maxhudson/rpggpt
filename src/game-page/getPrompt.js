@@ -67,9 +67,6 @@ ${Object.entries(game.enabledActions || {}).map(([actionName, actionConfig]) => 
     case 'Investigate':
       implementation = 'AI-driven action. Always available when no nearby objects. (1) Allow player to look around, search, or examine the environment, (2) Provide contextual information based on current location, quests, and story state, (3) May reveal hidden items, clues, or locations based on context';
       break;
-    case 'Pass Time':
-      implementation = 'AI-driven action. (1) User specifies duration (e.g., "1 hour", "until evening"), (2) Advance clock accordingly, (3) Apply energy depletion (1 per hour), (4) Describe what happens during that time period';
-      break;
     case 'Hunt':
       implementation = 'AI-driven action. General hunting without targeting specific animal. (1) Roll for encounter based on location and time, (2) If successful, describe encounter and transition to combat or tracking, (3) Advance time by 30-60 minutes';
       break;

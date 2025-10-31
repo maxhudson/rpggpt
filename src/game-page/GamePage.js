@@ -7,11 +7,12 @@ import { Currency } from './Currency';
 import { ActionSelector } from './ActionSelector';
 import { HistoryItem } from './HistoryItem';
 import HUD from './HUD';
+import { EventModal } from './EventModal';
 import { getPrompt } from './getPrompt';
-import { formatTime, calculateAvailableActions } from './helpers';
+import { formatTime, calculateAvailableActions, findNearestObject } from './helpers';
 import { getActionColor } from './actionColors';
-import { handleClientAction, canHandleClientSide, validateInventory, calculateTimeUpdate, applyEnergyDepletion, checkGameOver } from './clientActions';
-import { updateActiveQuest } from './questTracking';
+import { handleClientAction, canHandleClientSide, validateInventory, checkGameOver, completeMinigameAction } from './clientActions';
+import { updateCompletedQuests } from './questTracking';
 import { primaryFont } from '../styles/fonts';
 import styles from './GamePage.module.css';
 
@@ -173,6 +174,7 @@ export default function GamePage() {
   const [gameOverMessage, setGameOverMessage] = useState('');
   const [selectedActionType, setSelectedActionType] = useState(null);
   const [redFlash, setRedFlash] = useState(false);
+  const [activeEvent, setActiveEvent] = useState(null);
 
   const resetGame = () => {
     if (confirm('Are you sure you want to reset the game? All progress will be lost.')) {
@@ -256,34 +258,29 @@ export default function GamePage() {
           // Apply client-side updates immediately
           let newGame = applyUpdates(gameRef.current, clientSideData.updates);
 
-          // Check if quest is complete after applying updates
-          const questUpdate = updateActiveQuest(newGame);
-          if (questUpdate) {
-            // Get current quest info for completion message
-            const currentQuestId = newGame.instance.activeQuest;
-            const quests = newGame.quests || [];
-            const currentQuest = quests.find(q => {
-              const id = typeof q === 'string' ? q : q.id;
-              return id === currentQuestId;
-            });
+          // Check for newly completed quests
+          const { updates: questUpdates, newlyCompleted } = updateCompletedQuests(newGame);
+          if (questUpdates.length > 0) {
+            // Apply quest completion updates
+            newGame = applyUpdates(newGame, questUpdates);
 
-            // Generate quest completion message
-            let questDisplayText = currentQuestId;
-            if (currentQuest && typeof currentQuest === 'object' && currentQuest.conditions) {
-              const condition = currentQuest.conditions[0];
-              const targetName = condition.item || condition.element;
-              if (condition.quantity && condition.quantity > 1) {
-                questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
-              } else {
-                questDisplayText = `${condition.action} ${targetName}`;
+            // Generate completion messages for all newly completed quests
+            const completionMessages = newlyCompleted.map(quest => {
+              let questDisplayText = quest.id;
+              if (quest.conditions) {
+                const condition = quest.conditions[0];
+                const targetName = condition.item || condition.element;
+                if (condition.quantity && condition.quantity > 1) {
+                  questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
+                } else {
+                  questDisplayText = `${condition.action} ${targetName}`;
+                }
               }
-            }
-
-            // Apply quest update
-            newGame = applyUpdates(newGame, [questUpdate]);
+              return `Quest complete: ${questDisplayText}`;
+            }).join('\n');
 
             // Add quest completion to story text
-            clientSideData.storyText = `${clientSideData.storyText}\n\nQuest complete: ${questDisplayText}`;
+            clientSideData.storyText = `${clientSideData.storyText}\n\n${completionMessages}`;
           }
 
           updateGame(newGame);
@@ -428,6 +425,45 @@ export default function GamePage() {
     }
   }
 
+  // Event system handlers
+  const handleTriggerEvent = async () => {
+    const response = await fetch('/api/generate-event', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        game: gameRef.current,
+        history: historyRef.current
+      }),
+    });
+
+    const eventData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(eventData.error || 'Failed to generate event');
+    }
+
+    setActiveEvent(eventData);
+  };
+
+  const handleEventComplete = (data) => {
+    // Add event result to history
+    addToHistory({
+      content: {
+        storyText: data.storyText,
+        updates: data.updates || []
+      },
+      type: 'response'
+    });
+
+    // Apply updates if any
+    if (data.updates && data.updates.length > 0) {
+      const newGame = applyUpdates(gameRef.current, data.updates);
+      updateGame(newGame);
+    }
+  };
+
   const game = gameRef.current;
   const history = historyRef.current;
 
@@ -435,6 +471,7 @@ export default function GamePage() {
 
   // Calculate available actions based on current game state (grouped by type)
   const actionsByType = calculateAvailableActions(game);
+  const nearestObject = findNearestObject(game);
 
   return (
     <div className={primaryFont.className} style={{
@@ -480,7 +517,7 @@ export default function GamePage() {
                     forceUpdate();
                   }
                 }}
-                onPositionUpdate={(newPosition, options = {}) => {
+                onPositionUpdate={(newPosition) => {
                   // Update character position in game state
                   const characterName = gameRef.current.instance.activeCharacter;
 
@@ -489,24 +526,12 @@ export default function GamePage() {
                     { type: 'set', path: `instance.characters.${characterName}.y`, value: newPosition.y }
                   ];
 
-                  // Add time progression if crossing cell boundaries (1 minute per cell)
-                  if (options.timeProgression) {
-                    const hoursElapsed = 1 / 60; // 1 minute
-                    const timeUpdate = calculateTimeUpdate(gameRef.current.instance.clock, hoursElapsed);
-                    if (timeUpdate) {
-                      updates.push(timeUpdate);
-                    }
-                    // Apply energy depletion (1 per hour)
-                    const energyDepletionUpdates = applyEnergyDepletion(gameRef.current, hoursElapsed, characterName, false);
-                    updates.push(...energyDepletionUpdates);
-                  }
-
                   const newGame = applyUpdates(gameRef.current, updates);
                   // Use debounced save for movement to avoid excessive localStorage writes
                   updateGameWithDebounce(newGame);
                 }}
               />
-              <FilmNoise opacity={0.2} intensity={0.2} />
+              {/* <FilmNoise opacity={0.2} intensity={0.2} /> */}
               {/* Red flash overlay when attacked */}
               {redFlash && (
                 <div style={{
@@ -522,12 +547,135 @@ export default function GamePage() {
               )}
               <HUD
                 game={game}
+                gameRef={gameRef}
+                gameId={gameId}
                 history={history}
                 actionsByType={actionsByType}
                 isProcessing={isProcessing}
                 isGameOver={isGameOver}
                 selectedActionType={selectedActionType}
                 setSelectedActionType={setSelectedActionType}
+                nearestObject={nearestObject}
+                onTriggerEvent={handleTriggerEvent}
+                onMinigameEvent={(event) => {
+                  const { energyCost, progress } = event;
+                  const characterName = gameRef.current.instance.activeCharacter;
+                  const currentEnergy = gameRef.current.instance.characters?.[characterName]?.stats?.Energy || 0;
+                  const newEnergy = Math.max(0, currentEnergy - energyCost);
+
+                  const updates = [{
+                    type: 'set',
+                    path: `instance.characters.${characterName}.stats.Energy`,
+                    value: newEnergy
+                  }];
+
+                  const currentNearestObject = findNearestObject(gameRef.current);
+                  if (currentNearestObject?.instanceId) {
+                    const { activeLocation } = gameRef.current.instance;
+                    updates.push({
+                      type: 'set',
+                      path: `instance.locations.${activeLocation}.elementInstances.${currentNearestObject.instanceId}.progress`,
+                      value: progress
+                    });
+                  }
+
+                  const newGame = applyUpdates(gameRef.current, updates);
+                  updateGame(newGame, { save: false });
+                }}
+                onMinigameComplete={(result) => {
+                  const currentNearestObject = findNearestObject(gameRef.current);
+                  if (currentNearestObject?.instanceId && currentNearestObject?.instance?.activeAction) {
+                    const { activeLocation } = gameRef.current.instance;
+                    const activeAction = currentNearestObject.instance.activeAction;
+
+                    // Wait 1 second before clearing action state
+                    setTimeout(() => {
+                      const updates = [
+                        {
+                          type: 'unset',
+                          path: `instance.locations.${activeLocation}.elementInstances.${currentNearestObject.instanceId}.progress`
+                        },
+                        {
+                          type: 'unset',
+                          path: `instance.locations.${activeLocation}.elementInstances.${currentNearestObject.instanceId}.activeAction`
+                        }
+                      ];
+
+                      // Add crafted item to inventory
+                      if (activeAction.actionType === 'Craft') {
+                        const itemName = activeAction.craftedItem;
+                        const inventoryPath = gameRef.current.useLocationBasedInventory
+                          ? `instance.locations.${activeLocation}.inventory`
+                          : 'instance.inventory';
+
+                        const inventory = gameRef.current.useLocationBasedInventory
+                          ? gameRef.current.instance.locations[activeLocation]?.inventory || {}
+                          : gameRef.current.instance.inventory || {};
+
+                        const currentAmount = inventory[itemName] || 0;
+                        updates.push({
+                          type: 'set',
+                          path: `${inventoryPath}.${itemName}`,
+                          value: currentAmount + 1
+                        });
+                      }
+
+                      let newGame = applyUpdates(gameRef.current, updates);
+
+                      // Check for newly completed quests
+                      const { updates: questUpdates, newlyCompleted } = updateCompletedQuests(newGame);
+                      let questCompletionText = '';
+
+                      if (questUpdates.length > 0) {
+                        // Apply quest completion updates
+                        newGame = applyUpdates(newGame, questUpdates);
+
+                        // Generate completion messages for all newly completed quests
+                        const completionMessages = newlyCompleted.map(quest => {
+                          let questDisplayText = quest.id;
+                          if (quest.conditions) {
+                            const condition = quest.conditions[0];
+                            const targetName = condition.item || condition.element;
+                            if (condition.quantity && condition.quantity > 1) {
+                              questDisplayText = `${condition.action} ${condition.quantity} ${targetName}`;
+                            } else {
+                              questDisplayText = `${condition.action} ${targetName}`;
+                            }
+                          }
+                          return `Quest complete: ${questDisplayText}`;
+                        }).join('\n');
+
+                        questCompletionText = `\n\n${completionMessages}`;
+                      }
+
+                      updateGame(newGame, { save: true });
+
+                      // Generate appropriate message based on action type
+                      let storyText;
+                      if (activeAction.actionType === 'Craft') {
+                        storyText = `You crafted ${activeAction.craftedItem}.`;
+                      } else if (activeAction.actionType === 'Upgrade') {
+                        storyText = `You upgraded the ${currentNearestObject.instance.element}.`;
+                      } else {
+                        storyText = `You built a ${currentNearestObject.instance.element}.`;
+                      }
+
+                      // Add quest completion message if applicable
+                      storyText = storyText + questCompletionText;
+
+                      const newHistoryItem = {
+                        content: {
+                          storyText,
+                          updates: []
+                        },
+                        type: 'response'
+                      };
+                      historyRef.current.push(newHistoryItem);
+                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                      forceUpdate();
+                    }, 1000);
+                  }
+                }}
                 onClearMessage={(index) => {
                   // Mark the history item as cleared
                   if (historyRef.current[index]) {
@@ -539,6 +687,131 @@ export default function GamePage() {
                   }
                 }}
                 onActionClick={(actionType, isSingleOption, action) => {
+                  // Handle actions with requiredScore (Build, Upgrade, Craft)
+                  if (action?.actionData?.requiredScore) {
+                    const actionData = action.actionData || {};
+                    const requiredScore = actionData.requiredScore;
+
+                    // Check if minigames are disabled (debug mode)
+                    const disableMinigames = typeof window !== 'undefined' && localStorage.getItem('debug-disable-minigames') === 'true';
+
+                    // Determine which client action handler to use
+                    const handlerActionType = (actionType === 'Build' || actionType === 'Upgrade') ? 'Build' : actionType;
+
+                    const result = handleClientAction(gameRef.current, handlerActionType, {
+                      targetElement: action.targetElement,
+                      targetInstanceId: action.targetInstanceId
+                    });
+
+                    if (!result?.success) {
+                      const newHistoryItem = {
+                        type: 'error',
+                        content: {message: result?.message || `Cannot ${actionType.toLowerCase()}`},
+                        cleared: false,
+                        timestamp: Date.now()
+                      };
+                      historyRef.current.push(newHistoryItem);
+                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                      forceUpdate();
+                      return;
+                    }
+
+                    // Determine which instance to attach action to
+                    let instanceId;
+                    if (actionType === 'Build' || actionType === 'Upgrade') {
+                      // For Build/Upgrade, use the building being built/upgraded
+                      instanceId = result.instanceId || action.targetInstanceId;
+                    } else {
+                      // For Craft and other actions, use nearest object (the building)
+                      const nearestObject = findNearestObject(gameRef.current);
+                      instanceId = nearestObject?.instanceId;
+                    }
+
+                    const { activeLocation } = gameRef.current.instance;
+
+                    // Determine minigame type based on action
+                    let minigameType = 'accuracy'; // Default for Build/Upgrade
+                    if (actionType === 'Craft') {
+                      minigameType = 'timing';
+                    } else if (actionType === 'Attack') {
+                      minigameType = 'accuracy';
+                    }
+
+                    if (!disableMinigames) {
+                      // Start minigame normally
+                      const activeActionValue = {
+                        actionType,
+                        requiredScore,
+                        minigameType,
+                        ...(actionType === 'Craft' && { craftedItem: action.targetElement })
+                      };
+
+                      result.updates.push({
+                        type: 'set',
+                        path: `instance.locations.${activeLocation}.elementInstances.${instanceId}.activeAction`,
+                        value: activeActionValue
+                      });
+
+                      const newGame = applyUpdates(gameRef.current, result.updates);
+                      updateGame(newGame, { save: true });
+                    } else {
+                      // Complete immediately if minigames are disabled
+                      const completionResult = completeMinigameAction(gameRef.current, actionType, action.targetElement, instanceId);
+
+                      const allUpdates = [...result.updates, ...completionResult.updates];
+                      const newGame = applyUpdates(gameRef.current, allUpdates);
+                      updateGame(newGame, { save: true });
+
+                      const newHistoryItem = {
+                        content: {
+                          storyText: completionResult.storyText,
+                          updates: []
+                        },
+                        type: 'response'
+                      };
+                      historyRef.current.push(newHistoryItem);
+                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                      forceUpdate();
+                    }
+
+                    setSelectedActionType(null);
+                    return;
+                  }
+
+                  // Handle Plant action client-side
+                  if (actionType === 'Plant' && action && action.targetElement) {
+                    const result = handleClientAction(gameRef.current, 'Plant', action);
+
+                    if (!result?.success) {
+                      const newHistoryItem = {
+                        content: { error: true, message: result?.message || 'Cannot plant' },
+                        type: 'error'
+                      };
+                      historyRef.current.push(newHistoryItem);
+                      localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                      forceUpdate();
+                      setSelectedActionType(null);
+                      return;
+                    }
+
+                    const newGame = applyUpdates(gameRef.current, result.updates);
+                    updateGame(newGame, { save: true });
+
+                    const newHistoryItem = {
+                      content: {
+                        storyText: result.storyText,
+                        updates: []
+                      },
+                      type: 'response'
+                    };
+                    historyRef.current.push(newHistoryItem);
+                    localStorage.setItem(`game-history-${gameId}`, JSON.stringify(historyRef.current));
+                    forceUpdate();
+
+                    setSelectedActionType(null);
+                    return;
+                  }
+
                   if (isSingleOption) {
                     // If only one option, execute it directly
                     let prompt = '';
@@ -546,17 +819,6 @@ export default function GamePage() {
                       prompt = `${actionType} ${action.targetElement} (Instance ${action.targetInstanceId})`;
                     } else {
                       prompt = `${actionType} ${action.targetElement}`;
-                    }
-
-                    // For Build and Plant actions, append player position
-                    if (actionType === 'Build' || actionType === 'Plant') {
-                      const characterName = gameRef.current.instance.activeCharacter;
-                      const characterData = gameRef.current.instance.characters[characterName];
-                      if (characterData) {
-                        const x = Math.round(characterData.x);
-                        const y = Math.round(characterData.y);
-                        prompt += ` at position (${x}, ${y})`;
-                      }
                     }
 
                     handlePrompt(prompt, actionType, action);
@@ -568,26 +830,11 @@ export default function GamePage() {
                     } else if (action && action.targetElement) {
                       // Submenu item clicked
                       let prompt = '';
-                      const isUpgrade = action.isUpgrade;
 
-                      // For upgrades, use the existing instance ID
-                      if (isUpgrade && action.existingInstanceId) {
-                        prompt = `${actionType} ${action.targetElement} (Instance ${action.existingInstanceId})`;
-                      } else if (action.targetInstanceId) {
+                      if (action.targetInstanceId) {
                         prompt = `${actionType} ${action.targetElement} (Instance ${action.targetInstanceId})`;
                       } else {
                         prompt = `${actionType} ${action.targetElement}`;
-                      }
-
-                      // For Build and Plant actions, append player position (only if new build, not upgrade)
-                      if ((actionType === 'Build' && !isUpgrade) || actionType === 'Plant') {
-                        const characterName = gameRef.current.instance.activeCharacter;
-                        const characterData = gameRef.current.instance.characters[characterName];
-                        if (characterData) {
-                          const x = Math.round(characterData.x);
-                          const y = Math.round(characterData.y);
-                          prompt += ` at position (${x}, ${y})`;
-                        }
                       }
 
                       handlePrompt(prompt, actionType, action);
@@ -602,240 +849,82 @@ export default function GamePage() {
             </>
           )}
         </div>
-
-        <div className={styles.storyWrapper}>
-          {/* <h1 style={{ color: '#fff', marginBottom: 5, fontSize: '1.5rem', fontWeight: 'normal'}}>
-            {game.title}
-          </h1> */}
-          <div style={{fontSize: '1em', marginBottom: 20}}>
-            {game.money !== undefined && (
-              <div style={{marginBottom: 8}}><b><Currency amount={game.money} /></b></div>
-            )}
-
-            {game.weather && (
-              <p style={{opacity: 0.7}}>{game.weather.condition} {game.weather.high && `(${game.weather.low}°F - ${game.weather.high}°F)`}</p>
-            )}
-          </div>
-
-          {/* Action buttons moved to HUD - keep this comment for reference */}
-          {false && !isProcessing && !isGameOver && Object.keys(actionsByType).length > 0 && (
-            <div style={{ marginTop: 30, marginBottom: '20px' }}>
-              {/* Show action type buttons */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginBottom: 15 }}>
-                {Object.keys(actionsByType).map((actionType) => {
-                  const actions = actionsByType[actionType];
-                  const isSingleOption = actions.length === 1;
-                  const singleAction = isSingleOption ? actions[0] : null;
-                  const actionColor = getActionColor(actionType);
-
-                  return (
-                    <Button
-                      key={actionType}
-                      active={selectedActionType === actionType}
-                      onClick={() => {
-                        if (isSingleOption) {
-                          // If only one option, execute it directly
-                          let prompt = '';
-                          if (singleAction.targetInstanceId) {
-                            prompt = `${actionType} ${singleAction.targetElement} (Instance ${singleAction.targetInstanceId})`;
-                          } else {
-                            prompt = `${actionType} ${singleAction.targetElement}`;
-                          }
-
-                          // For Build and Plant actions, append player position
-                          if (actionType === 'Build' || actionType === 'Plant') {
-                            const characterName = gameRef.current.instance.activeCharacter;
-                            const characterData = gameRef.current.instance.characters[characterName];
-                            if (characterData) {
-                              const x = Math.round(characterData.x);
-                              const y = Math.round(characterData.y);
-                              prompt += ` at position (${x}, ${y})`;
-                            }
-                          }
-
-                          handlePrompt(prompt, actionType, singleAction);
-                        } else {
-                          // Multiple options, show submenu
-                          setSelectedActionType(selectedActionType === actionType ? null : actionType);
-                        }
-                      }}
-                      style={{
-                        position: 'relative',
-                      }}
-                    >
-                      {isSingleOption
-                        ? `${singleAction.isUpgrade ? 'Upgrade' : actionType} ${singleAction.targetElement}`
-                        : actionType}
-                      {!isSingleOption && (
-                        <span style={{
-                          fontSize: '9px',
-                          position: 'absolute',
-                          bottom: '2px',
-                          right: '4px',
-                          fontWeight: 'bold',
-                          opacity: 0.7,
-                          pointerEvents: 'none'
-                        }}>
-                          {actions.length}
-                        </span>
-                      )}
-                    </Button>
-                  );
-                })}
-              </div>
-
-              {/* Show submenu for selected action type (only if multiple options) */}
-              {selectedActionType && actionsByType[selectedActionType] && actionsByType[selectedActionType].length > 1 && (
-                <div style={{ marginTop: 10}}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                    {actionsByType[selectedActionType].map((action, index) => {
-                      const isUpgrade = action.isUpgrade;
-                      const displayLabel = isUpgrade ? `Upgrade ${action.targetElement}` : action.targetElement;
-
-                      // Get element color
-                      const elementDef = game.elements?.[action.targetCollection]?.[action.targetElement];
-                      const elementColor = elementDef?.color || '#676767ff';
-
-                      return (
-                        <Button
-                          key={`${selectedActionType}-${index}`}
-                          theme='secondary'
-                          style={{
-                            backgroundColor: elementColor,
-                            color: 'white'
-                          }}
-                          onClick={() => {
-                            let prompt = '';
-
-                            // For upgrades, use the existing instance ID
-                            if (isUpgrade && action.existingInstanceId) {
-                              prompt = `${selectedActionType} ${action.targetElement} (Instance ${action.existingInstanceId})`;
-                            } else if (action.targetInstanceId) {
-                              prompt = `${selectedActionType} ${action.targetElement} (Instance ${action.targetInstanceId})`;
-                            } else {
-                              prompt = `${selectedActionType} ${action.targetElement}`;
-                            }
-
-                            // For Build and Plant actions, append player position (only if new build, not upgrade)
-                            if ((selectedActionType === 'Build' && !isUpgrade) || selectedActionType === 'Plant') {
-                              const characterName = gameRef.current.instance.activeCharacter;
-                              const characterData = gameRef.current.instance.characters[characterName];
-                              if (characterData) {
-                                const x = Math.round(characterData.x);
-                                const y = Math.round(characterData.y);
-                                prompt += ` at position (${x}, ${y})`;
-                              }
-                            }
-
-                            handlePrompt(prompt, selectedActionType, action);
-                            setSelectedActionType(null);
-                          }}
-                        >
-                          {displayLabel}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {isProcessing && (
-            <div style={{ marginBottom: '20px', color: '#666' }}>
-              Loading...
-            </div>
-          )}
-          {/* Story History - Reversed so most recent is at top */}
-          <div style={{ marginBottom: '20px', borderRadius: '5px' }}>
-            {[...history].reverse().map((historyItem, reverseIndex) => {
-              const index = history.length - 1 - reverseIndex; // Original index for checkpoint loading
-              return (
-                <div key={index} style={{ marginTop: '10px' }}>
-                  <HistoryItem
-                    historyItem={historyItem}
-                    onLoadCheckpoint={() => {
-                      if (confirm(`Load checkpoint from Day ${historyItem.content.day}? Current progress will be lost.`)) {
-                        updateGame(historyItem.content.gameState);
-                        updateHistory(history.slice(0, index + 1));
-                        setIsGameOver(false);
-                        setGameOverMessage('');
-                      }
-                    }}
-                  />
-                </div>
-              );
-            })}
-            {game.instance.storyText && (
-              <p style={{ whiteSpace: 'pre-line' }}>{game.instance.storyText}</p>
-            )}
-          </div>
-
-          {/* Game Over Screen */}
-          {isGameOver && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.85)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}>
-              <div style={{
-                backgroundColor: 'white',
-                borderRadius: '8px',
-                width: '90%',
-                textAlign: 'center'
-              }}>
-                <h1 style={{ color: '#c33', marginBottom: '20px' }}>Game Over</h1>
-                <p style={{ fontSize: '18px', marginBottom: '30px', whiteSpace: 'pre-wrap' }}>
-                  {gameOverMessage}
-                </p>
-
-                <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
-                  <strong>Final Stats:</strong>
-                  <div style={{ marginTop: '10px', textAlign: 'left' }}>
-                    {game.clock && <div>Day: {game.clock.day}</div>}
-                    {game.money !== undefined && <div>Money: <Currency amount={game.money} /></div>}
-                    {game.currentLocation && <div>Location: {game.currentLocation}</div>}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <Button
-                    onClick={() => {
-                      // Find most recent checkpoint
-                      const lastCheckpoint = [...history].reverse().find(h => h.type === 'checkpoint');
-                      if (lastCheckpoint) {
-                        updateGame(lastCheckpoint.content.gameState);
-                        updateHistory(history.slice(0, history.lastIndexOf(lastCheckpoint) + 1));
-                        setIsGameOver(false);
-                        setGameOverMessage('');
-                      } else {
-                        alert('No checkpoints available');
-                      }
-                    }}
-                    style={{ backgroundColor: '#ffa500', color: 'white', flex: 1 }}
-                  >
-                    Load Last Checkpoint
-                  </Button>
-                  <Button
-                    onClick={resetGame}
-                    variant="outline"
-                    style={{ borderColor: '#c33', color: '#c33', flex: 1 }}
-                  >
-                    Reset Game
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Game Over Screen */}
+      {isGameOver && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '90%',
+            textAlign: 'center'
+          }}>
+            <h1 style={{ color: '#c33', marginBottom: '20px' }}>Game Over</h1>
+            <p style={{ fontSize: '18px', marginBottom: '30px', whiteSpace: 'pre-wrap' }}>
+              {gameOverMessage}
+            </p>
+
+            <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '5px' }}>
+              <strong>Final Stats:</strong>
+              <div style={{ marginTop: '10px', textAlign: 'left' }}>
+                {game.clock && <div>Day: {game.clock.day}</div>}
+                {game.money !== undefined && <div>Money: <Currency amount={game.money} /></div>}
+                {game.currentLocation && <div>Location: {game.currentLocation}</div>}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <Button
+                onClick={() => {
+                  // Find most recent checkpoint
+                  const lastCheckpoint = [...history].reverse().find(h => h.type === 'checkpoint');
+                  if (lastCheckpoint) {
+                    updateGame(lastCheckpoint.content.gameState);
+                    updateHistory(history.slice(0, history.lastIndexOf(lastCheckpoint) + 1));
+                    setIsGameOver(false);
+                    setGameOverMessage('');
+                  } else {
+                    alert('No checkpoints available');
+                  }
+                }}
+                style={{ backgroundColor: '#ffa500', color: 'white', flex: 1 }}
+              >
+                Load Last Checkpoint
+              </Button>
+              <Button
+                onClick={resetGame}
+                variant="outline"
+                style={{ borderColor: '#c33', color: '#c33', flex: 1 }}
+              >
+                Reset Game
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event Modal */}
+      {activeEvent && (
+        <EventModal
+          event={activeEvent}
+          game={game}
+          history={history}
+          onClose={() => setActiveEvent(null)}
+          onEventComplete={handleEventComplete}
+        />
+      )}
 
       {/* Loading overlay that fades out */}
       {showOverlay && (

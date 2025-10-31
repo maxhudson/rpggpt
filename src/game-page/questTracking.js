@@ -98,46 +98,63 @@ export function getNextQuest(quests, game, currentQuestId) {
 }
 
 /**
- * Update active quest if current one is complete
+ * Check all quests and return updates for newly completed ones
  * @param {Object} game - Current game state
- * @returns {Object|null} - Update object for activeQuest or null if no change
+ * @returns {Array} - Array of update objects for newly completed quests
  */
-export function updateActiveQuest(game) {
-  const { activeQuest } = game.instance;
+export function updateCompletedQuests(game) {
   const quests = game.quests || [];
+  const completedQuests = game.instance?.completedQuests || {};
+  const updates = [];
+  const newlyCompleted = [];
 
-  if (!activeQuest) return null;
+  // Check each quest
+  for (const quest of quests) {
+    // Skip string quests (AI-tracked)
+    if (typeof quest === 'string') continue;
 
-  // activeQuest is now stored as ID (string) - either quest.id or the string quest itself
-  const currentQuestId = activeQuest;
+    const questId = quest.id;
 
-  // Find current quest in quests array
-  const currentQuest = quests.find(quest => {
-    const id = typeof quest === 'string' ? quest : quest.id;
-    return id === currentQuestId;
-  });
+    // Skip if already completed
+    if (completedQuests[questId]) continue;
 
-  // Check if current quest is complete
-  if (currentQuest && isQuestComplete(currentQuest, game)) {
-    // Get next quest
-    const nextQuest = getNextQuest(quests, game, currentQuestId);
-
-    if (nextQuest) {
-      // Return update object - store the ID (quest.id or the string itself)
-      return {
+    // Check if quest is complete
+    if (isQuestComplete(quest, game)) {
+      updates.push({
         type: 'set',
-        path: 'instance.activeQuest',
-        value: typeof nextQuest === 'string' ? nextQuest : nextQuest.id
-      };
-    } else {
-      // No more quests - clear activeQuest
-      return {
-        type: 'set',
-        path: 'instance.activeQuest',
-        value: null
-      };
+        path: `instance.completedQuests.${questId}`,
+        value: { completedAt: Date.now() }
+      });
+      newlyCompleted.push(quest);
     }
   }
 
+  return { updates, newlyCompleted };
+}
+
+/**
+ * Get all incomplete quests
+ * @param {Object} game - Current game state
+ * @returns {Array} - Array of incomplete quest objects
+ */
+export function getIncompleteQuests(game) {
+  const quests = game.quests || [];
+  const completedQuests = game.instance?.completedQuests || {};
+
+  return quests.filter(quest => {
+    if (typeof quest === 'string') return true; // Keep string quests (AI-tracked)
+    return !completedQuests[quest.id];
+  });
+}
+
+/**
+ * @deprecated Use updateCompletedQuests instead
+ */
+export function updateActiveQuest(game) {
+  const result = updateCompletedQuests(game);
+  if (result.updates.length > 0) {
+    // Return first update for backwards compatibility
+    return result.updates[0];
+  }
   return null;
 }

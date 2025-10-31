@@ -106,7 +106,7 @@ export default {
         color: "#90EE90",
         description: "A healing tea made from local herbs. Requires crafting level 2",
         actions: {
-          "Craft": { timeInMinutes: 30, cost: { Items: { "Herb Leaf": 3 } }, requiredLevel: 2 },
+          "Craft": { timeInMinutes: 30, costs: { Items: { "Herb Leaf": 3 } }, requiredLevel: 2 },
           "Use": { output: { Stats: { "Health": 10 } } }
         }
       },

@@ -16,7 +16,6 @@ export default {
     "Sell": { elementTypes: ["Buildings", "Items"] },
     "Craft": { elementTypes: ["Items"] },
     "Travel": { elementTypes: ["Locations"] },
-    "Pass Time": { elementTypes: [] },
     "Rent": { elementTypes: ["Locations"] },
     "Hire": { elementTypes: ["Characters"] }
   },
@@ -52,60 +51,60 @@ export default {
       }
     },
     "Items": {
-      "Ice": { color: "#E0F7FA", actions: { "Buy": { cost: { money: 3 }, output: { Items: { "Ice": 32 } } } } },
-      "Sugar": { color: "#FFFFFF", actions: { "Buy": { cost: { money: 4 }, output: { Items: { "Sugar": 10 } } } } },
-      "Water": { color: "#2196F3", actions: { "Buy": { cost: { money: 2 }, output: { Items: { "Water": 6 } } } } },
-      "Lemon": { color: "#FFEB3B", actions: { "Buy": { cost: { money: 2 }, output: { Items: { "Lemon": 1 } } } } },
-      "Cup": { color: "#FFF8DC", actions: { "Buy": { cost: { money: 5 }, output: { Items: { "Cup": 50 } } } } },
+      "Ice": { color: "#E0F7FA", actions: { "Buy": { costs: { money: 3 }, output: { Items: { "Ice": 32 } } } } },
+      "Sugar": { color: "#FFFFFF", actions: { "Buy": { costs: { money: 4 }, output: { Items: { "Sugar": 10 } } } } },
+      "Water": { color: "#2196F3", actions: { "Buy": { costs: { money: 2 }, output: { Items: { "Water": 6 } } } } },
+      "Lemon": { color: "#FFEB3B", actions: { "Buy": { costs: { money: 2 }, output: { Items: { "Lemon": 1 } } } } },
+      "Cup": { color: "#FFF8DC", actions: { "Buy": { costs: { money: 5 }, output: { Items: { "Cup": 50 } } } } },
       "Lemonade": {
         color: "#FFFF99",
         actions: {
-          "Craft": { timeInMinutes: 3, cost: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 3, costs: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Cup": 1 } } },
           "Sell": { value: 5 }
         }
       },
-      "Strawberry": { color: "#FF6B6B", actions: { "Buy": { cost: { money: 6 }, output: { Items: { "Strawberry": 12 } } } } },
+      "Strawberry": { color: "#FF6B6B", actions: { "Buy": { costs: { money: 6 }, output: { Items: { "Strawberry": 12 } } } } },
       "Strawberry Lemonade": {
         color: "#FFB3BA",
         actions: {
-          "Craft": { timeInMinutes: 4, cost: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Strawberry": 2, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 4, costs: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Strawberry": 2, "Cup": 1 } } },
           "Sell": { value: 8 }
         }
       },
-      "Mint Leaf": { color: "#98FB98", actions: { "Buy": { cost: { money: 4 }, output: { Items: { "Mint Leaf": 8 } } } } },
+      "Mint Leaf": { color: "#98FB98", actions: { "Buy": { costs: { money: 4 }, output: { Items: { "Mint Leaf": 8 } } } } },
       "Mint Lemonade": {
         color: "#BDFCC9",
         actions: {
-          "Craft": { timeInMinutes: 4, cost: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Mint Leaf": 3, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 4, costs: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Mint Leaf": 3, "Cup": 1 } } },
           "Sell": { value: 6 }
         }
       },
-      "Ginger": { color: "#F4A460", actions: { "Buy": { cost: { money: 5 }, output: { Items: { "Ginger": 3 } } } } },
+      "Ginger": { color: "#F4A460", actions: { "Buy": { costs: { money: 5 }, output: { Items: { "Ginger": 3 } } } } },
       "Ginger Lemonade": {
         color: "#FFE4B5",
         actions: {
-          "Craft": { timeInMinutes: 5, cost: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 2, "Water": 1, "Ginger": 1, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 5, costs: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 2, "Water": 1, "Ginger": 1, "Cup": 1 } } },
           "Sell": { value: 7 }
         }
       },
-      "Cucumber": { color: "#90EE90", actions: { "Buy": { cost: { money: 2 }, output: { Items: { "Cucumber": 1 } } } } },
+      "Cucumber": { color: "#90EE90", actions: { "Buy": { costs: { money: 2 }, output: { Items: { "Cucumber": 1 } } } } },
       "Cucumber Mint Lemonade": {
         color: "#AFFFAF",
         actions: {
-          "Craft": { timeInMinutes: 6, cost: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Cucumber": 2, "Mint Leaf": 2, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 6, costs: { Items: { "Lemon": 2, "Ice": 1, "Sugar": 1, "Water": 1, "Cucumber": 2, "Mint Leaf": 2, "Cup": 1 } } },
           "Sell": { value: 9 }
         }
       },
-      "Tea Bag": { color: "#8B4513", actions: { "Buy": { cost: { money: 5 }, output: { Items: { "Tea Bag": 50 } } } } },
+      "Tea Bag": { color: "#8B4513", actions: { "Buy": { costs: { money: 5 }, output: { Items: { "Tea Bag": 50 } } } } },
       "Arnold Palmer": {
         color: "#C19A6B",
         actions: {
-          "Craft": { timeInMinutes: 6, cost: { Items: { "Lemon": 1, "Ice": 1, "Sugar": 1, "Water": 2, "Tea Bag": 1, "Cup": 1 } } },
+          "Craft": { timeInMinutes: 6, costs: { Items: { "Lemon": 1, "Ice": 1, "Sugar": 1, "Water": 2, "Tea Bag": 1, "Cup": 1 } } },
           "Sell": { value: 8 }
         }
       },
-      "Car": { color: "#4A90E2", actions: { "Buy": { cost: { money: 5000 } } } },
-      "Acre of Land": { color: "#8B7355", actions: { "Buy": { cost: { money: 50000 } } } }
+      "Car": { color: "#4A90E2", actions: { "Buy": { costs: { money: 5000 } } } },
+      "Acre of Land": { color: "#8B7355", actions: { "Buy": { costs: { money: 50000 } } } }
     },
     "Buildings": {
       "Grocery Store": {

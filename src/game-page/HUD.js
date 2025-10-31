@@ -1,9 +1,11 @@
-import React from 'react';
-import { formatTime } from './helpers';
+import React, { useState } from 'react';
 import { Button } from './Button';
 import { getActionColor } from './actionColors';
 import { TypingText } from './TypingText';
 import { Tooltip } from 'react-tooltip';
+import { Minigame } from './actions/Minigame';
+import { SettingsModal } from './SettingsModal';
+import { getIncompleteQuests } from './questTracking';
 import styles from './HUD.module.css';
 
 export default function HUD({
@@ -15,14 +17,33 @@ export default function HUD({
   setSelectedActionType,
   onActionClick,
   history,
-  onClearMessage
+  onClearMessage,
+  nearestObject,
+  onMinigameEvent,
+  onMinigameComplete,
+  gameId,
+  onTriggerEvent
 }) {
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   if (!game?.instance) return null;
 
-  const { activeLocation, clock, activeQuest, activeCharacter, characters } = game.instance;
+  const activeAction = nearestObject?.instance?.activeAction
+    ? {
+        ...nearestObject.instance.activeAction,
+        targetElement: nearestObject.instance.element,
+        targetInstanceId: nearestObject.instanceId
+      }
+    : null;
+
+  console.log('[HUD] activeAction:', activeAction, 'nearestObject:', nearestObject);
+
+  const { activeLocation, activeCharacter, characters } = game.instance;
   const locationName = activeLocation || 'Unknown';
-  const timeString = clock?.time ? formatTime(clock.time) : '';
+
+  // Get all incomplete quests
+  const incompleteQuests = getIncompleteQuests(game);
 
   // Get active character stats
   const characterData = characters?.[activeCharacter];
@@ -153,12 +174,17 @@ export default function HUD({
 
   return (
     <>
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        gameId={gameId}
+        onTriggerEvent={onTriggerEvent}
+      />
+
       {/* Top Center - Quest/Message, Time, Location */}
       <div className={styles.topCenter} style={{...lastMessage ? {} : {}}}>
         <div style={{position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: '100%'}}>
-          <div className={styles.timeDisplay}>
-            {timeString} &nbsp; &nbsp; Day {clock?.day} &nbsp; &nbsp; {locationName}
-          </div>
           {lastMessage ? (
             <div className={styles.questDisplay} style={{pointerEvents: 'auto'}}>
               <span style={{flex: 1}}>
@@ -185,23 +211,57 @@ export default function HUD({
                 </div>
               )}
             </div>
-          ) : activeQuest ? (
+          ) : incompleteQuests.length > 0 ? (
             <div className={styles.questDisplay}>
-              <TypingText text={getQuestDisplayText(activeQuest)} speed={16} />
+              <TypingText text={getQuestDisplayText(incompleteQuests[0])} speed={16} />
+              {incompleteQuests.length > 1 && (
+                <span style={{fontSize: '0.8em', opacity: 0.6, marginLeft: '8px'}}>
+                  (+{incompleteQuests.length - 1} more)
+                </span>
+              )}
             </div>
           ) : null}
         </div>
+
+        {/* Settings Button */}
+        <div
+          onClick={() => setIsSettingsOpen(true)}
+          style={{
+            position: 'absolute',
+            top: '4px',
+            right: '15px',
+            border: 'none',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '20px',
+            pointerEvents: 'auto',
+            opacity: 0.7,
+            transition: 'opacity 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.opacity = '1'}
+          onMouseLeave={(e) => e.target.style.opacity = '0.7'}
+        >
+          ⚙
+        </div>
+
         {/* <div style={{position: 'absolute', right: 'calc(100% - 0.25px)', top: 0, width: 0, height: 0, borderRight: '50px solid rgb(68, 64, 61)', borderBottom: '50px solid transparent'}}></div>
         <div style={{position: 'absolute', left: 'calc(100% - 0.25px)', top: 0, width: 0, height: 0, borderLeft: '50px solid rgb(68, 64, 61)', borderBottom: '50px solid transparent'}}></div> */}
       </div>
 
-      {/* Bottom Left - Action Buttons */}
+      {/* Bottom Left - Action Buttons or Minigame */}
       <div className={styles.bottomLeft}>
-        {!isProcessing && !isGameOver && actionsByType && Object.keys(actionsByType).length > 0 && (
+        {activeAction ? (
+          <Minigame
+            minigameType={activeAction.minigameType || 'accuracy'}
+            onEvent={onMinigameEvent}
+            onComplete={onMinigameComplete}
+            requiredScore={activeAction.requiredScore || 100}
+          />
+        ) : !isProcessing && !isGameOver && actionsByType && Object.keys(actionsByType).length > 0 && (
           <div style={{pointerEvents: 'auto'}}>
             {selectedActionType && actionsByType[selectedActionType] && actionsByType[selectedActionType].length > 1 ? (
               /* Submenu view - show only sub-actions for selected action type */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {actionsByType[selectedActionType].map((action, index) => {
                   const isUpgrade = action.isUpgrade;
                   const displayLabel = isUpgrade ? `Upgrade ${action.targetElement}` : action.targetElement;
@@ -232,7 +292,7 @@ export default function HUD({
               </div>
             ) : (
               /* Main action type buttons */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {Object.keys(actionsByType).map((actionType, i) => {
                   const actions = actionsByType[actionType];
                   const isSingleOption = actions.length === 1;
@@ -265,7 +325,7 @@ export default function HUD({
 
         {/* Stats and Inventory */}
         {allItems.length > 0 && (
-          <div style={{display: 'flex', pointerEvents: 'auto', flexDirection: 'column-reverse', flexWrap: 'wrap', gap: 2, zIndex: 2000}}>
+          <div style={{display: 'flex', pointerEvents: 'auto', flexDirection: 'column-reverse', flexWrap: 'wrap', gap: 5, zIndex: 2000}}>
             {allItems.map((item) => {
               const itemColor = item.def?.color || 'rgba(0, 0, 0, 0.3)';
               const tooltipContent = item.type === 'stat'
@@ -286,7 +346,7 @@ export default function HUD({
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '14px',
-                    cursor: 'default'
+                    cursor: 'default',
                   }}
                   data-tooltip-id={`${item.type}-tooltip-${item.name}`}
                   data-tooltip-content={tooltipContent}
@@ -299,7 +359,9 @@ export default function HUD({
                     right: 0,
                     bottom: 0,
                     backgroundColor: itemColor,
-                    pointerEvents: 'none'
+                    pointerEvents: 'none',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    borderRadius: '5px',
                   }} />
 
                   {/* Content layer */}

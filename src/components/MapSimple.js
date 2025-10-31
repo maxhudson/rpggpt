@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, memo } from 'react';
 import dynamic from 'next/dynamic';
 import MapSimpleObject from './MapSimpleObject';
 import MapSimpleCharacter from './MapSimpleCharacter';
@@ -12,6 +12,70 @@ const Stage = dynamic(() => import('react-konva').then(mod => ({ default: mod.St
 const Layer = dynamic(() => import('react-konva').then(mod => ({ default: mod.Layer })), { ssr: false });
 const Ellipse = dynamic(() => import('react-konva').then(mod => ({ default: mod.Ellipse })), { ssr: false });
 const Rect = dynamic(() => import('react-konva').then(mod => ({ default: mod.Rect })), { ssr: false });
+
+// Memoized shadow components
+const ObjectShadow = memo(function ObjectShadow({ instance, instanceId, isNearest }) {
+  const spriteConfig = sprites[instance.element] || {};
+  const width = cellSize * (spriteConfig.width || 1);
+  const shadowScale = spriteConfig.shadowScale || 1;
+  const height = width;
+  const isAnimal = instance.collection === 'Animals';
+  const opacity = isNearest ? 0.5 : 0.25;
+
+  return (
+    <>
+      {!isAnimal && (
+        <Rect
+          key={`shadow-rect-${instanceId}`}
+          x={instance.x * cellSize + 1}
+          y={instance.y * cellSize + 1}
+          width={width - 2}
+          height={height - 2}
+          fill={`rgba(0, 0, 0, ${opacity * 0.2})`}
+          cornerRadius={5}
+        />
+      )}
+      {sprites[instance.element] && spriteConfig.shadowScale !== 0 && (
+        <Ellipse
+          key={`shadow-ellipse-${instanceId}`}
+          x={instance.x * cellSize + width / 2}
+          y={instance.y * cellSize + height / 2}
+          radiusX={width / 2 * shadowScale}
+          radiusY={height / 2 * shadowScale}
+          fill="rgba(0, 0, 0, 0.1)"
+          opacity={spriteConfig.shadowOpacity || 1}
+        />
+      )}
+    </>
+  );
+}, (prev, next) => {
+  // Only re-render if position, element, or nearest status changes
+  return (
+    prev.instance.x === next.instance.x &&
+    prev.instance.y === next.instance.y &&
+    prev.instance.element === next.instance.element &&
+    prev.isNearest === next.isNearest
+  );
+});
+
+const CharacterShadow = memo(function CharacterShadow({ charData, entityId }) {
+  return (
+    <Ellipse
+      key={`shadow-${entityId}`}
+      x={charData.x * cellSize}
+      y={charData.y * cellSize + 1}
+      radiusX={cellSize / 6}
+      radiusY={cellSize / 6}
+      fill="rgba(0, 0, 0, 0.1)"
+    />
+  );
+}, (prev, next) => {
+  // Only re-render if position changes
+  return (
+    prev.charData.x === next.charData.x &&
+    prev.charData.y === next.charData.y
+  );
+});
 
 export default function MapSimple({
   game,
@@ -229,49 +293,21 @@ export default function MapSimple({
         {/* Render shadows for all entities (objects and character) */}
         {[...sortedEntities].reverse().map((entity) => {
           if (entity.type === 'object') {
-            const instance = entity.data;
-            const instanceId = entity.id;
-            const spriteConfig = sprites[instance.element] || {};
-            const width = cellSize * (spriteConfig.width || 1);
-            const shadowScale = spriteConfig.shadowScale || 1;
-            var height = width;
-            const isAnimal = instance.collection === 'Animals';
-
-            // Full opacity only for the nearest object, reduced for all others
-            const isNearest = instanceId === nearestInstanceId;
-            const opacity = isNearest ? 0.5 : 0.25;
-
-            return (<>
-              {!isAnimal && (
-                <Rect
-                  key={`shadow-${instanceId}`}
-                  x={instance.x * cellSize + 1}
-                  y={instance.y * cellSize + 1}
-                  width={width - 2}
-                  height={height - 2}
-                  fill={`rgba(0, 0, 0, ${opacity * 0.2})`}
-                />
-              )}
-              {sprites[instance.element] && spriteConfig.shadowScale !== 0 && (<Ellipse
-                x={instance.x * cellSize + width / 2}
-                y={instance.y * cellSize + height / 2}
-                radiusX={width / 2 * shadowScale}
-                radiusY={height / 2 * shadowScale}
-                fill={`rgba(0, 0, 0, 0.1)`}
-                opacity={(spriteConfig.shadowOpacity || 1)}
-              />)}
-            </>);
-          } else {
-            // Character shadow
-            const charData = entity.data;
+            const isNearest = entity.id === nearestInstanceId;
             return (
-              <Ellipse
+              <ObjectShadow
                 key={`shadow-${entity.id}`}
-                x={charData.x * cellSize}
-                y={charData.y * cellSize + 1}
-                radiusX={cellSize / 6}
-                radiusY={cellSize / 6}
-                fill="rgba(0, 0, 0, 0.1)"
+                instance={entity.data}
+                instanceId={entity.id}
+                isNearest={isNearest}
+              />
+            );
+          } else {
+            return (
+              <CharacterShadow
+                key={`shadow-${entity.id}`}
+                charData={entity.data}
+                entityId={entity.id}
               />
             );
           }

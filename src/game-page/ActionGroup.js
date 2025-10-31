@@ -5,7 +5,6 @@ import { formatCurrency } from './helpers';
 
 export function ActionGroup({ action, onSelectAction }) {
   const [quantities, setQuantities] = useState({});
-  const [passTimeMinutes, setPassTimeMinutes] = useState(30);
 
   // If action has no options, treat it as a single immediate action
   if (!action.options || action.options.length === 0) {
@@ -13,30 +12,6 @@ export function ActionGroup({ action, onSelectAction }) {
       <Button onClick={() => onSelectAction(action.type, null, null)}>
         {action.type}
       </Button>
-    );
-  }
-
-  // Special handling for Pass Time action - show numeric input
-  if (action.type === 'Pass Time') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <input
-          type="number"
-          min="1"
-          value={passTimeMinutes}
-          onChange={(e) => setPassTimeMinutes(parseInt(e.target.value) || 1)}
-          style={{
-            width: '80px',
-            height: '30px',
-            padding: '0 8px',
-            fontSize: '14px',
-          }}
-        />
-        <span>minutes</span>
-        <Button onClick={() => onSelectAction(action.type, passTimeMinutes, null)}>
-          Pass Time
-        </Button>
-      </div>
     );
   }
 

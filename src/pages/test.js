@@ -61,7 +61,6 @@ function Button({ children, onClick, variant = 'filled', disabled = false, style
 // Action Component with back navigation
 function ActionGroup({ action, onSelectAction }) {
   const [quantities, setQuantities] = useState({});
-  const [passTimeMinutes, setPassTimeMinutes] = useState(30);
 
   // If action has no options, treat it as a single immediate action
   if (!action.options || action.options.length === 0) {
@@ -69,33 +68,6 @@ function ActionGroup({ action, onSelectAction }) {
       <Button onClick={() => onSelectAction(action.type, null, null)}>
         {action.type}
       </Button>
-    );
-  }
-
-  // Special handling for Pass Time action - show numeric input
-  if (action.type === 'Pass Time') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <input
-          type="number"
-          min="1"
-          value={passTimeMinutes}
-          onChange={(e) => setPassTimeMinutes(parseInt(e.target.value) || 1)}
-          style={{
-            width: '80px',
-            height: '40px',
-            padding: '0 8px',
-            fontSize: '14px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontFamily: 'monospace'
-          }}
-        />
-        <span>minutes</span>
-        <Button onClick={() => onSelectAction(action.type, passTimeMinutes, null)}>
-          Pass Time
-        </Button>
-      </div>
     );
   }
 
@@ -755,12 +727,8 @@ Don't include any other text or markdown formatting - we'll be calling JSON.pars
         <ActionSelector
           actions={game.availableActions}
           onSelectAction={(type, label, option) => {
-            // Handle Pass Time action (label is minutes)
-            if (type === 'Pass Time' && typeof label === 'number') {
-              handlePrompt(`${type}: ${label} minutes`);
-            }
             // Handle Buy/Craft actions with quantities (label is array of items)
-            else if ((type === 'Buy' || type === 'Craft') && Array.isArray(label)) {
+            if ((type === 'Buy' || type === 'Craft') && Array.isArray(label)) {
               const itemList = label.map(item => `${item.quantity}x ${item.label}`).join(', ');
               handlePrompt(`${type}: ${itemList}`);
             }

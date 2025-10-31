@@ -130,21 +130,12 @@ export const calculateAvailableActions = (game) => {
   // Find the nearest object within interaction distance
   const nearestObject = findNearestObject(game);
 
-  // Add always-available actions (Build, Plant, Investigate, Pass Time, Travel)
+  // Add always-available actions (Build, Plant, Investigate, Travel)
   // These show up even when not near specific elements
 
   // Investigate - always available when no nearby object
   if (game.enabledActions?.Investigate && !nearestObject) {
     alwaysAvailable.Investigate = [{
-      targetElement: null,
-      targetCollection: null,
-      actionData: {}
-    }];
-  }
-
-  // Pass Time - always available when no nearby object
-  if (game.enabledActions?.['Pass Time'] && !nearestObject) {
-    alwaysAvailable['Pass Time'] = [{
       targetElement: null,
       targetCollection: null,
       actionData: {}
@@ -275,6 +266,18 @@ export const calculateAvailableActions = (game) => {
             return;
           }
 
+          // Skip Harvest action on plants that are not mature yet
+          if (actionName === 'Harvest' && instance.collection === 'Plants') {
+            const plantDef = game.elements?.Plants?.[instance.element];
+            const matureTimeHours = plantDef?.matureTimeHours || 1;
+            const plantedAt = instance.plantedAt || 0;
+            const now = Date.now();
+            const hoursElapsed = (now - plantedAt) / (1000 * 60 * 60);
+            if (hoursElapsed < matureTimeHours) {
+              return;
+            }
+          }
+
           // Skip Attack action on dead animals
           if (actionName === 'Attack' && instance.collection === 'Animals' && instance.isDead) {
             return;
@@ -285,7 +288,40 @@ export const calculateAvailableActions = (game) => {
             return;
           }
 
-          if (actionName === 'Build' || actionName === 'Plant') return;
+          if (actionName === 'Build') return;
+
+          // Special handling for Plant action - show plantable items as submenu
+          if (actionName === 'Plant') {
+            // Get all plants that have Plant actions
+            const allPlants = game.elements?.Plants || {};
+            Object.entries(allPlants).forEach(([plantName, plantDef]) => {
+              if (plantDef?.actions?.Plant) {
+                const plantAction = plantDef.actions.Plant;
+                // Check if player has the required seeds/items to plant
+                const costItems = plantAction.costs?.Items || {};
+                const hasRequiredItems = true || Object.entries(costItems).every(([itemName, amount]) => {
+                  const available = inventory[itemName] || 0;
+                  return available >= amount;
+                });
+
+                if (hasRequiredItems) {
+                  if (!proximityBased.Plant) {
+                    proximityBased.Plant = [];
+                  }
+                  proximityBased.Plant.push({
+                    targetElement: plantName,
+                    targetCollection: "Plants",
+                    targetInstanceId: null,
+                    distance: 0, // Plant at player position
+                    actionData: plantAction,
+                    items: [plantName] // Pass the plant to be planted
+                  });
+                }
+              }
+            });
+            return; // Don't add the instance itself
+          }
+
           console.log(actionName, instance)
           // Special handling for Attack action on Animals - show weapons as submenu
           if (actionName === 'Attack' && instance.collection === 'Animals') {

@@ -1,4 +1,7 @@
 // Client-side action handlers for deterministic actions that don't require AI
+import { handleSleep as handleSleepAction } from './actions/Sleep';
+import { handlePlant as handlePlantAction } from './actions/Plant';
+import { handleBuild as handleBuildAction } from './actions/Build';
 
 /**
  * Gets the inventory object based on game's inventory mode
@@ -53,11 +56,20 @@ export function handleClientAction(game, actionType, action) {
       break;
 
     case 'Sleep':
-      result = handleSleep(game, action, location, activeLocation, activeCharacter);
+      result = handleSleepAction(game);
       break;
 
     case 'Craft':
       result = handleCraft(game, action, location, activeLocation, activeCharacter);
+      break;
+
+    case 'Plant':
+      console.log('[handleClientAction Plant]', { action, targetElement: action.targetElement });
+      result = handlePlantAction(game, action.targetElement);
+      break;
+
+    case 'Build':
+      result = handleBuildAction(game, action.targetElement, action.targetInstanceId);
       break;
 
     default:
@@ -308,94 +320,108 @@ function handleCraft(game, action, location, activeLocation, activeCharacter) {
   const inventory = getInventory(game);
   const inventoryPath = getInventoryPath(game);
 
+  // Check if costs are disabled (debug mode)
+  const disableCosts = typeof window !== 'undefined' && localStorage.getItem('debug-disable-costs') === 'true';
+
   // Check costs (Items and Stats)
-  const costItems = craftAction.cost?.Items || {};
-  const costStats = craftAction.cost?.Stats || {};
+  const costItems = craftAction.costs?.Items || {};
+  const costStats = craftAction.costs?.Stats || {};
 
-  // Validate Items
-  for (const [itemName, amount] of Object.entries(costItems)) {
-    const available = inventory[itemName] || 0;
-    if (available < amount) {
-      return {
-        success: false,
-        message: `Not enough ${itemName} (have ${available}, need ${amount})`,
-        updates: []
-      };
+  if (!disableCosts) {
+    // Validate Items
+    for (const [itemName, amount] of Object.entries(costItems)) {
+      const available = inventory[itemName] || 0;
+      if (available < amount) {
+        return {
+          success: false,
+          message: `Not enough ${itemName} (have ${available}, need ${amount})`,
+          updates: []
+        };
+      }
     }
-  }
 
-  // Validate Stats (like Energy)
-  for (const [statName, amount] of Object.entries(costStats)) {
-    const available = characterData.stats[statName] || 0;
-    if (available < amount) {
-      return {
-        success: false,
-        message: `Not enough ${statName} (have ${available}, need ${amount})`,
-        updates: []
-      };
+    // Validate Stats (like Energy)
+    for (const [statName, amount] of Object.entries(costStats)) {
+      const available = characterData.stats[statName] || 0;
+      if (available < amount) {
+        return {
+          success: false,
+          message: `Not enough ${statName} (have ${available}, need ${amount})`,
+          updates: []
+        };
+      }
     }
   }
 
   const updates = [];
 
-  // Deduct Items from inventory
-  Object.entries(costItems).forEach(([itemName, amount]) => {
-    const currentAmount = inventory[itemName] || 0;
-    updates.push({
-      type: 'set',
-      path: `${inventoryPath}.${itemName}`,
-      value: currentAmount - amount
+  if (!disableCosts) {
+    // Deduct Items from inventory
+    Object.entries(costItems).forEach(([itemName, amount]) => {
+      const currentAmount = inventory[itemName] || 0;
+      updates.push({
+        type: 'set',
+        path: `${inventoryPath}.${itemName}`,
+        value: currentAmount - amount
+      });
     });
-  });
 
-  // Deduct Stats from character
-  Object.entries(costStats).forEach(([statName, amount]) => {
-    const currentAmount = characterData.stats[statName] || 0;
-    updates.push({
-      type: 'set',
-      path: `instance.characters.${activeCharacter}.stats.${statName}`,
-      value: currentAmount - amount
+    // Deduct Stats from character
+    Object.entries(costStats).forEach(([statName, amount]) => {
+      const currentAmount = characterData.stats[statName] || 0;
+      updates.push({
+        type: 'set',
+        path: `instance.characters.${activeCharacter}.stats.${statName}`,
+        value: currentAmount - amount
+      });
     });
-  });
-
-  // Add output items to inventory
-  // If no explicit output, default to 1 of the item being crafted
-  let outputItems = craftAction.output?.Items || craftAction.output || {};
-  if (Object.keys(outputItems).length === 0) {
-    outputItems = { [targetElement]: 1 };
   }
 
-  Object.entries(outputItems).forEach(([itemName, amount]) => {
-    const currentAmount = inventory[itemName] || 0;
-    updates.push({
-      type: 'set',
-      path: `${inventoryPath}.${itemName}`,
-      value: currentAmount + amount
-    });
-  });
-
-  // Update time (if specified) and apply energy depletion
-  let hoursElapsed = 0;
-  if (craftAction.timeInHours) {
-    hoursElapsed = craftAction.timeInHours;
-    const timeUpdate = calculateTimeUpdate(game.instance.clock, hoursElapsed);
-    if (timeUpdate) {
-      updates.push(timeUpdate);
-    }
-  }
-
-  // Apply energy depletion for time elapsed
-  const energyUpdates = applyEnergyDepletion(game, hoursElapsed);
-  updates.push(...energyUpdates);
-
-  const itemsGainedText = Object.entries(outputItems)
-    .map(([item, qty]) => `${qty} ${item}`)
-    .join(', ');
+  // NOTE: Output items are NOT added here when using minigame (requiredScore exists)
+  // They will be added when minigame completes in GamePage.js onMinigameComplete
 
   return {
     success: true,
-    storyText: `${activeCharacter} crafts ${itemsGainedText}.`,
     updates
+  };
+}
+
+export function completeMinigameAction(game, actionType, targetElement, instanceId) {
+  const { activeLocation } = game.instance;
+  const updates = [];
+
+  // Add crafted item to inventory for Craft actions
+  if (actionType === 'Craft') {
+    const inventoryPath = game.useLocationBasedInventory
+      ? `instance.locations.${activeLocation}.inventory`
+      : 'instance.inventory';
+
+    const inventory = game.useLocationBasedInventory
+      ? game.instance.locations[activeLocation]?.inventory || {}
+      : game.instance.inventory || {};
+
+    const currentAmount = inventory[targetElement] || 0;
+    updates.push({
+      type: 'set',
+      path: `${inventoryPath}.${targetElement}`,
+      value: currentAmount + 1
+    });
+  }
+
+  // Generate message
+  let storyText;
+  if (actionType === 'Craft') {
+    storyText = `You crafted ${targetElement}.`;
+  } else if (actionType === 'Upgrade') {
+    storyText = `You upgraded the ${targetElement}.`;
+  } else {
+    storyText = `You built a ${targetElement}.`;
+  }
+
+  return {
+    success: true,
+    updates,
+    storyText
   };
 }
 
@@ -495,7 +521,7 @@ function handleEat(game, action, location, activeLocation, activeCharacter) {
 
   // Check if item is in inventory (from cost.Items)
   const inventory = getInventory(game);
-  const itemCost = eatAction.cost?.Items || {};
+  const itemCost = eatAction.costs?.Items || {};
   for (const [itemName, amount] of Object.entries(itemCost)) {
     const currentAmount = inventory[itemName] || 0;
     if (currentAmount < amount) {
@@ -553,78 +579,6 @@ function handleEat(game, action, location, activeLocation, activeCharacter) {
   };
 }
 
-function handleSleep(game, action, location, activeLocation, activeCharacter) {
-  const { targetElement, targetInstanceId } = action;
-  const instance = location.elementInstances[targetInstanceId];
-
-  if (!instance) {
-    return {
-      success: false,
-      message: `${targetElement} not found`,
-      updates: []
-    };
-  }
-
-  const elementDef = game.elements?.Buildings?.[targetElement];
-  const sleepAction = elementDef?.actions?.Sleep;
-
-  if (!sleepAction) {
-    return {
-      success: false,
-      message: `Cannot sleep in ${targetElement}`,
-      updates: []
-    };
-  }
-
-  const characterData = game.instance.characters[activeCharacter];
-  const updates = [];
-
-  // Restore stats (output.Stats)
-  const statsOutput = sleepAction.output?.Stats || {};
-  Object.entries(statsOutput).forEach(([statName, amount]) => {
-    const currentStatValue = characterData?.stats?.[statName] || 0;
-    const statDef = game.elements?.Stats?.[statName];
-    const maxAmount = statDef?.maxAmount || 10;
-
-    // Add the amount to current stat (don't just set it)
-    const newValue = Math.min(currentStatValue + amount, maxAmount);
-
-    updates.push({
-      type: 'set',
-      path: `instance.characters.${activeCharacter}.stats.${statName}`,
-      value: newValue
-    });
-  });
-
-  // Reset daily eating limit
-  updates.push({
-    type: 'set',
-    path: `instance.characters.${activeCharacter}.energyFromEatingSinceLastSlept`,
-    value: 0
-  });
-
-  // Update lastDaySlept
-  updates.push({
-    type: 'set',
-    path: `instance.characters.${activeCharacter}.lastDaySlept`,
-    value: game.instance.clock.day
-  });
-
-  // Add time progression
-  const timeInHours = sleepAction.timeInHours || 8;
-  const timeUpdate = calculateTimeUpdate(game.instance.clock, timeInHours);
-  if (timeUpdate) {
-    updates.push(timeUpdate);
-  }
-
-  const storyText = `You slept for ${timeInHours} hours and feel refreshed. You can eat again.`;
-
-  return {
-    success: true,
-    storyText,
-    updates
-  };
-}
 
 /**
  * Validates inventory has sufficient materials for an action
@@ -649,9 +603,9 @@ export function validateInventory(game, actionType, action) {
   const missingMoney = [];
 
   // Handle structured cost format {Items: {}, Stats: {}, money: X} or legacy flat format
-  const itemCosts = actionData.cost?.Items || (actionData.cost?.Stats || actionData.cost?.money ? {} : actionData.cost);
-  const statCosts = actionData.cost?.Stats || {};
-  const moneyCost = actionData.cost?.money;
+  const itemCosts = actionData.costs?.Items || (actionData.costs?.Stats || actionData.costs?.money ? {} : actionData.cost);
+  const statCosts = actionData.costs?.Stats || {};
+  const moneyCost = actionData.costs?.money;
 
   // Get inventory (universal or location-based)
   const inventory = game.useLocationBasedInventory
@@ -701,7 +655,7 @@ export function validateInventory(game, actionType, action) {
  * Returns true for Harvest, Forage, Eat, Sleep, Attack, Craft to enable instant client-side updates
  */
 export function canHandleClientSide(actionType) {
-  return actionType === 'Harvest' || actionType === 'Forage' || actionType === 'Eat' || actionType === 'Sleep' || actionType === 'Attack' || actionType === 'Craft';
+  return ['Harvest', 'Forage', 'Eat', 'Sleep', 'Attack', 'Craft', 'Plant', 'Build'].includes(actionType);
 }
 
 /**
